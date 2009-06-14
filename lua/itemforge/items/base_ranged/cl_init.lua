@@ -32,7 +32,7 @@ local cDefaultBar =Color(255,204,0,255);
 local cDefaultLow =Color(255,0,0,255);
 
 --Loads the given clip with the given item. Clientside it just sets the clip to the item no questions asked
-function ITEM:Load(clip,item)
+function ITEM:Load(item,clip)
 	self.Clip[clip]=item;
 	
 	return true;
@@ -46,7 +46,7 @@ function ITEM:Unload(clip)
 end
 
 --Clientside this does not take ammo; it's just so you can have TakeAmmo in a shared function without it generating errors clientside.
-function ITEM:TakeAmmo(clip,amt)
+function ITEM:TakeAmmo(amt,clip)
 	return true;
 end
 
@@ -81,7 +81,7 @@ end
 --If usable ammo is dragged here we ask the server to load it
 function ITEM:OnDragDropHere(otherItem)
 	for i=1,table.getn(self.Clips) do
-		if self:CanLoadClipWith(i,otherItem) then return self:SendNWCommand("PlayerLoadAmmo",otherItem); end
+		if self:CanLoadClipWith(otherItem,i) then return self:SendNWCommand("PlayerLoadAmmo",otherItem); end
 	end
 	return false;
 end
@@ -103,7 +103,7 @@ Draws an ammo meter whose top-left corner is at <x,y> and whose width/height is 
 This ammo meter "drains" from top to bottom.
 This function is intended for use in Draw2D but it probably works in any 2D drawing cycle
 iAmmo is how much ammo is in the clip.
-iMaxAmmo is the total amount of ammo that is in the clip.
+iMaxAmmo is the total ammo that can be stored in the clip.
 cBack is the color of the bar's background (the "empty" part of the bar).
 cBar is the color of the bar itself (the "full" part of the bar).
 cBarLow is the color of the bar when we're low on ammo.
@@ -140,7 +140,7 @@ function ITEM:DrawAmmoMeter(x,y,w,h,iAmmo,iMaxAmmo,cBack,cBar,cBarLow)
 	return true;
 end
 
-IF.Items:CreateNWCommand(ITEM,"Load",function(self,...) self:Load(...) end,{"int","item"});
+IF.Items:CreateNWCommand(ITEM,"Load",function(self,...) self:Load(...) end,{"item","int"});
 IF.Items:CreateNWCommand(ITEM,"Unload",function(self,...) self:Unload(...) end,{"int"});
 IF.Items:CreateNWCommand(ITEM,"PlayerFirePrimary",nil,{});
 IF.Items:CreateNWCommand(ITEM,"PlayerFireSecondary",nil,{});

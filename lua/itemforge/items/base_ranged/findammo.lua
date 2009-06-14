@@ -44,7 +44,7 @@ list.Add("Itemforge_BaseRanged_FindAmmo",function(self,clip)
 	if inv then
 		local items=inv:GetItems();
 		for k,v in pairs(items) do
-			if self:CanLoadClipWith(clip,i) then
+			if self:CanLoadClipWith(v,clip) then
 				return v;
 			end
 		end
@@ -63,7 +63,7 @@ list.Add("Itemforge_BaseRanged_FindAmmo",function(self,clip)
 	
 	for k,v in pairs(ents) do
 		local i=v:GetItem();
-		if i&&i:IsValid()&&self:CanLoadClipWith(clip,i) then
+		if i&&i:IsValid()&&self:CanLoadClipWith(i,clip) then
 			local tr={};
 			tr.start=pOwner:GetShootPos();
 			tr.endpos=tr.start+((v:LocalToWorld(v:OBBCenter())-tr.start):GetNormal()*64);
@@ -88,7 +88,7 @@ list.Add("Itemforge_BaseRanged_FindAmmo",function(self,clip)
 	
 	for k,v in pairs(ents) do
 		local i=v:GetItem();
-		if i&&i:IsValid()&&self:CanLoadClipWith(clip,i) then
+		if i&&i:IsValid()&&self:CanLoadClipWith(i,clip) then
 			local tr={};
 			tr.start=eEnt:LocalToWorld(eEnt:OBBCenter());
 			tr.endpos=tr.start+((v:LocalToWorld(v:OBBCenter())-tr.start):GetNormal()*64);

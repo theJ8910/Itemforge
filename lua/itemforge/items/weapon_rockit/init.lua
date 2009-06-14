@@ -46,18 +46,18 @@ end
 Overridden from base_ranged.
 When this function is called we load items into the gun's inventory instead of the clip.
 ]]--
-function ITEM:Load(clip,item,amt)
+function ITEM:Load(item,clip,amt)
 	if !self:CanReload() then return false end
 	
-	--Even though we don't use clips, the rock-it launcher does hvae a clip that says what items we can load. This is what it's good for.
-	if !self:CanLoadClipWith(1,item) then return false end
+	--Even though we don't use clips, the rock-it launcher does have a clip that says what items we can load. This is what it's good for.
+	if !self:CanLoadClipWith(item,1) then return false end
 	
 	--Can't load items into a non-existent inventory
 	local inv=self:GetInventory();
 	if !inv then return false end
 	
 	--If we don't insert the item successfully we fail.
-	if item:ToInv(inv) then return false end
+	if !item:ToInv(inv) then return false end
 	
 	self:ReloadEffects();
 	self:SetNextBoth(CurTime()+self:GetReloadDelay());

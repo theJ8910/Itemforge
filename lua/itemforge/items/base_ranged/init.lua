@@ -49,7 +49,7 @@ function ITEM:OnReload()
 		if !curAmmo || self.Clips[i].Size==0 || curAmmo:GetAmount()<self.Clips[i].Size then
 			local items=self:FindAmmo(i);
 			for k,v in pairs(items) do
-				if self:Load(i,v) then return true end
+				if self:Load(v,i) then return true end
 			end
 		end
 	end
@@ -64,17 +64,17 @@ amt is an optional amount indicating how many items from the stack to transfer.
 	If this is nil/not given, we'll try to load the whole stack (or we'll try to transfer as many as possible).
 Returns false if it couldn't be loaded for some reason, and true if it could.
 ]]--
-function ITEM:Load(clip,item,amt)
+function ITEM:Load(item,clip,amt)
 	if !self:CanReload() then return false end
 	
 	if !clip then
 		for i=1,table.getn(self.Clips) do
-			if self:Load(i,item,amt) then return true end
+			if self:Load(item,i,amt) then return true end
 		end
 		return false;
 	end
 	
-	if !self:CanLoadClipWith(clip,item) then return false end
+	if !self:CanLoadClipWith(item,clip) then return false end
 	
 	--Get currently loaded ammo, if any
 	local currentAmmo=self:GetAmmo(clip);
@@ -87,7 +87,7 @@ function ITEM:Load(clip,item,amt)
 			local i=item:Split(false,self.Clips[clip].Size);
 			if !i then return false end
 		
-			return self:Load(clip,i,amt);
+			return self:Load(i,clip,amt);
 		end
 	
 	--We're loading more ammo of the same type
@@ -114,7 +114,7 @@ function ITEM:Load(clip,item,amt)
 		item:SetMaxAmount(self.Clips[clip].Size);
 
 		self.Clip[clip]=item;
-		self:SendNWCommand("Load",nil,clip,item);
+		self:SendNWCommand("Load",nil,item,clip);
 	end
 	
 	self:ReloadEffects();
@@ -129,7 +129,7 @@ Consumes primary ammo; returns true if ammo was consumed, false otherwise
 One reason this could fail is if we're trying to take too much ammo.
 	For example, what if we have one shotgun shell and try to take two?
 ]]--
-function ITEM:TakeAmmo(clip,amt)
+function ITEM:TakeAmmo(amt,clip)
 	local ammo=self:GetAmmo(clip);
 	if !ammo then return false end
 	
@@ -152,7 +152,7 @@ function ITEM:Unload(clip)
 	ammo:SetMaxAmount(0);
 	
 	self.Clip[clip]=nil;
-	self:SendNWCommand("Unload",nil,clip,nil);
+	self:SendNWCommand("Unload",nil,clip);
 	
 	return true;
 end
@@ -163,7 +163,7 @@ Returns true if the ammo was loaded somewhere, false otherwise.
 ]]--
 function ITEM:PlayerLoadAmmo(pl,item)
 	if !self:CanPlayerInteract(pl) || !item:CanPlayerInteract(pl) then return false end
-	return self:Load(0,item);
+	return self:Load(item);
 end
 
 --[[
@@ -235,8 +235,8 @@ function ITEM:UpdateWireAmmoCount()
 	end
 end
 
-IF.Items:CreateNWCommand(ITEM,"Load",nil,{"int","item"});
-IF.Items:CreateNWCommand(ITEM,"Unload",nil,{"int","item"});
+IF.Items:CreateNWCommand(ITEM,"Load",nil,{"item","int"});
+IF.Items:CreateNWCommand(ITEM,"Unload",nil,{"int"});
 IF.Items:CreateNWCommand(ITEM,"PlayerFirePrimary",	function(self,...) self:OnPrimaryAttack(...)	end,{});
 IF.Items:CreateNWCommand(ITEM,"PlayerFireSecondary",function(self,...) self:OnSecondaryAttack(...)	end,{});
 IF.Items:CreateNWCommand(ITEM,"PlayerReload",		function(self,...) self:OnReload(...)			end,{});

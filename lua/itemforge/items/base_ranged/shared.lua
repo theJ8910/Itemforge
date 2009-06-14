@@ -131,7 +131,7 @@ function ITEM:OnPrimaryAttack()
 	end
 	
 	self:SetNextBoth(CurTime()+self:GetPrimaryDelay(),CurTime()+self:GetPrimaryDelayAuto());
-	self:TakeAmmo(self.PrimaryClip,self.PrimaryTakes);
+	self:TakeAmmo(self.PrimaryTakes,self.PrimaryClip);
 	self:PrimaryFireEffects();
 	
 	return true;
@@ -157,7 +157,7 @@ function ITEM:OnSecondaryAttack()
 	end
 	
 	self:SetNextBoth(CurTime()+self:GetSecondaryDelay(),CurTime()+self:GetSecondaryDelayAuto());
-	self:TakeAmmo(self.SecondaryClip,self.SecondaryTakes);
+	self:TakeAmmo(self.SecondaryTakes,self.SecondaryClip);
 	self:SecondaryFireEffects();
 	
 	return true;
@@ -166,12 +166,13 @@ end
 --[[
 If a player [USE]s this gun while holding some ammo (an item based off of base_ammo), we'll try to load this gun with it.
 If the gun is used clientside, we won't actually load the gun, we'll just return true to indiciate we want the server to load the gun.
+TODO check clips instead of checking for base_ammo
 ]]--
 function ITEM:OnUse(pl)
 	local wep=pl:GetActiveWeapon();
 	if wep:IsValid() then
 		local item=IF.Items:GetWeaponItem(wep);
-		if item && item:InheritsFrom("base_ammo") && (CLIENT || self:Load(0,item) ) then
+		if item && item:InheritsFrom("base_ammo") && (CLIENT || self:Load(item) ) then
 			return true;
 		end
 	end
@@ -315,7 +316,7 @@ Returns false if:
 	The item given is not the right type of ammo (for example, if we use "base_ammo", that means that "base_ammo" or anything that inherits from "base_ammo" works)
 Returns true otherwise.
 ]]--
-function ITEM:CanLoadClipWith(clip,item)
+function ITEM:CanLoadClipWith(item,clip)
 	--Don't bother loading if we don't use ammo in that clip or if it's the wrong type of ammo for that clip
 	if !self.Clips[clip] || !item || !item:IsValid() || !item:InheritsFrom(self.Clips[clip].Type) then return false end
 	
