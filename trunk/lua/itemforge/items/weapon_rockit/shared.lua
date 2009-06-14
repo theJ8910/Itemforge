@@ -129,6 +129,9 @@ function ITEM:Chuck(speed)
 		ent:SetOwner(eEnt);
 		
 		return true;
+	elseif self:InInventory() then
+		local inv=self:GetContainer();
+		item:ToInv(inv);
 	end
 	return false;
 end

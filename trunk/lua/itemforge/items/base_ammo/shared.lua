@@ -30,7 +30,7 @@ function ITEM:OnUse(pl)
 	local wep=pl:GetActiveWeapon();
 	if wep:IsValid() then
 		local item=IF.Items:GetWeaponItem(wep);
-		if item && item:InheritsFrom("base_ranged") && (CLIENT || item:Load(0,self) ) then
+		if item && item:InheritsFrom("base_ranged") && (CLIENT || item:Load(self) ) then
 			return true;
 		end
 	end
