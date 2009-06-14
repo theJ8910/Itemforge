@@ -7,6 +7,7 @@ The module loading is carried out here. Modules are loaded, then initialized. Af
 ]]--
 IF={};
 IF.Version=0.1;								--Itemforge Version. Your items can use this if you want.
+IF.Tag="itemforge_beta";					--Server Tag. Whenever a server is hosting Itemforge, this shows up next to the server's name in the "Tags" column of the Server Browser.
 IF.Modules={};
 
 --The following paths are relative to the lua/ folder.

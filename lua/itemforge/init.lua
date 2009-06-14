@@ -18,9 +18,10 @@ function IF:ServerInitialize()
 		self.Resources:AddCSLuaFiles(IF.SharedFolder);
 		self.Resources:AddCSLuaFiles(IF.ClientFolder);
 	end
-	local str=GetConVarString("sv_tags");
-	if !string.find(str,"itemforge") then
-		game.ConsoleCommand("sv_tags "..str..",itemforge\n");
+	
+	local cur=GetConVarString("sv_tags");
+	if !string.find(cur,self.Tag) then
+		game.ConsoleCommand("sv_tags "..cur..","..self.Tag.."\n");
 	end
 end
 
