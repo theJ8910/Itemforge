@@ -1,0 +1,6 @@
+theJ89: Well duh, I made the system
+Azui-Sleet:  His world model correction code eventually lead me to a final solution to the itemforge_item_held world model issues.
+Night-Eagle: Solved my problem with drawing a texture in a circle in the inventory.
+Josh: Suggested the use of networking macros (that pass minimal information)
+Random people that come into my server
+Other people I have forgot at the moment
