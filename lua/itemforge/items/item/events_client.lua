@@ -168,32 +168,18 @@ function ITEM:OnPopulateMenu(pMenu)
 		r="Itemforge Item";
 	end
 	
-	--Header code; this panel is the yellow background of the header
-	local p=vgui.Create("DPanel");
-	p:SetTall(20);
-	p.Paint=function(self)
-		surface.SetDrawColor(255,201,0,255);
-		surface.DrawRect(0,0,self:GetSize());
-		return true;
-	end
-	
-	--Header code; this panel is the black text on the header
-	local l=Label(r,p)
-	l:SetTextColor(Color(0,0,0,255));
-	l:SetContentAlignment(4);
-	l:SetTextInset(5);
-	l:SizeToContents();
-	l:SetPos(0,3);
-	
 	--Add header
-	pMenu:AddPanel(p);
+	local h=vgui.Create("ItemforgeMenuHeader");
+	h:SetText(r);
+	pMenu:AddPanel(h);
+	
+	--Add basic "Use" and "Hold" options
 	pMenu:AddOption("Use",function(panel) self:Use(LocalPlayer()) end);
 	pMenu:AddOption("Hold",function(panel) self:Hold(LocalPlayer()) end);
 	
+	--Add "Split" option; as long as there are enough items to split (at least 2)
 	if self:GetMaxAmount()!=1 && self:GetAmount()>1 then
-		--We can split stacks, as long as there are enough items to split (at least 2)
-		--TODO
-		pMenu:AddOption("Split",function(panel) end);
+		pMenu:AddOption("Split",function(panel) self:PlayerSplit(LocalPlayer()); end);
 	end
 end
 

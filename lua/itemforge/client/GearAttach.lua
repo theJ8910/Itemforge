@@ -122,9 +122,9 @@ The model is moved to the given attachment point on the player.
 	 |
 player should be a valid player.
 model should be a string corresponding to a model path.
-refBone should be the name of a bone in both the player's model and the given model.
+attachPoint should be the name of an attachment point on the player.
 
-True is returned if the model was created successfully using the given bone.
+True is returned if the model was created successfully using the given attachment point.
 False is returned if:
 	no valid player was given (or if something other than a player was given).
 	no model was given

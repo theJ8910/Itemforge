@@ -1078,6 +1078,7 @@ IF.Items:ProtectKey("ReceiveNWCommand");
 
 
 function ITEM:PlayerSendToInventory(player,inv,invSlot)
+	if !self:CanPlayerInteract(player) then return false end
 	if !inv || !inv:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't move "..tostring(self).." to inventory as requested by player "..tostring(player)..", inventory given was not valid!\n"); return false end
 	if invSlot==nil then ErrorNoHalt("Itemforge Items: Couldn't move "..tostring(self).." to inventory "..inv:GetID().." as requested by player "..tostring(player)..", no slot was given!\n"); return false end
 	
@@ -1089,14 +1090,22 @@ end
 IF.Items:ProtectKey("PlayerSendToInventory");
 
 function ITEM:PlayerSendToWorld(player,where)
+	if !self:CanPlayerInteract(player) then return false end
 	self:ToWorld(where);
 end
 IF.Items:ProtectKey("PlayerSendToWorld");
 
 function ITEM:PlayerMerge(player,otherItem)
+	if !self:CanPlayerInteract(player) then return false end
 	self:Merge(true,otherItem);
 end
 IF.Items:ProtectKey("PlayerMerge");
+
+function ITEM:PlayerSplit(player,amt)
+	if !self:CanPlayerInteract(player) then return false end
+	return self:Split(true,amt);
+end
+IF.Items:ProtectKey("PlayerSplit");
 
 --Place networked commands here in the same order as in cl_init.lua.
 IF.Items:CreateNWCommand(ITEM,"ToInventory",nil,{"inventory","short"});
@@ -1108,3 +1117,4 @@ IF.Items:CreateNWCommand(ITEM,"Hold",ITEM.Hold);
 IF.Items:CreateNWCommand(ITEM,"PlayerSendToInventory",ITEM.PlayerSendToInventory,{"inventory","short"});
 IF.Items:CreateNWCommand(ITEM,"PlayerSendToWorld",ITEM.PlayerSendToWorld,{"vector"});
 IF.Items:CreateNWCommand(ITEM,"PlayerMerge",ITEM.PlayerMerge,{"item"});
+IF.Items:CreateNWCommand(ITEM,"PlayerSplit",ITEM.PlayerSplit,{"int"});

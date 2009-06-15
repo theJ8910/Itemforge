@@ -209,6 +209,9 @@ end
 
 --Draw world model, hooks into item's Draw3D hook
 function SWEP:DrawWorldModelTranslucent()
+	if !self.WM then	self:ShowWorldModel();	end
+	if self.WM then		self.WM:Draw();			end
+	
 	local item=self:GetItem();
 	if !item then
 		item=self:AcquireItem();

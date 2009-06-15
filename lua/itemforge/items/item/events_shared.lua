@@ -39,14 +39,19 @@ This function double checks that the player is ALLOWED to do this at the moment.
 Otherwise, the player could load ammo half-way across the map, or use items in a locked inventory.
 ]]--
 function ITEM:CanPlayerInteract(pl)
-	--The player can't interact with private items he doesn't own
-	if SERVER && !self:CanSendItemData(pl) then return false end
+	--An item must be public or in a private inventory owned by this player to be interacted with.
+	--Also, if a player is interacting with something clientside, we expect him to be the local player.
+	if SERVER then	if !self:CanSendItemData(pl) then return false end
+	else			if pl!=LocalPlayer() then return false end
+	end
 	
 	--And the player must be nearby the item in order to interact with it
 	local pos=self:GetPos();
 	local postype=type(pos);
 	if postype=="Vector" then
 		if pos:Distance(pl:GetPos())<=256 then return true end
+	
+	--If we're in several locations we have to be nearby at least one.
 	elseif postype=="table" then
 		for k,v in pairs(pos) do
 			if v:Distance(pl:GetPos())<=256 then return true end
