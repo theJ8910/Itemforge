@@ -5,6 +5,15 @@ SHARED
 This module implements items. The purpose of this module is to load item types, keep track of created items and item types,
 handle inheritence between item types, handle networking of items between client and server, and much, much more.
 
+THINGS FOR TODAY:
+Rename Hold to PlayerHold, Use to PlayerUse, add "CanPlayerInteract" checks to all such commands serverside/clientside?
+Investigate broken inventory merge (and ToInventory partial stack split)
+Isolate Amount and Weight oriented functions in their own files if possible.
+Add/Subtract amount functions.
+LoopingSound function
+Partially empty clips count as empty clips for ranged weapon menu.
+Shotgun reload loop.
+
 theJ89's Giant TODO list
 This is why the system hasn't been released yet:
 

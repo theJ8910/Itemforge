@@ -58,7 +58,10 @@ function PANEL:PerformLayout()
 	local sw=math.floor((self:GetWide()+self.SlotPaddingX-self.ScrollbarWidth)/slotOccWidth);
 	local sh=math.floor((self:GetTall()+self.SlotPaddingY)/slotOccHeight);
 	
-	--If the number of slots that can be displayed has changed from what it currently is, we remove any existing slots and make new ones. We check because that way this panel can be resized as much as necessary without needlessly removing/creating slots each time
+	--[[
+	If the number of slots that can be displayed has changed from what it currently is, we remove any existing slots and make new ones.
+	We check because that way this panel can be resized as much as necessary without needlessly removing/creating slots each time
+	]]--
 	if sw~=self.SlotsWide or sh~=self.SlotsHigh then
 		self.SlotsWide=sw;
 		self.SlotsHigh=sh;

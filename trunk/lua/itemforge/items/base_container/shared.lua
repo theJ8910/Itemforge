@@ -41,12 +41,8 @@ end
 
 --Automatically take items that touch the container
 function ITEM:OnStartTouch(ent,activator)
-	if activator:GetClass()=="itemforge_item" then
-		local touchItem=activator:GetItem();
-		if touchItem && touchItem:IsValid() then
-			if self.Inventory && self.Inventory:IsValid() then touchItem:ToInventory(self.Inventory); end
-		end
-	end
+	local touchItem=IF.Items:GetEntItem(activator);
+	if touchItem && self.Inventory && self.Inventory:IsValid() then touchItem:ToInventory(self.Inventory); end
 end
 
 --Show the container's inventory to whoever used it

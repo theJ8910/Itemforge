@@ -118,5 +118,5 @@ function ITEM:ReturnPassword(pl,reqid,string)
 end
 
 IF.Items:CreateNWCommand(ITEM,"AskForPassword",nil,{"short","string"});
-IF.Items:CreateNWCommand(ITEM,"ReturnPassword",ITEM.ReturnPassword,{"short","string"});
+IF.Items:CreateNWCommand(ITEM,"ReturnPassword",function(self,...) self:ReturnPassword(...) end,{"short","string"});
 IF.Items:CreateNWCommand(ITEM,"SetPassword",ITEM.SetPassword);

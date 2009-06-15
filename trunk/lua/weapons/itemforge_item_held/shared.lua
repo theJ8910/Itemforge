@@ -100,9 +100,6 @@ end
 
 --Reroute to item's OnLeftMouse
 function SWEP:PrimaryAttack()
-	--DEBUG
-	Msg("Itemforge Item Weapon: PRIMARY ATTACK\n");
-	
 	local item=self:GetItem();
 	if !item then return false; end
 	
@@ -113,8 +110,6 @@ end
 
 --Reroute to item's OnRightMouse
 function SWEP:SecondaryAttack()
-	--DEBUG
-	Msg("Itemforge Item Weapon: SECONDARY ATTACK\n");
 	local item=self:GetItem();
 	if !item then return false; end
 	

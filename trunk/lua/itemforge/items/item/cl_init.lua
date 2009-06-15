@@ -238,7 +238,7 @@ IF.Items:ProtectKey("ShowMenu");
 
 --[[
 Removes the menu if it is open.
-Returns true if the menu was opened and was closed,
+Returns true if the menu was open and was closed,
 or false if there wasn't a menu open.
 ]]--
 function ITEM:KillMenu()
@@ -250,6 +250,114 @@ function ITEM:KillMenu()
 	return true;
 end
 IF.Items:ProtectKey("KillMenu");
+
+function ITEM:PlayerSplit(pl)
+	if !self:CanPlayerInteract(pl) then return false end
+	
+	--Can't split 1 item
+	local amt=self:GetAmount();
+	if amt==1 then return false end
+	
+	local s,r=pcall(self.GetName,self);
+	if !s then ErrorNoHalt(r.."\n"); r="Itemforge Item" end
+	
+	local Window = vgui.Create("DFrame");
+		Window:SetTitle("Split "..r);
+		Window:SetDraggable(false);
+		Window:ShowCloseButton(false);
+		Window:SetBackgroundBlur(true);
+		Window:SetDrawOnTop(true);
+	
+	--The inner pannel contains the following controls:
+	local InnerPanel=vgui.Create("DPanel",Window);
+		InnerPanel:SetPos(0,25);
+		
+		--Instructions for how to use this window.
+		local Text=Label("Drag the slider to choose how even the split is:",InnerPanel);
+			Text:SizeToContents();
+			Text:SetWide(Text:GetWide()+100);
+			Text:SetContentAlignment(5);
+			Text:SetTextColor(Color(255,255,255,255));
+			Text:SetPos(0,5);
+		
+		--Text that displays a fraction like "50/50" or "25/75" that says how "even" the split is
+		local Fraction = Label("",InnerPanel);
+			Fraction:SizeToContents();
+			Fraction:SetContentAlignment(5);
+			Fraction:SetPos(0,Text:GetTall()+5)
+			Fraction:SetWide(Text:GetWide());		
+		
+		--Text that displays the number of items that will stay in the original stack
+		local Value1 = Label("",InnerPanel);
+			Value1:SetFont("ItemforgeInventoryFontBold");
+			Value1:SetTextColor(Color(255,255,0,255));
+			Value1:SetContentAlignment(6);
+			Value1:SetPos(0,Text:GetTall()+Fraction:GetTall()+10)
+			Value1:SetWide(50);
+		
+		--Text that displays the number of items that will be split off into the new stack
+		local Value2 = Label("",InnerPanel);
+			Value2:SetFont("ItemforgeInventoryFontBold");
+			Value2:SetTextColor(Color(255,255,0,255));
+			Value2:SetContentAlignment(4);
+			Value2:SetPos(0,Text:GetTall()+Fraction:GetTall()+10)
+			Value2:SetWide(50);
+		
+		--Slider that controls how many items will be split.
+		local Slider = vgui.Create("DSlider",InnerPanel);
+			Slider:SetTrapInside(true);
+			Slider:SetImage("vgui/slider");
+			Slider:SetLockY(0.5);
+			Slider:SetSize(Text:GetWide()-100,13);
+			Slider:SetPos(0,Text:GetTall()+Fraction:GetTall()+15)
+			Derma_Hook(Slider,"Paint","Paint","NumSlider");
+			--Whenever the slider is moved, the Fraction and Stack Numbers will be updated with the correct numbers.
+			Slider.TranslateValues=function(self,x,y)
+				local firstHalf=math.ceil(amt*x);
+				local secondHalf=amt-firstHalf;
+				local firstFrac=math.ceil(x*100);
+				local secondFrac=100-firstFrac;
+				
+				Fraction:SetText(firstFrac.."/"..secondFrac);
+				Value1:SetText(firstHalf);
+				Value2:SetText(secondHalf);
+				return x,y;
+			end
+			
+	local ButtonPanel = vgui.Create( "DPanel", Window )
+		local Button=vgui.Create("DButton",ButtonPanel)
+			Button:SetText("OK");
+			Button:SizeToContents();
+			Button:SetSize(Button:GetWide()+20,20);		--Make the button a little wider than it's text
+			Button:SetPos(5,5)
+			Button.DoClick = function(panel) Window:Close(); self:SendNWCommand("PlayerSplit",amt-math.ceil(amt*Slider:GetSlideX())) end
+		local Button2=vgui.Create("DButton",ButtonPanel)
+			Button2:SetText("Cancel");
+			Button2:SizeToContents();
+			Button2:SetSize(Button2:GetWide()+20,20);	--Make the button a little wider than it's text
+			Button2:SetPos(10+Button:GetWide(),5);
+			Button2.DoClick = function(panel) Window:Close(); end
+		ButtonPanel:SetSize(Button:GetWide()+Button2:GetWide()+15,30);
+		
+	InnerPanel:SetSize(Text:GetWide(),Text:GetTall()+Fraction:GetTall()+Slider:GetTall()+20)
+	
+	Slider:CenterHorizontal();
+	Slider:TranslateValues(0.5,0.5);
+	Value1:MoveLeftOf(Slider);
+	Value2:MoveRightOf(Slider);
+	
+	Window:SetSize(InnerPanel:GetWide()+10,InnerPanel:GetTall()+ButtonPanel:GetTall()+38);
+	Window:Center();
+	
+	InnerPanel:CenterHorizontal();
+	
+	ButtonPanel:CenterHorizontal();
+	ButtonPanel:AlignBottom(8);
+	
+	Window:MakePopup();
+	Window:DoModal();
+end
+IF.Items:ProtectKey("PlayerSplit");
 
 --[[
 Sends a networked command by name with the supplied arguments
@@ -404,3 +512,4 @@ IF.Items:CreateNWCommand(ITEM,"Hold");
 IF.Items:CreateNWCommand(ITEM,"PlayerSendToInventory",nil,{"inventory","short"});
 IF.Items:CreateNWCommand(ITEM,"PlayerSendToWorld",nil,{"vector"});
 IF.Items:CreateNWCommand(ITEM,"PlayerMerge",nil,{"item"});
+IF.Items:CreateNWCommand(ITEM,"PlayerSplit",nil,{"int"});

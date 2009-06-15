@@ -202,10 +202,10 @@ else
 
 
 function ITEM:OnPopulateMenu(pMenu)
+	self["item"].OnPopulateMenu(self,pMenu);
 	if self:GetAttachedEnt()!=nil && self:InWorld() then
 		pMenu:AddOption("Detach",function(panel) self:SendNWCommand("WorldDetach") end);
 	end
-	self["item"].OnPopulateMenu(self,pMenu);
 end
 
 

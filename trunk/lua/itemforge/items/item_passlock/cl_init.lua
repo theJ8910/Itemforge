@@ -85,6 +85,6 @@ function ITEM:AskForPassword(reqid,strQuestion)
 	Derma_StringRequest("Password Lock",strQuestion,"",function(str) self:SendNWCommand("ReturnPassword",reqid,str) end,nil,"OK","Cancel");
 end
 
-IF.Items:CreateNWCommand(ITEM,"AskForPassword",ITEM.AskForPassword,{"short","string"});
+IF.Items:CreateNWCommand(ITEM,"AskForPassword",function(self,...) self:AskForPassword(...) end,{"short","string"});
 IF.Items:CreateNWCommand(ITEM,"ReturnPassword",nil,{"short","string"});
 IF.Items:CreateNWCommand(ITEM,"SetPassword");
