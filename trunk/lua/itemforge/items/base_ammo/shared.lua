@@ -39,3 +39,29 @@ function ITEM:OnUse(pl)
 	return self["item"].OnUse(self,pl);
 end
 
+if CLIENT then
+
+
+
+
+--[[
+If the player has a base_ranged weapon out, we'll give him the option to load his weapon with this ammo
+]]--
+function ITEM:OnPopulateMenu(pMenu)
+	self["item"].OnPopulateMenu(self,pMenu);
+	
+	--TODO more than one clip
+	local wep=LocalPlayer():GetActiveWeapon();
+	if wep:IsValid() then
+		local item=IF.Items:GetWeaponItem(wep);
+		if item && item:InheritsFrom("base_ranged") && item:CanLoadClipWith(self,1) then
+			pMenu:AddOption("Load into "..item:GetName(),function(panel) return item:SendNWCommand("PlayerLoadAmmo",self); end);
+		end
+	end
+end
+
+
+
+
+end
+

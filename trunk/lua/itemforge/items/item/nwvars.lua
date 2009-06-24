@@ -48,13 +48,15 @@ You can also override networked vars inherited from other item types. For exampl
 ]]--
 
 --Don't modify/override these. They're either set automatically, don't need to be changed, or are listed here so I can keep track of them.
-ITEM.NWVars=nil;			--Networked vars stored here, both clientside and serverside.
-ITEM.NWVarsByName=nil;		--List of Networked vars in this item (key is name, value is id). When a networked var is set serverside (with ITEM:SetNetworked*), it's updated clientside. If a networked var is set clientside, it's not updated serverside (to prevent exploits and to allow the clients to set their own values to account for lag between server updates)
-ITEM.NWVarsByID=nil;		--List of Networked vars in this item (key is id, value is name). When a networked var is set serverside (with ITEM:SetNetworked*), it's updated clientside. If a networked var is set clientside, it's not updated serverside (to prevent exploits and to allow the clients to set their own values to account for lag between server updates)
+ITEM.NWVarsByName=nil;		--List of Networked vars in this itemtype (key is name, value is id).
+ITEM.NWVarsByID=nil;		--List of Networked vars in this itemtype (key is id, value is name).
+ITEM.NWVars=nil;			--The current value for networked vars set on this particular item are stored here, both clientside and serverside.
+ITEM.NWVarsLastTick=nil;	--Last time the server ticked, the predicted networked vars had these values.
+
 
 
 --[[
-Default Networked Vars - ITEM, NameOfVar, Datatype, DefaultValue
+Default Networked Vars - ITEM, NameOfVar, Datatype, DefaultValue (optional), IsPredicted (optional), HoldFromUpdate (optional)
 ]]--
 --Weight is how much an item weighs, in kg. This affects how much weight an item fills in an inventory with a weight cap, not the physics weight when the item is on the ground.
 IF.Items:CreateNWVar(ITEM,"Weight","int",function(self) return self.Weight end);
@@ -62,7 +64,7 @@ IF.Items:CreateNWVar(ITEM,"Weight","int",function(self) return self.Weight end);
 --Size is a measure of how much space an item takes up (think volume, not weight). Inventories can be set up to reject items that are too big.
 IF.Items:CreateNWVar(ITEM,"Size","int",function(self) return self.Size end);
 
---What condition is this item in? This refers to the 'top' item in a stack.
+--What condition is this item in? If the item is actually a stack of items, the 'top' item is in this condition.
 IF.Items:CreateNWVar(ITEM,"Health","int",function(self) return self:GetMaxHealth() end);
 
 --How durable is the item (how many hit points total does it have)? Higher values mean the item is more durable.
@@ -79,7 +81,7 @@ IF.Items:CreateNWVar(ITEM,"Color","color",function(self) return self.Color end);
 
 --[[
 How many items are in this stack?
-Items with amounts greater than 1 are called stacks.
+Items with max amounts other than 1 are called stacks.
 This doesn't actually create copies of the item, it just "says" there are 100.
 The total weight of the stack is calculated by doing (amount * individual item weight)
 Whenever an item's health reaches 0, item amounts are subtracted (usually by 1, but possibly more if the damage is great enough).
@@ -94,7 +96,7 @@ IF.Items:CreateNWVar(ITEM,"MaxAmount","int",function(self)
 													return self.MaxAmount
 												end);
 --Set a networked angle on this item
-function ITEM:SetNWAngle(sName,aAng,pl)
+function ITEM:SetNWAngle(sName,aAng,bSuppress)
 	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked angle on "..tostring(self)..". sName wasn't given!\n"); return false end
 	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
 	if self.NWVarsByName[sName].Type!=7 then ErrorNoHalt("Itemforge Items: Couldn't set networked angle on "..tostring(self)..". "..sName.." is not a networked angle.\n"); return false end
@@ -102,27 +104,8 @@ function ITEM:SetNWAngle(sName,aAng,pl)
 	
 	local upd=self:SetNWVar(sName,aAng);
 	
-	if SERVER && pl!=false && (upd||pl!=nil) then
-		local function nwv(p)
-			if aAng==nil then									--Set to nil clientside
-				IF.Items:IFIStart(p,IFI_MSG_SETNIL,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-			else
-				IF.Items:IFIStart(p,IFI_MSG_SETANGLE,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIAngle(aAng);
-			end
-			IF.Items:IFIEnd();
-		end
-		
-		local owner=self:GetOwner();
-		if pl==nil && owner==nil then
-			for k,v in pairs(player.GetAll()) do
-				nwv(v);
-			end
-		else
-			nwv(pl or owner);
-		end
+	if SERVER && upd && !bSuppress && !self.NWVarsByName[sName].Predicted  then
+		self:SendNWVar(sName);
 	end
 	
 	return true;
@@ -130,7 +113,7 @@ end
 IF.Items:ProtectKey("SetNWAngle");
 
 --Set a networked bool on this item
-function ITEM:SetNWBool(sName,bBool,pl)
+function ITEM:SetNWBool(sName,bBool,bSuppress)
 	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked bool on "..tostring(self)..". sName wasn't given!\n"); return false end
 	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
 	if self.NWVarsByName[sName].Type!=3 then ErrorNoHalt("Itemforge Items: Couldn't set networked bool on "..tostring(self)..". "..sName.." is not a networked bool.\n"); return false end
@@ -138,27 +121,8 @@ function ITEM:SetNWBool(sName,bBool,pl)
 	
 	local upd=self:SetNWVar(sName,bBool);
 	
-	if SERVER && pl!=false && (upd||pl) then
-		local function nwv(p)
-			if bBool==nil then									--Set to nil clientside
-				IF.Items:IFIStart(p,IFI_MSG_SETNIL,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-			else
-				IF.Items:IFIStart(p,IFI_MSG_SETBOOL,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIBool(bBool);
-			end
-			IF.Items:IFIEnd();
-		end
-		
-		local owner=self:GetOwner();
-		if pl==nil && owner==nil then
-			for k,v in pairs(player.GetAll()) do
-				nwv(v);
-			end
-		else
-			nwv(pl or owner);
-		end
+	if SERVER && upd && !bSuppress && !self.NWVarsByName[sName].Predicted  then
+		self:SendNWVar(sName);
 	end
 	
 	return true;
@@ -166,7 +130,7 @@ end
 IF.Items:ProtectKey("SetNWBool");
 
 --Set a networked entity on this item
-function ITEM:SetNWEntity(sName,cEnt,pl)
+function ITEM:SetNWEntity(sName,cEnt,bSuppress)
 	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked entity on "..tostring(self)..". sName wasn't given!\n"); return false end
 	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
 	if self.NWVarsByName[sName].Type!=5 then ErrorNoHalt("Itemforge Items: Couldn't set networked entity on "..tostring(self)..". "..sName.." is not a networked entity.\n"); return false end
@@ -174,23 +138,8 @@ function ITEM:SetNWEntity(sName,cEnt,pl)
 	
 	local upd=self:SetNWVar(sName,cEnt);
 	
-	if SERVER && pl!=false && (upd||pl) then
-		local function nwv(p)
-			if cEnt==nil then									--Set to nil clientside
-				IF.Items:IFIStart(p,IFI_MSG_SETNIL,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-			else
-				IF.Items:IFIStart(p,IFI_MSG_SETENTITY,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIEntity(cEnt);
-			end
-			IF.Items:IFIEnd();
-		end
-		
-		local owner=self:GetOwner();
-		if pl==nil && owner==nil then	for k,v in pairs(player.GetAll()) do nwv(v); end
-		else							nwv(pl or owner);
-		end
+	if SERVER && upd && !bSuppress && !self.NWVarsByName[sName].Predicted  then
+		self:SendNWVar(sName);
 	end
 	
 	return true;
@@ -198,7 +147,7 @@ end
 IF.Items:ProtectKey("SetNWEntity");
 
 --Set a networked float on this item
-function ITEM:SetNWFloat(sName,fFloat,pl)
+function ITEM:SetNWFloat(sName,fFloat,bSuppress)
 	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked float on "..tostring(self)..". sName wasn't given!\n"); return false end
 	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
 	if self.NWVarsByName[sName].Type!=2 then ErrorNoHalt("Itemforge Items: Couldn't set networked float on "..tostring(self)..". "..sName.." is not a networked float.\n"); return false end
@@ -206,23 +155,8 @@ function ITEM:SetNWFloat(sName,fFloat,pl)
 	
 	local upd=self:SetNWVar(sName,fFloat);
 	
-	if SERVER && pl!=false && (upd||pl) then
-		local function nwv(p)
-			if fFloat==nil then									--Set to nil clientside
-				IF.Items:IFIStart(p,IFI_MSG_SETNIL,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-			else
-				IF.Items:IFIStart(p,IFI_MSG_SETFLOAT,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIFloat(fFloat);
-			end
-			IF.Items:IFIEnd();
-		end
-		
-		local owner=self:GetOwner();
-		if pl==nil && owner==nil then	for k,v in pairs(player.GetAll()) do nwv(v); end
-		else							nwv(pl or owner);
-		end
+	if SERVER && upd && !bSuppress && !self.NWVarsByName[sName].Predicted  then
+		self:SendNWVar(sName);
 	end
 	
 	return true;
@@ -234,7 +168,7 @@ Set a networked integer on this item. The right type of data to send (char, ucha
 We opt to use the smallest datatypes possible.
 If run on the server, and the number given is too large to be sent (even larger than an unsigned int) the number will be set to 0, both serverside and clientside.
 ]]--
-function ITEM:SetNWInt(sName,iInt,pl)
+function ITEM:SetNWInt(sName,iInt,bSuppress)
 	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked integer on "..tostring(self)..". sName wasn't given!\n"); return false end
 	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
 	if self.NWVarsByName[sName].Type!=1 then ErrorNoHalt("Itemforge Items: Couldn't set networked int on "..tostring(self)..". "..sName.." is not a networked int.\n"); return false end
@@ -248,52 +182,8 @@ function ITEM:SetNWInt(sName,iInt,pl)
 	
 	local upd=self:SetNWVar(sName,iInt);
 	
-	if SERVER && pl!=false && (upd||pl) then
-		local function nwv(p)
-			if iInt==nil then									--Set to nil clientside
-				IF.Items:IFIStart(p,IFI_MSG_SETNIL,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-			elseif iInt>=-128 && iInt<=127 then					--Send as a char
-				IF.Items:IFIStart(p,IFI_MSG_SETCHAR,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIChar(iInt);
-			elseif iInt>=0 && iInt<=255 then					--Send as an unsigned char
-				IF.Items:IFIStart(p,IFI_MSG_SETUCHAR,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIChar(iInt-128);
-			elseif iInt>=-32768 && iInt<=32767 then				--Send as a short
-				IF.Items:IFIStart(p,IFI_MSG_SETSHORT,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIShort(iInt);
-			elseif iInt>=0 && iInt<=65535 then					--Send as an unsigned short
-				IF.Items:IFIStart(p,IFI_MSG_SETUSHORT,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIShort(iInt-32768);
-			elseif iInt>=-2147483648 && iInt<=2147483647 then	--Send as a long
-				IF.Items:IFIStart(p,IFI_MSG_SETLONG,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFILong(iInt);
-			elseif iInt>=0 && iInt<=4294967295 then				--Send as an unsigned long
-				IF.Items:IFIStart(p,IFI_MSG_SETULONG,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFILong(iInt-2147483648);
-			else
-				--TODO better error handling here
-				ErrorNoHalt("Itemforge Items: Error - Trying to set NWVar "..sName.." on "..tostring(self).." failed - number '"..iInt.."' is too big to be sent!\n");
-				
-				--It's an invalid number to send
-				self:SetNWVar(sName,0);
-				IF.Items:IFIStart(p,IFI_MSG_SETCHAR,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIChar(0);
-			end
-			IF.Items:IFIEnd();
-		end
-		
-		local owner=self:GetOwner();
-		if pl==nil && owner==nil then	for k,v in pairs(player.GetAll()) do nwv(v); end
-		else							nwv(pl or owner);
-		end
+	if SERVER && upd && !bSuppress && !self.NWVarsByName[sName].Predicted  then
+		self:SendNWVar(sName);
 	end
 	
 	return true;
@@ -301,7 +191,7 @@ end
 IF.Items:ProtectKey("SetNWInt");
 
 --Set a networked string on this item
-function ITEM:SetNWString(sName,sString,pl)
+function ITEM:SetNWString(sName,sString,bSuppress)
 	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked string on "..tostring(self)..". sName wasn't given!\n"); return false end
 	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
 	if self.NWVarsByName[sName].Type!=4 then ErrorNoHalt("Itemforge Items: Couldn't set networked string on "..tostring(self)..". "..sName.." is not a networked string.\n"); return false end
@@ -309,23 +199,8 @@ function ITEM:SetNWString(sName,sString,pl)
 	
 	local upd=self:SetNWVar(sName,sString);
 	
-	if SERVER && pl!=false && (upd||pl) then
-		local function nwv(p)
-			if sString==nil then									--Set to nil clientside
-				IF.Items:IFIStart(p,IFI_MSG_SETNIL,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-			else
-				IF.Items:IFIStart(p,IFI_MSG_SETSTRING,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIString(sString);
-			end
-			IF.Items:IFIEnd();
-		end
-		
-		local owner=self:GetOwner();
-		if pl==nil && owner==nil then	for k,v in pairs(player.GetAll()) do nwv(v); end
-		else							nwv(pl or owner);
-		end
+	if SERVER && upd && !bSuppress && !self.NWVarsByName[sName].Predicted  then
+		self:SendNWVar(sName);
 	end
 	
 	return true;
@@ -333,7 +208,7 @@ end
 IF.Items:ProtectKey("SetNWString");
 
 --Set a networked vector on this item
-function ITEM:SetNWVector(sName,vVec,pl)
+function ITEM:SetNWVector(sName,vVec,bSuppress)
 	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked vector on "..tostring(self)..". sName wasn't given!\n"); return false end
 	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
 	if self.NWVarsByName[sName].Type!=6 then ErrorNoHalt("Itemforge Items: Couldn't set networked vector on "..tostring(self)..". "..sName.." is not a networked vector.\n"); return false end
@@ -341,23 +216,8 @@ function ITEM:SetNWVector(sName,vVec,pl)
 	
 	local upd=self:SetNWVar(sName,vVec);
 	
-	if SERVER && pl!=false && (upd||pl) then
-		local function nwv(p)
-			if vVec==nil then									--Set to nil clientside
-				IF.Items:IFIStart(p,IFI_MSG_SETNIL,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-			else
-				IF.Items:IFIStart(p,IFI_MSG_SETVECTOR,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIVector(vVec);
-			end
-			IF.Items:IFIEnd();
-		end
-		
-		local owner=self:GetOwner();
-		if pl==nil && owner==nil then	for k,v in pairs(player.GetAll()) do nwv(v); end
-		else							nwv(pl or owner);
-		end
+	if SERVER && upd && !bSuppress && !self.NWVarsByName[sName].Predicted  then
+		self:SendNWVar(sName);
 	end
 	
 	return true;
@@ -365,31 +225,23 @@ end
 IF.Items:ProtectKey("SetNWVector");
 
 --Set a networked item on this item
-function ITEM:SetNWItem(sName,cItem,pl)
+function ITEM:SetNWItem(sName,cItem,bSuppress)
 	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked item on "..tostring(self)..". sName wasn't given!\n"); return false end
 	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name \""..sName.."\" on "..tostring(self)..".\n"); return false end
 	if self.NWVarsByName[sName].Type!=8 then ErrorNoHalt("Itemforge Items: Couldn't set networked item on "..tostring(self)..". \""..sName.."\" is not a networked item.\n"); return false end
-	if cItem!=nil && type(cItem)!="table" then ErrorNoHalt("Itemforge Items: Couldn't set networked item on "..tostring(self)..". Given value was a \""..type(cItem).."\", not an item!\n"); return false end
+	if cItem!=nil then
+		if type(cItem)!="table" then
+			ErrorNoHalt("Itemforge Items: Couldn't set networked item on "..tostring(self)..". Given value was a \""..type(cItem).."\", not an item!\n");
+			return false;
+		elseif !cItem:IsValid() then
+			cItem=nil;
+		end
+	end
 	
 	local upd=self:SetNWVar(sName,cItem);
 	
-	if SERVER && pl!=false && (upd||pl) then
-		local function nwv(p)
-			if cItem==nil then									--Set to nil clientside
-				IF.Items:IFIStart(p,IFI_MSG_SETNIL,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-			else
-				IF.Items:IFIStart(p,IFI_MSG_SETITEM,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIShort(cItem:GetID()-32768);
-			end
-			IF.Items:IFIEnd();
-		end
-		
-		local owner=self:GetOwner();
-		if pl==nil && owner==nil then	for k,v in pairs(player.GetAll()) do nwv(v); end
-		else nwv(pl or owner);
-		end
+	if SERVER && upd && !bSuppress && !self.NWVarsByName[sName].Predicted  then
+		self:SendNWVar(sName);
 	end
 	
 	return true;
@@ -397,31 +249,23 @@ end
 IF.Items:ProtectKey("SetNWItem");
 
 --Set a networked inventory on this item
-function ITEM:SetNWInventory(sName,cInv,pl)
+function ITEM:SetNWInventory(sName,cInv,bSuppress)
 	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked inventory on "..tostring(self)..". sName wasn't given!\n"); return false end
 	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
 	if self.NWVarsByName[sName].Type!=9 then ErrorNoHalt("Itemforge Items: Couldn't set networked inventory on "..tostring(self)..". "..sName.." is not a networked inventory.\n"); return false end
-	if cInv!=nil && type(cInv)!="table" then ErrorNoHalt("Itemforge Items: Couldn't set networked inventory on "..tostring(self)..". Given value was a \""..type(cInv).."\", not an inventory!\n"); return false end
+	if cInv!=nil then
+		if type(cInv)!="table" then
+			ErrorNoHalt("Itemforge Items: Couldn't set networked inventory on "..tostring(self)..". Given value was a \""..type(cInv).."\", not an inventory!\n");
+			return false;
+		elseif !cInv:IsValid() then
+			cInv=nil;
+		end
+	end
 	
 	local upd=self:SetNWVar(sName,cInv);
 	
-	if SERVER && pl!=false && (upd||pl) then
-		local function nwv(p)
-			if cInv==nil then									--Set to nil clientside
-				IF.Items:IFIStart(p,IFI_MSG_SETNIL,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-			else
-				IF.Items:IFIStart(p,IFI_MSG_SETINV,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIShort(cInv:GetID()-32768);
-			end
-			IF.Items:IFIEnd();
-		end
-		
-		local owner=self:GetOwner();
-		if pl==nil && owner==nil then	for k,v in pairs(player.GetAll()) do nwv(v); end
-		else nwv(pl or owner);
-		end
+	if SERVER && upd && !bSuppress && !self.NWVarsByName[sName].Predicted  then
+		self:SendNWVar(sName);
 	end
 	
 	return true;
@@ -429,34 +273,30 @@ end
 IF.Items:ProtectKey("SetNWInventory");
 
 --Set a networked color on this item
-function ITEM:SetNWColor(sName,cColor,pl)
+function ITEM:SetNWColor(sName,cColor,bSuppress)
 	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked color on "..tostring(self)..". sName wasn't given!\n"); return false end
 	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name \""..sName.."\" on "..tostring(self)..".\n"); return false end
 	if self.NWVarsByName[sName].Type!=10 then ErrorNoHalt("Itemforge Items: Couldn't set networked color on "..tostring(self)..". \""..sName.."\" is not a networked color.\n"); return false end
-	if cColor!=nil && type(cColor)!="table" then ErrorNoHalt("Itemforge Items: Couldn't set networked color on "..tostring(self)..". Given value was a \""..type(cColor).."\", not a color!\n"); return false end
+	if cColor!=nil then
+		if type(cColor)!="table" then
+			ErrorNoHalt("Itemforge Items: Couldn't set networked color on "..tostring(self)..". Given value was a \""..type(cColor).."\", not a color!\n");
+			return false;
+		elseif !cColor.r || !cColor.g || !cColor.b || !cColor.a then
+			ErrorNoHalt("Itemforge Items: Couldn't set networked color on "..tostring(self)..". Given table didn't have an 'r','g','b', and/or 'a' entry; maybe this table is not a color?\n");
+			return false;
+		else
+			--Lets make sure values are in range here
+			cColor.r=math.Clamp(cColor.r,0,255);
+			cColor.g=math.Clamp(cColor.g,0,255);
+			cColor.b=math.Clamp(cColor.b,0,255);
+			cColor.a=math.Clamp(cColor.a,0,255);
+		end
+	end
 	
 	local upd=self:SetNWVar(sName,cColor);
 	
-	if SERVER && pl!=false && (upd||pl) then
-		local function nwv(p)
-			if cColor==nil then									--Set to nil clientside
-				IF.Items:IFIStart(p,IFI_MSG_SETNIL,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-			else
-				IF.Items:IFIStart(p,IFI_MSG_SETCOLOR,self:GetID());
-				IF.Items:IFIChar(self.NWVarsByName[sName].ID-128);
-				IF.Items:IFIChar(math.Clamp(cColor.r,0,255)-128);
-				IF.Items:IFIChar(math.Clamp(cColor.g,0,255)-128);
-				IF.Items:IFIChar(math.Clamp(cColor.b,0,255)-128);
-				IF.Items:IFIChar(math.Clamp(cColor.a,0,255)-128);
-			end
-			IF.Items:IFIEnd();
-		end
-		
-		local owner=self:GetOwner();
-		if pl==nil && owner==nil then	for k,v in pairs(player.GetAll()) do nwv(v); end
-		else nwv(pl or owner);
-		end
+	if SERVER && upd && !bSuppress && !self.NWVarsByName[sName].Predicted  then
+		self:SendNWVar(sName);
 	end
 	
 	return true;
@@ -464,8 +304,9 @@ end
 IF.Items:ProtectKey("SetNWItem");
 
 --[[
-Don't call this directly, it's used by other networked functions.
-This returns true if the networked value changed, or false if it didn't.
+Don't call this directly, it's called by the other SetNW* functions
+This actually sets the networked var to the given value serverside/clientside.
+This returns true if the networked value changed from what it was, or false if it didn't.
 ]]--
 function ITEM:SetNWVar(sName,vValue)
 	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return nil; end
@@ -495,7 +336,7 @@ function ITEM:GetNWEntity(sName)
 	local ent=self:GetNWVar(sName);
 	if ent && !ent:IsValid() then
 		self:SetNWEntity(sName,nil);
-		ent=nil;
+		return nil;
 	end
 	return ent;
 end
@@ -509,7 +350,7 @@ function ITEM:GetNWItem(sName)
 	local item=self:GetNWVar(sName);
 	if item && !item:IsValid() then
 		self:SetNWItem(sName,nil);
-		item=nil;
+		return nil;
 	end
 	return item;
 end
@@ -523,9 +364,9 @@ function ITEM:GetNWInventory(sName)
 	local inv=self:GetNWVar(sName);
 	if inv && !inv:IsValid() then
 		self:SetNWInventory(sName,nil);
-		inv=nil;
+		return nil;
 	end
-	return imv;
+	return inv;
 end
 IF.Items:ProtectKey("GetNWInventory");
 
@@ -579,9 +420,9 @@ ITEM.GetNetworkedFloat=ITEM.GetNWVar;				IF.Items:ProtectKey("GetNetworkedFloat"
 ITEM.GetNetworkedInt=ITEM.GetNWVar;					IF.Items:ProtectKey("GetNetworkedInt");
 ITEM.GetNetworkedString=ITEM.GetNWVar;				IF.Items:ProtectKey("GetNetworkedString");
 ITEM.GetNetworkedVector=ITEM.GetNWVar;				IF.Items:ProtectKey("GetNetworkedVector");
-ITEM.GetNetworkedItem=ITEM.GetNWVar;				IF.Items:ProtectKey("GetNetworkedItem");
-ITEM.GetNetworkedInventory=ITEM.GetNWVar;			IF.Items:ProtectKey("GetNetworkedInventory");
-ITEM.GetNetworkedInv=ITEM.GetNWVar;					IF.Items:ProtectKey("GetNetworkedInv");
+ITEM.GetNetworkedItem=ITEM.GetNWItem;				IF.Items:ProtectKey("GetNetworkedItem");
+ITEM.GetNetworkedInventory=ITEM.GetNWInventory;		IF.Items:ProtectKey("GetNetworkedInventory");
+ITEM.GetNetworkedInv=ITEM.GetNWInv;					IF.Items:ProtectKey("GetNetworkedInv");
 
 ITEM.GetNWAngle=ITEM.GetNWVar;						IF.Items:ProtectKey("GetNWAngle");
 ITEM.GetNWBool=ITEM.GetNWVar;						IF.Items:ProtectKey("GetNWBool");
@@ -591,3 +432,145 @@ ITEM.GetNWInt=ITEM.GetNWVar;						IF.Items:ProtectKey("GetNWInt");
 ITEM.GetNWString=ITEM.GetNWVar;						IF.Items:ProtectKey("GetNWString");
 ITEM.GetNWVector=ITEM.GetNWVar;						IF.Items:ProtectKey("GetNWVector");
 ITEM.GetNWInv=ITEM.GetNWInventory;					IF.Items:ProtectKey("GetNWInv");
+
+
+if SERVER then
+
+
+
+
+--[[
+Sends a networked var to the given player.
+We'll tell the clients to set the var to nil if the networked var:
+	Hasn't been set
+	Was set to nil
+	Hasn't been set to something other than the default yet
+Otherwise we'll tell the clients to set the var to what we changed.
+	
+sName is the name of a networked var to send.
+pTo is an optional player to send to.
+	If this is nil, we will send the networked var to everybody (or to the owner if the item is private).
+True is returned if the networked var was sent to the requested player.
+	If we tried to send to everybody, true is returned if the networked var
+]]--
+function ITEM:SendNWVar(sName,pTo)
+	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return nil; end
+	
+	local owner=self:GetOwner();
+	if pTo==nil && owner==nil then
+		local allSuccess=true;
+		for k,v in pairs(player.GetAll()) do
+			if !self:SendNWVar(sName,v) then allSuccess=false end
+		end
+		return allSuccess;
+	else
+		pTo=pTo or owner;
+	end
+	
+	local varid=self.NWVarsByName[sName].ID-128;
+	local type=self.NWVarsByName[sName].Type;
+	local val=nil;
+	if self.NWVars then val=self.NWVars[sName] end
+	
+	if val==nil then
+		IF.Items:IFIStart(pTo,IFI_MSG_SETNIL,self:GetID());
+		IF.Items:IFIChar(varid);
+		IF.Items:IFIEnd();
+	elseif type==1 then
+		if val>=-128 && val<=127 then						--Send as a char
+			IF.Items:IFIStart(pTo,IFI_MSG_SETCHAR,self:GetID());
+			IF.Items:IFIChar(varid);
+			IF.Items:IFIChar(val);
+			IF.Items:IFIEnd();
+		elseif val>=0 && val<=255 then					--Send as an unsigned char
+			IF.Items:IFIStart(pTo,IFI_MSG_SETUCHAR,self:GetID());
+			IF.Items:IFIChar(varid);
+			IF.Items:IFIChar(val-128);
+			IF.Items:IFIEnd();
+		elseif val>=-32768 && val<=32767 then				--Send as a short
+			IF.Items:IFIStart(pTo,IFI_MSG_SETSHORT,self:GetID());
+			IF.Items:IFIChar(varid);
+			IF.Items:IFIShort(val);
+			IF.Items:IFIEnd();
+		elseif val>=0 && val<=65535 then					--Send as an unsigned short
+			IF.Items:IFIStart(pTo,IFI_MSG_SETUSHORT,self:GetID());
+			IF.Items:IFIChar(varid);
+			IF.Items:IFIShort(val-32768);
+			IF.Items:IFIEnd();
+		elseif val>=-2147483648 && val<=2147483647 then	--Send as a long
+			IF.Items:IFIStart(pTo,IFI_MSG_SETLONG,self:GetID());
+			IF.Items:IFIChar(varid);
+			IF.Items:IFILong(val);
+			IF.Items:IFIEnd();
+		elseif val>=0 && val<=4294967295 then				--Send as an unsigned long
+			IF.Items:IFIStart(pTo,IFI_MSG_SETULONG,self:GetID());
+			IF.Items:IFIChar(varid);
+			IF.Items:IFILong(val-2147483648);
+			IF.Items:IFIEnd();
+		else
+			--TODO better error handling here
+			ErrorNoHalt("Itemforge Items: Error - Trying to set NWVar "..sName.." on "..tostring(self).." failed - number '"..val.."' is too big to be sent!\n");
+			
+			--It's an invalid number to send
+			self:SetNWVar(sName,0);
+			IF.Items:IFIStart(pTo,IFI_MSG_SETCHAR,self:GetID());
+			IF.Items:IFIChar(varid);
+			IF.Items:IFIChar(0);
+			IF.Items:IFIEnd();
+		end
+	elseif type==3 then
+		IF.Items:IFIStart(pTo,IFI_MSG_SETBOOL,self:GetID());
+		IF.Items:IFIChar(varid);
+		IF.Items:IFIBool(val);
+		IF.Items:IFIEnd();
+	elseif type==2 then
+		IF.Items:IFIStart(pTo,IFI_MSG_SETFLOAT,self:GetID());
+		IF.Items:IFIChar(varid);
+		IF.Items:IFIFloat(val);
+		IF.Items:IFIEnd();
+	elseif type==4 then
+		IF.Items:IFIStart(pTo,IFI_MSG_SETSTRING,self:GetID());
+		IF.Items:IFIChar(varid);
+		IF.Items:IFIString(val);
+		IF.Items:IFIEnd();
+	elseif type==6 then
+		IF.Items:IFIStart(pTo,IFI_MSG_SETVECTOR,self:GetID());
+		IF.Items:IFIChar(varid);
+		IF.Items:IFIVector(val);
+		IF.Items:IFIEnd();
+	elseif type==7 then
+		IF.Items:IFIStart(pTo,IFI_MSG_SETANGLE,self:GetID());
+		IF.Items:IFIChar(varid);
+		IF.Items:IFIAngle(val);
+		IF.Items:IFIEnd();
+	elseif type==8 then
+		IF.Items:IFIStart(pTo,IFI_MSG_SETITEM,self:GetID());
+		IF.Items:IFIChar(varid);
+		IF.Items:IFIShort(val:GetID()-32768);
+		IF.Items:IFIEnd();
+	elseif type==9 then
+		IF.Items:IFIStart(pTo,IFI_MSG_SETINV,self:GetID());
+		IF.Items:IFIChar(varid);
+		IF.Items:IFIShort(val:GetID()-32768);
+		IF.Items:IFIEnd();
+	elseif type==5 then
+		IF.Items:IFIStart(pTo,IFI_MSG_SETENTITY,self:GetID());
+		IF.Items:IFIChar(varid);
+		IF.Items:IFIEntity(val);
+		IF.Items:IFIEnd();
+	elseif type==10 then
+		IF.Items:IFIStart(pTo,IFI_MSG_SETCOLOR,self:GetID());
+		IF.Items:IFIChar(varid);
+		IF.Items:IFIChar(val.r-128);
+		IF.Items:IFIChar(val.g-128);
+		IF.Items:IFIChar(val.b-128);
+		IF.Items:IFIChar(val.a-128);
+		IF.Items:IFIEnd();
+	end
+end
+IF.Items:ProtectKey("SendNWVar");
+
+
+
+
+end

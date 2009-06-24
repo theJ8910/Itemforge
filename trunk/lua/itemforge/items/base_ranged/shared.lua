@@ -28,7 +28,10 @@ Some features the base_ranged has:
 
 TODO the base_ranged ammo will not be known to a connecting client; have it send that OnFullUpdate() or whatever
 TODO non-singly reloading weapons must stop reloads when holstering during one
+TODO wire reload needs to be auto like primary and secondary
 ]]--
+include("findammo.lua");
+
 ITEM.Name="Base Ranged Weapon";
 ITEM.Description="This item is the base ranged weapon.\nItems used as ranged weapons, such as firearms, rocket launchers, etc, can inherit from this\nto make their creation easier.\n\nThis is not supposed to be spawned.";
 ITEM.Base="base_weapon";
@@ -86,24 +89,25 @@ ITEM.SecondaryFireSounds={						--When attacking with the secondary mode, a rand
 	Sound("weapons/pistol/pistol_fire3.wav")
 };
 
+ITEM.ReloadsSingly=false;						--Do we reload like a shotgun (one 'bullet' at a time)?
+ITEM.ReloadDelay=1.4333332777023;				--The gun pauses for this long after loading a fresh clip of ammo. If we ReloadSingly, the gun pauses for this long after each "bullet" is loaded.
+ITEM.ReloadStartDelay=1;						--If we ReloadSingly, the gun pauses for this long before the first "bullet" is loaded.
+ITEM.ReloadFinishDelay=1;						--If we ReloadSingly, the gun pauses for this long after the last "bullet" has been loaded.
+ITEM.ReloadSounds={								--When ammo is loaded into any clip, a random sound here plays
+	Sound("weapons/pistol/pistol_reload1.wav")
+};
+
 ITEM.DryFireDelay=0.5;								--If we try to fire and can't (out of ammo/underwater), when is the next time we can attack?
 ITEM.DryFireSounds={								--If we try to fire and can't (out of ammo/underwater), a random sound here plays
 	Sound("weapons/pistol/pistol_empty.wav")
 };
 
-ITEM.ReloadDelay=1.4333332777023;				--It takes this long to reload the gun
-ITEM.ReloadsSingly=false;						--Do we reload like a shotgun (one 'bullet' at a time)?
-ITEM.Reloading=false;							--If we ReloadSingly, then this will be true while we're in a reload-loop.
-ITEM.ReloadSounds={								--When ammo is loaded into any clip, a random sound here plays
-	Sound("weapons/pistol/pistol_reload1.wav")
-};
-
 ITEM.MuzzleName="muzzle";						--What's the name of the muzzle attachment point on the gun? If we're in the world, we'll shoot things from the muzzle (special effects, bullets, grenades, flechettes, whatever)
-
-
 
 --Don't modify; these are set automatically
 ITEM.MuzzleAP=nil;								--What attachment ID does the muzzle on the gun use (if any?)
+ITEM.ReloadSource=nil;							--If we ReloadSingly, we have selected this stack to reload from.
+ITEM.ReloadClip=nil;							--If we ReloadSingly, we are currently reloading this clip.
 
 function ITEM:OnInit(owner)
 	self.Clip={};
@@ -161,6 +165,37 @@ function ITEM:OnSecondaryAttack()
 	self:SecondaryFireEffects();
 	
 	return true;
+end
+
+--[[
+This function is called when:
+	The player presses R to reload.
+	The player right clicks the weapon and chooses "Reload"
+	Wiremod triggers the "Reload" input
+It locates nearby ammo and tells the gun to load it.
+]]--
+function ITEM:OnReload()
+	if !self:CanReload() then return false end
+	if self.ReloadsSingly then return self:StartReload(); end
+	
+	for i=1,table.getn(self.Clips) do
+		local clipsize=self:GetClipSize(clip);
+		local curAmmo=self:GetAmmo(clip);
+		if clipsize==0 || !curAmmo || curAmmo:GetAmount()<clipsize then
+			local getNearbyAmmo=function(self,item)
+				if self:Load(item,i) then
+					return true;
+				end
+				return false;
+			end
+			
+			if self:FindAmmo(getNearbyAmmo) then
+				return true;
+			end
+		end
+	end
+	
+	return false;
 end
 
 --[[
@@ -232,11 +267,108 @@ end
 
 
 --[[
+Returns true if we can reload right now.
+The only time we can't reload is if the primary or secondary is cooling down;
+That means we can't reload if we're already reloading, and we can't reload right after attacking with the primary/secondary.
+]]--
+function ITEM:CanReload()
+	if !self:CanPrimaryAttack() || !self:CanSecondaryAttack() then return false end
+	
+	return true;
+end
+
+--[[
+If we ReloadSingly, then this function is called whenever the gun is told to reload.
+It returns true if we have started reloading, or false if we couldn't.
+]]--
+function ITEM:StartReload()
+	if self:GetNWBool("InReload") then return false end
+	
+	--Determine what clip needs to be loaded and locate ammo for it
+	for i=1,table.getn(self.Clips) do
+		local clipsize=self:GetClipSize(clip);
+		local curAmmo=self:GetAmmo(clip);
+		if clipsize==0 || !curAmmo || curAmmo:GetAmount()<clipsize then
+			local canUseAmmo=function(self,item)
+				if self:CanLoadClipWith(item,i) then
+					self.ReloadSource=item;
+					self.ReloadClip=i;
+					return true;
+				end
+				return false;
+			end
+			
+			--If we found ammo for this clip, break
+			if self:FindAmmo(canUseAmmo) then break; end
+		end
+	end
+	
+	--If we couldn't find any ammo then stop
+	if self.ReloadSource==nil then return false end
+	
+	self:SetNWBool("InReload",true);
+	self:SetNextBoth(CurTime()+self.ReloadStartDelay);
+	return true;
+end
+
+--[[
+If we ReloadSingly then this loads one bullet into a clip.
+]]--
+function ITEM:Reload()
+	if !self:CanReload() then return false end
+	
+	local curAmmo=self:GetAmmo(self.ReloadClip);
+	
+	--If our ammo source disappeared or we're full we can stop
+	if !self:GetNWBool("InReload") || (SERVER && (!self.ReloadSource || !self.ReloadSource:IsValid())) || (curAmmo && curAmmo:GetAmount()>=self:GetClipSize(self.ReloadClip)) then
+		self:FinishReload();
+	end
+	
+	if !self:Load(self.ReloadSource,self.ReloadClip,1) then return false end
+	
+	return true;
+end
+
+--[[
+If we ReloadSingly, then this function is called when the gun is finished reloading (it's clip is full)
+It returns true if we finished reloading successfully, or false otherwise.
+]]--
+function ITEM:FinishReload()
+	self.ReloadSource=nil;
+	self.ReloadClip=nil;
+	
+	self:SetNWBool("InReload",false);
+	self:SetNextBoth(CurTime()+self.ReloadFinishDelay);
+	return true;
+end
+
+--[[
+Plays a reload sound and plays the reload animation (both on the weapon and player himself).
+]]--
+function ITEM:ReloadEffects()
+	if #self.ReloadSounds>0 then self:EmitSound(self.ReloadSounds[math.random(1,#self.ReloadSounds)]); end
+	
+	if !self:IsHeld() then return false end
+	self:GetWeapon():SendWeaponAnim(ACT_VM_RELOAD);
+	self:GetWOwner():SetAnimation(PLAYER_RELOAD);
+end
+
+--[[
+Returns the reload delay (this is how long it takes to reload a weapon).
+The weapon cannot attack while reloading.
+]]--
+function ITEM:GetReloadDelay()
+	return self.ReloadDelay;
+end
+
+
+
+
+--[[
 This function runs when the player tries to fire, but the gun doesn't fire anything.
 Typically, this runs when the gun is out of ammo or tries to fire underwater
 It plays the weapon's dry-fire sound and plays the dry-fire viewmodel animation.
 It also cools the weapon down; the length of the cooldown is determined by the dry-fire delay.
-
 ]]--
 function ITEM:DryFire()
 	if #self.DryFireSounds>0 then self:EmitSound(self.DryFireSounds[math.random(1,#self.DryFireSounds)]); end
@@ -257,7 +389,6 @@ end
 
 
 
-
 --[[
 Returns the item in the given clip.
 If that clip doesn't exist, or if nothing is loaded in it, returns nil.
@@ -266,47 +397,6 @@ function ITEM:GetAmmo(clip)
 	if !self.Clip[clip] then return nil end
 	if !self.Clip[clip]:IsValid() then self.Clip[clip]=nil; end
 	return self.Clip[clip];
-end
-
---[[
-Plays a reload sound and plays the reload animation (both on the weapon and player himself).
-]]--
-function ITEM:ReloadEffects()
-	if #self.ReloadSounds>0 then self:EmitSound(self.ReloadSounds[math.random(1,#self.ReloadSounds)]); end
-	
-	if !self:IsHeld() then return false end
-	self:GetWeapon():SendWeaponAnim(ACT_VM_RELOAD);
-	self:GetWOwner():SetAnimation(PLAYER_RELOAD);
-end
-
---[[
-If we ReloadSingly, then this function is called whenever the gun is told to reload.
-It returns true if we have started reloading, or false if we couldn't.
-]]--
-function ITEM:StartReload()
-	if self.Reloading then return false end
-	self.Reloading=true;
-	return true;
-end
-
---[[
-If we ReloadSingly, then this function is called when the gun is finished reloading (it's clip is full)
-It returns true if we finished reloading successfully, or false otherwise.
-]]--
-function ITEM:FinishReload()
-	self.Reloading=false;
-	return true;
-end
-
---[[
-Returns true if we can reload right now.
-The only time we can't reload is if the primary or secondary is cooling down;
-That means we can't reload if we're already reloading, and we can't reload right after attacking with the primary/secondary.
-]]--
-function ITEM:CanReload()
-	if !self:CanPrimaryAttack() || !self:CanSecondaryAttack() then return false end
-	
-	return true;
 end
 
 --[[
@@ -324,12 +414,16 @@ function ITEM:CanLoadClipWith(item,clip)
 end
 
 --[[
-Returns the reload delay (this is how long it takes to reload a weapon).
-The weapon cannot attack while reloading.
+Returns the size of the given clip (the number of 'bullets' it can hold).
+Returns 0 if the clip can hold an unlimited amount of ammo.
+Returns false if the clip doesn't exist.
 ]]--
-function ITEM:GetReloadDelay()
-	return self.ReloadDelay;
+function ITEM:GetClipSize(clip)
+	if !self.Clips[clip] then return false end
+	return self.Clips[clip].Size;
 end
+
+
 
 
 
@@ -356,3 +450,5 @@ function ITEM:GetMuzzle()
 	else						return {Pos=eEnt:GetPos(),Ang=eEnt:GetAngles()};
 	end
 end
+
+IF.Items:CreateNWVar(ITEM,"InReload","bool",false,true,true);

@@ -1113,11 +1113,11 @@ If there are several items of this type in the inventory, then the first item fo
 ]]--
 function _INV:GetItemByType(sItemtype)
 	if !sItemtype then ErrorNoHalt("Itemforge Inventories: Can't find a specific item-type in inventory "..self:GetID().." - the type of item to find wasn't given!\n"); return false end
-	local sItemtype=string.lower(sItemtype);
+	sItemtype=string.lower(sItemtype);
 	
 	for k,v in pairs(self.Items) do
 		if v:IsValid() then
-			if v:GetType()==sItemtype then return item end
+			if v:GetType()==sItemtype then return v end
 		else
 			--INVALID - Item was removed but not taken out of inventory for some reason
 			ErrorNoHalt("Itemforge Inventories: Found an item in inventory "..self:GetID().." (slot "..k..") that no longer exists but is still recorded as being in this inventory.\n");
@@ -1571,34 +1571,6 @@ item is the item being inserted.
 slot is the slot in the inventory that the item is being placed in.
 ]]--
 function _INV:OnInsertItem(item,slot)
-	--We're not trying to pull a loophole by putting an item into itself are we?
-	if self:IsBeneath(item) then return false end
-	
-	--Is the item being inserted small enough to fit inside this inventory?
-	if self:GetSizeLimit()!=0 && item:GetSize()>self:GetSizeLimit() then return false end
-	
-	--Can this inventory support the weight of all the items being inserted?
-	if self:GetWeightCapacity()!=0 && (self:GetWeightFree()-item:GetStackWeight())<0 then
-		--TODO Inventory split has been disabled temporarily; we return false if the whole stack doesn't fit
-		return false;
-		--[[
-		--Since we don't have enough room, will you settle for moving part of the stack instead?
-		if bNoSplit then return false end
-		
-		--How many items of this weight can fit in the inventory, if any?
-		local howMany=math.floor(self:GetWeightFree()/item:GetWeight());
-		
-		--If no items can fit end, we'll just end it here.
-		if howMany<=0 then return false end
-			
-		--The stack being moved to our inventory is 'item', so we'll create a stack with everything that _isn't_ moving to that inventory in the same location.
-		local newStack=item:Split(true,item:GetAmount()-howMany);
-		
-		--If the new stack couldn't be created, we return false because it's been established that we can't fit the whole stack
-		if !newStack then return false end
-		]]--
-	end
-	
 	return true;
 end
 
@@ -1796,6 +1768,33 @@ function _INV:InsertItem(item,slotnum,bNoSplit)
 			if !i then return false end
 		end
 		
+		
+		--We're not trying to pull a loophole by putting an item into itself are we?
+		--Also, is the item being inserted small enough to fit inside this inventory?
+		if self:IsBeneath(item) || (self:GetSizeLimit()!=0 && item:GetSize()>self:GetSizeLimit()) then return false end
+
+		--Can this inventory support the weight of all the items being inserted?
+		--TODO Hard Weight Caps and Soft Weight Caps
+		if self:GetWeightCapacity()!=0 && (self:GetWeightFree()-item:GetStackWeight())<0 then
+			--Since we don't have enough room, will you settle for moving part of the stack instead?
+			if bNoSplit then return false end
+			
+			--How many items of this weight can fit in the inventory, if any?
+			local howMany=math.floor(self:GetWeightFree()/item:GetWeight());
+			
+			--If no items can fit, we'll just end it here.
+			if howMany<1 then return false end
+				
+			--The stack being moved to our inventory is 'item', so we'll create a stack with everything that _isn't_ moving to that inventory in the same location.
+			--TODO I don't like this approach; it should split off a stack and move the new one instead
+			local newStack=item:Split(true,item:GetAmount()-howMany);
+			
+			--If the new stack couldn't be created, we fail because it's been established that we can't fit the whole stack
+			if !newStack then return false end
+		end
+		
+		
+		
 		--We'll run the OnInsertItem event to give the inventory a chance to deny entry (we check a lot of things here like size limit, weight, etc)
 		local s,r=pcall(self.OnInsertItem,self,item,i);
 		if !s then ErrorNoHalt(r.."\n");
@@ -1875,6 +1874,9 @@ function _INV:MoveItem(item,oldslot,newslot)
 	return true;
 end
 
+--[[
+Finds a free slot in this inventory, starting from the first slot.
+]]--
 function _INV:GetFreeSlot()
 	local max=self:GetMaxSlots();
 	if max!=0 then

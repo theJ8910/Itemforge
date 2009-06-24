@@ -36,11 +36,7 @@ function ITEM:TurnOn()
 	self:SetNWBool("On",true);
 	self:StartThink();
 	self:EmitSound(self.Sounds[1]);
-	if self:InWorld() && !self.LoopingSound then
-		Msg("Created looping sound\n");
-		self.LoopingSound=CreateSound(self:GetEntity(),self.Sounds[3]);
-		self.LoopingSound:Play();
-	end
+	self:LoopingSound(self.Sounds[3],"MagnetPull");
 	self:WireOutput("On",1);
 end
 
@@ -50,10 +46,7 @@ function ITEM:TurnOff()
 	self:SetNWBool("On",false);
 	self:StopThink();
 	self:EmitSound(self.Sounds[2]);
-	if self.LoopingSound then
-		self.LoopingSound:Stop();
-		self.LoopingSound=nil;
-	end
+	self:StopLoopingSound("MagnetPull");
 	self:WireOutput("On",0);
 end
 
@@ -79,14 +72,6 @@ function ITEM:OnThink()
 			end
 		end
 	end
-end
-
-function ITEM:OnWorldExit(ent,forced)
-	if self.LoopingSound then
-		self.LoopingSound:Stop();
-		self.LoopingSound=nil;
-	end
-	return true;
 end
 
 function ITEM:GetWireInputs(entity)
@@ -118,6 +103,10 @@ ITEM.GlowMat=Material("sprites/gmdm_pickups/light");
 ITEM.GlowColor=Color(255,200,0,255);
 ITEM.GlowOffset=Vector(0,0,6.5);
 
+--[[
+Draws a glow sprite on an entity.
+The entity varies depending on what is drawing.
+]]--
 function ITEM:DrawGlow(ent)
 	if self:GetNWBool("On") then
 		render.SetMaterial(self.GlowMat);

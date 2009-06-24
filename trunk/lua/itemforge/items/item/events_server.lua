@@ -39,6 +39,7 @@ end
 
 --[[
 While the item is in the world as an entity, if it's damaged physically (such as being burned by fire or hit with a crowbar) then this event will be triggered.
+By default, whenever an item's entity is damaged, the item is damaged. Then the item's entity is knocked around a bit when we do TakePhysicsDamage.
 entity should be the same thing as self:GetEntity(). It's the entity the item is using while it's in the world.
 dmgInfo is information passed to the entity's OnTakeDamage function.
 ]]--
@@ -235,7 +236,7 @@ value is also a string. It describes what 'key' should be set to. For example, "
 ]]--
 function ITEM:OnKeyValue(bSWEP,eEntity,key,value)
 	--DEBUG
-	Msg("Itemforge Item: Keyvalue "..key.."/"..value.." set on "..tostring(eEntity)..", "..tostring(self).."\n");
+	Msg("Itemforge Item: Keyvalue "..key.."/"..value.." set on "..tostring(eEntity).." ("..tostring(self)..")\n");
 end
 
 --[[
@@ -273,6 +274,21 @@ function ITEM:OnRemove()
 end
 
 --[[
+This is run when you 'use' an item. An item can be used in the inventory with the use button, or if on the ground, by looking at the item's model and pressing E.
+The default action for when it's on the ground is to pick it up.
+Return false to tell the player the item cannot be used
+]]--
+function ITEM:OnUse(pl)
+	local ent=self:GetEntity();
+	if self:InWorld() && self:CanPlayerInteract(pl) then
+		self:Hold(pl);
+		
+		return true;
+	end
+	return false;
+end
+
+--[[
 This function runs when an item in the stack is broken (health reaches 0).
 This runs once for each item in the stack. Lets say you have a stack of 10 bottles. Each time a bottle breaks, this function runs.
 howMany is how many items were broke (in the case of a stack of items, several items can possibly be broken with a single, powerful hit)
@@ -283,7 +299,7 @@ function ITEM:OnBreak(howMany,bLastBroke,who)
 	if !bLastBroke then return false end
 	
 	local ent=self:GetEntity();
-	if !ent || !ent:IsValid() then return false end
+	if !ent then return false end
 	
 	breakEnt=ents.Create("prop_physics");
 	breakEnt:SetModel(ent:GetModel());
@@ -300,21 +316,6 @@ function ITEM:OnBreak(howMany,bLastBroke,who)
 	end
 	breakEnt:Spawn();
 	breakEnt:Fire("break","",0);
-end
-
---[[
-This is run when you 'use' an item. An item can be used in the inventory with the use button, or if on the ground, by looking at the item's model and pressing E.
-The default action for when it's on the ground is to pick it up.
-Return false to tell the player the item cannot be used
-]]--
-function ITEM:OnUse(pl)
-	local ent=self:GetEntity();
-	if self:InWorld() && self:CanPlayerInteract(pl) then
-		self:Hold(pl);
-		
-		return true;
-	end
-	return false;
 end
 
 --[[
@@ -337,10 +338,12 @@ function ITEM:OnHold(pl)
 end
 
 --[[
-This is run when you release the item. Return false to prevent from releasing.
-Note that  
+This is run when you release the item. 
 pl is the player who is currently holding the item.
-If forced is true, returning false won't stop the item from being released. Forced will usually be true if the release is forced due to technical issues (IE, death or removal of the item)
+forced is a true/false indicating whether or not we can stop the item from being released.
+	If forced is true, returning false in this event will not stop the item from being released.
+	forced will be true if the release has to happen. A couple of cases that this apply are death of a player or removal of the item.
+Return false to prevent from releasing.
 ]]--
 function ITEM:OnRelease(pl,forced)
 	return true;
@@ -398,6 +401,7 @@ forced is true if the removal of the item from the world is being forced (with g
 Return false to stop the item from leaving the world, or return true to allow it to enter the world.
 ]]--
 function ITEM:OnWorldExit(ent,forced)
+	if !forced && ent:IsConstrained() then return false end
 	return true;
 end
 
@@ -478,7 +482,8 @@ function ITEM:CanHoldMerge(otherItem,player)
 end
 
 --[[
-This runs when this stack of items is split into another stack of items. You can return false to stop the split from happening.
+This runs when this stack of items is split into another stack of items.
+You can return false to stop the split from happening.
 ]]--
 function ITEM:OnSplit(howMany)
 	return true;
@@ -489,6 +494,7 @@ Whenever a stack is split, a new stack is created. If this item is the new stack
 This function runs right after this stack has been created. Again, this function only runs if this item results from splitting from another stack of items.
 originItem will be the original stack that this item split from.
 howMany is how many items were transferred to this stack from originItem's stack.
+TODO copy network vars from originItem
 ]]--
 function ITEM:OnSplitFromStack(originItem,howMany)
 

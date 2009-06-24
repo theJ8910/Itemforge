@@ -7,6 +7,10 @@ A gun that fires random crap from it's inventory.
 
 include("shared.lua");
 
+ITEM.BlinkMat=Material("sprites/gmdm_pickups/light");
+ITEM.BlinkColor=Color(255,0,0,255);
+ITEM.BlinkOffset=Vector(3.1624,4.3433,1.5108);
+
 --This overrides base_ranged's OnDragDropHere; since we don't use clips, any item the player can interact with can be drag-dropped here.
 function ITEM:OnDragDropHere(otherItem)
 	if !self:CanPlayerInteract(LocalPlayer()) || !otherItem:CanPlayerInteract(LocalPlayer()) then return false end
@@ -76,4 +80,37 @@ function ITEM:ShowInventory()
 	if !inv || (self.InventoryPanel && self.InventoryPanel:IsValid()) then return false end	
 	self.InventoryPanel=vgui.Create("ItemforgeInventory");
 	self.InventoryPanel:SetInventory(inv);
+end
+
+--[[
+Draws a blinking sprite while the item is unloading.
+The entity varies depending on what is drawing.
+]]--
+function ITEM:DrawUnloadBlink(ent)
+	if self:GetNWBool("Unloading") && math.sin(CurTime()*30)>=0 then
+		render.SetMaterial(self.BlinkMat);
+		render.DrawSprite(ent:LocalToWorld(self.BlinkOffset),8,8,self.BlinkColor);
+	end
+end
+
+--Draw entity
+function ITEM:OnEntityDraw(eEntity,ENT,bTranslucent)
+	self["base_ranged"].OnEntityDraw(self,eEntity,ENT,bTranslucent);
+	self:DrawUnloadBlink(eEntity);
+end
+
+--Draw SWEP world model
+function ITEM:OnSWEPDraw(eEntity,SWEP,bTranslucent)
+	self["base_ranged"].OnSWEPDraw(self,eEntity,SWEP,bTranslucent);
+	
+	--TODO need to GetWorldModel() or something
+	if SWEP.WM!=nil then
+		self:DrawUnloadBlink(SWEP.WM.ent);
+	end
+end
+
+--Draw model in inventory
+function ITEM:OnDraw3D(eEntity,PANEL,bTranslucent)
+	self["base_ranged"].OnDraw3D(self,eEntity,PANEL,bTranslucent);
+	self:DrawUnloadBlink(eEntity);
 end

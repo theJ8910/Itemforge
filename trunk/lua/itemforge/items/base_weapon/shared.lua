@@ -73,15 +73,13 @@ If this function is run serverside, it will also sync the next primary attack cl
 
 fNext is the next time the weapon's primary can attack, period.
 fNextAuto is optional (defaults to fNext). This is the next time the weapon's primary can auto-attack.
-bNet is an optional true/false (that defaults to true).
-	If we're running this function on the server and this is false, we'll only set the next attack time on the server.
 ]]--
-function ITEM:SetNextPrimary(fNext,fNextAuto,bNet)
-	if bNet!=false then bNet=nil; end
-	self:SetNWFloat("PrimaryNext",fNext,bNet);
+function ITEM:SetNextPrimary(fNext,fNextAuto)
+	self:SetNWFloat("PrimaryNext",fNext);
+	self:SetNWFloat("LastPrimaryDelay",fNext-CurTime());
 	
-	if fNextAuto==nil || fNext==fNextAuto then	self:SetNWFloat("PrimaryNextAuto",nil,bNet);
-	else										self:SetNWFloat("PrimaryNextAuto",fNextAuto,bNet);
+	if fNextAuto==nil || fNext==fNextAuto then	self:SetNWFloat("PrimaryNextAuto",nil);
+	else										self:SetNWFloat("PrimaryNextAuto",fNextAuto);
 	end
 end
 
@@ -126,10 +124,8 @@ If this function is run serverside, it will also sync the next secondary attack 
 
 fNext is the next time the weapon's secondary can attack, period.
 fNextAuto is optional (defaults to fNext). This is the next time the weapon's secondary can auto-attack.
-bNet is an optional true/false (that defaults to true).
-	If we're running this function on the server and this is false, we'll only set the next attack time on the server.
 ]]--
-function ITEM:SetNextSecondary(fNext,fNextAuto,bNet)
+function ITEM:SetNextSecondary(fNext,fNextAuto)
 	if bNet!=false then bNet=nil; end
 	self:SetNWFloat("SecondaryNext",fNext,bNet);
 	
@@ -169,41 +165,33 @@ end
 
 --[[
 Stops the primary and secondary from attacking until [fNext].
-Use this function if you are need to stop all attacks until the given time instead of SetNextPrimary/SetNextSecondary;
-This function uses network macros, so it is less laggy than setting the cooldown of primary and secondary seperately.
+Also stops the primary and secondary from auto attacking until [fNextAuto] or, if not given, [fNext]. 
 ]]--
 function ITEM:SetNextBoth(fNext,fNextAuto)
-	self:SetNextPrimary(fNext,fNextAuto,false);
-	self:SetNextSecondary(fNext,fNextAuto,false);
-	
-	if CLIENT then return true end
-	
-	if fNextAuto==nil || fNextAuto==fNext then		self:SendNWCommand("SetNextBothCheap",nil,fNext);
-	else											self:SendNWCommand("SetNextBoth",nil,fNext,fNextAuto);
-	end
-	
-	return true;
+	self:SetNextPrimary(fNext,fNextAuto);
+	self:SetNextSecondary(fNext,fNextAuto);
 end
 
-
-if SERVER then
-
-
-IF.Items:CreateNWCommand(ITEM,"SetNextBothCheap",nil,{"float"});
-IF.Items:CreateNWCommand(ITEM,"SetNextBoth",nil,{"float","float"});
-
-
-else
-
-
-IF.Items:CreateNWCommand(ITEM,"SetNextBothCheap", function(self,...) self:SetNextBoth(...) end,{"float"});
-IF.Items:CreateNWCommand(ITEM,"SetNextBoth", function(self,...) self:SetNextBoth(...) end,{"float","float"});
-
-
+function ITEM:OnDraw2D(width,height)
+	self["item"].OnDraw2D(self,width,height);
+	
+	local remaining=self:GetNWFloat("PrimaryNext")-CurTime();
+	local delay=self:GetNWFloat("LastPrimaryDelay");
+	if remaining<=0 || delay==0 then return end	
+	
+	surface.SetDrawColor(255,0,0,(remaining/delay)*255);
+	--Vertical lines
+	surface.DrawRect(2,2,		1,height-4);
+	surface.DrawRect(width-3,2,	1,height-4);
+	
+	--Horizontal lines
+	surface.DrawRect(3,2		,width-6,1);
+	surface.DrawRect(3,height-3	,width-6,1);
 end
 
-IF.Items:CreateNWVar(ITEM,"PrimaryNext","float",0);
-IF.Items:CreateNWVar(ITEM,"PrimaryNextAuto","float",	function(self) return self:GetNWFloat("PrimaryNext") end);
-IF.Items:CreateNWVar(ITEM,"SecondaryNext","float",0);
-IF.Items:CreateNWVar(ITEM,"SecondaryNextAuto","float",	function(self) return self:GetNWFloat("SecondaryNext") end);
+IF.Items:CreateNWVar(ITEM,"PrimaryNext","float",0,true,true);
+IF.Items:CreateNWVar(ITEM,"PrimaryNextAuto","float",	function(self) return self:GetNWFloat("PrimaryNext") end,true,true);
+IF.Items:CreateNWVar(ITEM,"SecondaryNext","float",0,true,true);
+IF.Items:CreateNWVar(ITEM,"SecondaryNextAuto","float",	function(self) return self:GetNWFloat("SecondaryNext") end,true,true);
 
+IF.Items:CreateNWVar(ITEM,"LastPrimaryDelay","float",0,true,true);

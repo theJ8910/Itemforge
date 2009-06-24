@@ -13,12 +13,22 @@ ITEM.Base="base_melee";
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 
---Base Melee Weapon
+--Overridden Base Weapon stuff
+ITEM.PrimaryDelay=.4;
+
+--Overridden Base Melee stuff
 ITEM.HitRange=75;
 ITEM.HitForce=5;
 ITEM.HitDamage=25;
+ITEM.ViewKickMin=Angle(1.0,-2.0,0);
+ITEM.ViewKickMax=Angle(2.0,-1.0,0);
 
+--Crowbar
 ITEM.ForceOpenSound=Sound("doors/vent_open2.wav");
+ITEM.ImpactSounds={
+	Sound("weapons/crowbar/crowbar_impact1.wav"),
+	Sound("weapons/crowbar/crowbar_impact2.wav"),
+};
 
 function ITEM:OnUse(pl)
 	if self["base_melee"].OnUse(self,pl) then return true end
@@ -34,21 +44,26 @@ function ITEM:OnUse(pl)
 	return self:OpenDoor(traceRes.Entity);
 end
 
-if SERVER then
-
-
-ITEM.ImpactSounds={
-	Sound("weapons/crowbar/crowbar_impact1.wav"),
-	Sound("weapons/crowbar/crowbar_impact2.wav"),
-};
+function ITEM:OnHit(pOwner,hitent,hitpos,traceRes)
+	return self:OpenDoor(hitent);
+end
 
 function ITEM:OpenDoor(door)
 	if !door || !door:IsValid() || door:GetClass()!="prop_door_rotating" then return false end
+	
+	--Clientside we can't actually open doors, so we just return true if they can be opened
+	if CLIENT then return true end
+	
 	door:Fire("unlock","","0");
 	door:Fire("open","","0");
 	door:EmitSound(self.ForceOpenSound);
 	return true;
 end
+
+if SERVER then
+
+
+
 
 --[[
 Impact sounds.
@@ -64,22 +79,4 @@ end
 
 
 
-else
-
-
-
-
---Clientside this doesn't actually open doors, just returns true if they can be opened
-function ITEM:OpenDoor(door)
-	if !door || !door:IsValid() || door:GetClass()!="prop_door_rotating" then return false end
-	return true;
-end
-
-
-
-
-end
-
-function ITEM:OnHit(pOwner,hitent,hitpos,traceRes)
-	return self:OpenDoor(hitent);
 end

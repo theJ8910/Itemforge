@@ -6,12 +6,6 @@ This module implements items. The purpose of this module is to load item types, 
 handle inheritence between item types, handle networking of items between client and server, and much, much more.
 
 THINGS FOR TODAY:
-Rename Hold to PlayerHold, Use to PlayerUse, add "CanPlayerInteract" checks to all such commands serverside/clientside?
-Investigate broken inventory merge (and ToInventory partial stack split)
-Isolate Amount and Weight oriented functions in their own files if possible.
-Add/Subtract amount functions.
-LoopingSound function
-Partially empty clips count as empty clips for ranged weapon menu.
 Shotgun reload loop.
 
 theJ89's Giant TODO list
@@ -20,15 +14,10 @@ This is why the system hasn't been released yet:
 TODO code maintainence... make sure that multi-line comments are used for function descriptions, check arguments, do cleanup code (for items listed in an inventory for example), for collections check to see if something being inserted still exists, check events to make sure they are all being pcalled, consider putting "item"'s events into their own lua file.
 TODO remember to divide default files into sections: Methods, events, internal methods (things scripters won't be calling)
 TODO Have it so item types can be reloaded without needing a full map change/restart
-TODO helper functions like LoopingSound, Explode, etc
 TODO redux of itemforge_item and itemforge_item_held, need to reduce complexity and homogenize
 TODO consider renaming default item "item" to "base" or "base_item"
 TODO eliminate redundancy; ex: IF.Items:CreateItem becomes IF.Items:Create
 TODO pay attention to function return values; false should be returned for failures, true most of the other times
-TODO SetItemTypeNWVarAndCommandIDs... Couldn't I do this with metatables? I swear, sometimes I think I do things the hard way just for the hell of it.
-TODO okay let me set this straight once and for all: An update is when an item syncs everything related to that item with a client. A full update is an update of all items sent to a client. I need to rename these things as such.
-TODO it seems partial inventory split and inventory merge are disabled; re-enable them
-TODO base_containers couldn't* be put inside of other base_containers, investigate
 TODO wire outputs are forgotten when the item is taken out of the world and put back in; make an item wrapper that remembers them, restore when entity enters world
 TODO change inventory functions from MoveSlot to SwapSlot
 TODO SetWorldModel and SetViewModel need to work clientside too
@@ -48,6 +37,7 @@ TODO OnPopulateMenu is stupid, rename it to OnMakeMenu or OnRightClick
 TODO OnLeftClick/OnRightClick event for world entity & item icon??
 
 UI related
+TODO when item model changes it doesn't update on the "hold" icon.
 TODO dragdrops + mousewheel scrolling in inventory window = not good!
 TODO If drags are enabled on any slots in ItemforgeInventorySlots they stay on even if an item is no longer occupying the slot.
 TODO Need to come up with good looking Item Card
@@ -67,25 +57,24 @@ TODO Item icons do not automatically appear in the upper-left hand corner
 TODO SWEP pickup issues; waiting on garry for this
 
 Networking related
-TODO need to make a serverside security wrapper for base-item NWCommands going from client -> server such as hold.
+TODO For NWVars, I need to have two flags: "HoldFromUpdate" which stops the NWVar from being sent in a full update, and "Predicted", which sends it on the next tick rather than ASAP.
+TODO okay let me set this straight once and for all: An update is when an item syncs everything related to that item with a client. A full update is an update of all items sent to a client. I need to rename these things as such.
 TODO check that when a full update is performed everything is intact...
+TODO Default network commands, consider putting in IFI instead?
 TODO rename "Owner" to "NetOwner" or something to that effect, I can see this being accidentally overridden; "Owner" isn't a good name for the concept anyway
+TODO fix bug with SetNetOwner; is complaining about non-existent inventories table
 TODO Ownership has been neglected; needs to be looked at in a serious manner
 TODO Merge and split's networking can be macro'ed to save bandwidth 
 TODO Additionally I could rewrite the ownership to allow items clientside to be public, private, group-owned or hidden (where group-owned is like private with multiple players, and hidden is on no clients [server only])
 TODO the new reusable IDs may interfere with full-update checks - If an old item 5 (lets pretend it's a crowbar) exists clientside and a new item 5 (lets say it's a base_ranged) is created, then it needs to override. This may be troublesome.
 TODO Josh suggested doing something like Item-Types but with groups of items - creating macros and passing IDs: IFI_MSG_CREATEMACRO "macro_healthkit" 2 3 6 8 10 creates 5 items with IDs 2, 3, 6, 8, and 10
 TODO Josh also suggested prioritizing full updates of items, sending items in the order most important. Items held would be first, in world second, in inventories third, and in void fourth (or maybe not at all?).
-TODO Default network commands, consider putting in IFI instead?
-TODO fix bug with SetNetOwner; is complaining about non-existent inventories table
-TODO delayed networked vars for things that change often but aren't that important
-TODO for NWVars serverside, giving "false" for pl will only change the var serverside (for macros)
 
 Item creation/removal related
+TODO Duplicator support
 TODO split and join behavior - for example, a stack of 2 items with an inventory splits; what then? Or, a heavily damaged item stacks with an intact item - average? lowest on top? sum? what?
 TODO split and join; bSameLocation and bPartialMerge need to be at the end of the function as optional arguments
 TODO Need to have a tab on the spawn menu that allows you to spawn items in world(like entities)
-TODO Duplicator support
 TODO Save and reload capabilities for both databases, files, and singleplayer saves (perhaps make one interface for several methods)
 TODO Need to have an entity that spawns a given item-type in the world (so items can be pre-placed on maps). Perhaps even an inventory-item entity which takes an item-type and an item (to allow items to be created in containers)
 
@@ -101,23 +90,23 @@ MODULE.MaxItems=65535;										--WARNING: Item IDs beyond this value CANNOT be 
 if CLIENT then
 
 
-MODULE.FullUpInProgress=false;												--If this is true a full update is being recieved from the server
-MODULE.FullUpTarget=0;														--Whenever a full update starts, this is how many items need to be sent from the server.
-MODULE.FullUpCount=0;														--Every time an item is created while a full update is being recieved, this number is increased by 1.
-MODULE.FullUpItemsUpdated={};												--Every time an item is created while a full update is being recieved, FullUpItemsUpdated[Item ID] is set to true.
-																			--Whenever the full update finishes, we'll check to make sure all clientside items have been updated.
-																			--Any non-updated items are assumed to be removed on the server (since no update was recieved), and will be removed clientside.
+MODULE.FullUpInProgress=false;								--If this is true a full update is being recieved from the server
+MODULE.FullUpTarget=0;										--Whenever a full update starts, this is how many items need to be sent from the server.
+MODULE.FullUpCount=0;										--Every time an item is created while a full update is being recieved, this number is increased by 1.
+MODULE.FullUpItemsUpdated={};								--Every time an item is created while a full update is being recieved, FullUpItemsUpdated[Item ID] is set to true.
+															--Whenever the full update finishes, we'll check to make sure all clientside items have been updated.
+															--Any non-updated items are assumed to be removed on the server (since no update was recieved), and will be removed clientside.
 end
 
 --These are local on purpose. I want to prevent people from messing with ItemTypes so shit doesn't get screwy in case of some bad code. I'd also like people to use the Get function, and not grab the items directly from the table.
-local BaseType="item";									--This is the undisputed absolute base item-type. All items inherit from this item.
-local ItemTypes={};										--Item types. After being loaded from the script they are placed here
-local Items={};											--Items collection - all items are stored here
-local ItemRefs={};										--Item references - there's an item reference for every item. We pass this instead of the actual item. By storing the references, the actual item the reference refers to can be properly garbage collected when it's removed (freeing up memory). It also informs the scripter of any careless mistakes (referencing an item after it has been deleted mostly).
-local ItemsByType={};									--Items by type are stored here (ex ItemsByType["item_crowbar"] contains all item_crowbar items currently spawned)
-local NextItem=1;										--This is a pointer of types, that records where the next item will be made. IDs are assigned based on this number. This only serves as a starting point to search for a free ID. If this slot is taken then it will search through the entire items array once to look for a free slot.
-local ProtectedKeys={};									--This is a table of protected keys in the base item-type. If an item attempts to override a protected key, the console will report a warning and get rid of the override by setting it to nil. Likewise attempting to override a protected key on an item (myItem.Use="hello" for example) will be stopped as well.
-local AllowProtect=false;								--If this is true, we can protect keys (in other words, we're loading the base item-type while this is true)
+local BaseType="item";										--This is the undisputed absolute base item-type. All items inherit from this item.
+local ItemTypes={};											--Item types. After being loaded from the script they are placed here
+local Items={};												--Items collection - all items are stored here
+local ItemRefs={};											--Item references - there's an item reference for every item. We pass this instead of the actual item. By storing the references, the actual item the reference refers to can be properly garbage collected when it's removed (freeing up memory). It also informs the scripter of any careless mistakes (referencing an item after it has been deleted mostly).
+local ItemsByType={};										--Items by type are stored here (ex ItemsByType["item_crowbar"] contains all item_crowbar items currently spawned)
+local NextItem=1;											--This is a pointer of types, that records where the next item will be made. IDs are assigned based on this number. This only serves as a starting point to search for a free ID. If this slot is taken then it will search through the entire items array once to look for a free slot.
+local ProtectedKeys={};										--This is a table of protected keys in the base item-type. If an item attempts to override a protected key, the console will report a warning and get rid of the override by setting it to nil. Likewise attempting to override a protected key on an item (myItem.Use="hello" for example) will be stopped as well.
+local AllowProtect=false;									--If this is true, we can protect keys (in other words, we're loading the base item-type while this is true)
 
 --Itemforge Item (IFI) Message (-128 to 127. Uses char in usermessage).
 IFI_MSG_CREATE			=	-128;	--(Server > Client) Sync Create item clientside
@@ -146,8 +135,9 @@ IFI_MSG_SV2CLCOMMAND	=	-106;	--(Server > Client) Send a NWCommand for an item fr
 IFI_MSG_CL2SVCOMMAND	=	-105;	--(Client > Server) Send a NWCommand for an item from the client to the server
 IFI_MSG_CREATETYPE		=	-104;	--(Server > Client) Macro; Create several items of this item type (used with full updates, saves bandwidth)
 IFI_MSG_CREATEININV		=	-103;	--(Server > Client) Macro; Create item in inventory (saves bandwidth)
-
-
+IFI_MSG_MERGE			=	-102;	--(Server > Client) Macro; Merge two items (change amount of an item and remove another, saves bandwidth)
+IFI_MSG_PARTIALMERGE	=	-101;	--(Server > Client) Macro; Merge two items partially (change amount of two items, saves bandwidth)
+IFI_MSG_SPLIT			=	-100;	--(Server > Client) Macro; Split an item (saves bandwidth)
 
 
 
@@ -289,6 +279,9 @@ function MODULE:Initialize()
 	self:FixItemTypeMissingData();
 	self:SetItemTypeBases();
 	self:SetItemTypeNWVarAndCommandIDs();
+	if SERVER then
+		self:StartTick();
+	end
 end
 
 --Clean up the items module. Removes all items. Currently I have this done prior to a refresh. It will remove any items and clean up any local stuff stored here.
@@ -520,6 +513,8 @@ function MODULE:SetItemTypeNWVarAndCommandIDs()
 					local NWVarCopy={};
 					NWVarCopy.Name=b.NWVarsByID[i].Name;
 					NWVarCopy.Default=b.NWVarsByID[i].Default;
+					NWVarCopy.Predicted=b.NWVarsByID[i].Predicted;
+					NWVarCopy.HoldFromUpdate=b.NWVarsByID[i].HoldFromUpdate;
 					NWVarCopy.Type=b.NWVarsByID[i].Type;
 					NWVarCopy.ID=table.insert(NWVarIDs,NWVarCopy);
 					NWVarNames[NWVarCopy.Name]=NWVarCopy;
@@ -576,10 +571,18 @@ Creates a networked variable for a type of item.
 The networked command should be created serverside and clientside, in the same order.
 itemtype should usually be ITEM (assuming you're doing this in the itemtype's file)
 sName is the name you want to give the network var. This can be whatever you want, it won't lag since this string will not be sent (to cut down on networking lag). Instead, the name is used to identify this var and associate it with an ID passed through networking.
-sDatatype is what type of data this network var uses. Valid types are int,integer,long,char,short,uchar,ulong,ushort,float,bool,boolean,str,string,ent,entity,pl,ply,player,vec,vector,ang,angle,item,inventory,inv, and color.
-vDefaultValue can either be a value (such as 1, "hello", 3.4, or true) or a function( such as function(self) return self.CanEatCake(); end).
+sDatatype is what type of data this network var uses. Valid types are: int,integer,long,char,short,uchar,ulong,ushort,float,bool,boolean,str,string,ent,entity,pl,ply,player,vec,vector,ang,angle,item,inventory,inv, and color.
+vDefaultValue is optional; it can either be a value (such as 1, "hello", 3.4, or true) or a function( such as function(self) return self:CanEatCake(); end).
+	Whenever a network var hasn't been set (or is set to nil), and we need to grab the value of it, the default value will be returned.
+	If no default value is given, then nil will be returned if the network var isn't set.
+bPredicted is an optional true/false that defaults to false.
+	If bPredicted is false, then whenever the networked var changes it is updated as soon as possible on the clients.
+	If bPredicted is true, then whenever the networked var changes it is sent to the clients during the next server "tick" (there are about 3 of these per second).
+bHoldFromUpdate is an optional true/false that defaults to false.
+	If this is true, then whenever a player connects we won't send the networked var to him.
+	This is useful for things that aren't really that important for joining players to know, such as "Next Attack Time".
 ]]--
-function MODULE:CreateNWVar(itemtype,sName,sDatatype,vDefaultValue)
+function MODULE:CreateNWVar(itemtype,sName,sDatatype,vDefaultValue,bPredicted,bHoldFromUpdate)
 	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't create networked var. sName wasn't provided.\n"); return false end
 	if itemtype==nil then ErrorNoHalt("Itemforge Items: Couldn't create networked var \""..sName.."\". itemtype wasn't provided (if this is being called inside of an item itemtype should be ITEM\n"); return false end
 	if sDatatype==nil then ErrorNoHalt("Itemforge Items: Couldn't create networked var. The datatype wasn't provided.\n"); return false end
@@ -594,7 +597,8 @@ function MODULE:CreateNWVar(itemtype,sName,sDatatype,vDefaultValue)
 	local NewNWVar={}
 	NewNWVar.Name=sName;
 	NewNWVar.Default=vDefaultValue;
-	
+	NewNWVar.Predicted=bPredicted or false;
+	NewNWVar.HoldFromUpdate=bHoldFromUpdate or false;
 	local t=string.lower(sDatatype);
 		
 	if t=="int" || t=="integer" || t=="long" || t=="char" || t=="short" || t=="uchar" || t=="uint" || t=="uinteger" || t=="ulong" || t=="ushort" then
@@ -641,7 +645,7 @@ fHook is called if there's an incoming NWCommand with this name.
 tDatatypes is a table, which contains the types of data that will be sent with the command.
 	This can be nil if there is no data sent/received with this command.
 	If tDatatypes was {"bool","short"} that means it's expecting the first piece of data to be a bool, and the second to be a short whenever you send (and receive) the command.
-	valid types are: int,integer,long,char,short,float,bool,boolean,str,string,ent,entity,pl,ply,player,vec,vector,ang, and angle
+	valid types are:\n int,integer,long,char,short,float,bool,boolean,str,string,ent,entity,pl,ply,player,vec,vector,ang,angle,item,inv,inventory,uchar,ushort, and ulong
 	
 Here's an example of how to create a network command that is sent from the server and received on the client.
 	NWCommands are created on both the server and client.
@@ -708,7 +712,7 @@ function MODULE:CreateNWCommand(itemtype,sName,fHook,tDatatypes)
 			elseif t=="ushort" then
 				table.insert(newNWCommand.Datatypes,14);
 			else
-				ErrorNoHalt("Itemforge Items: CreateNWCommand (\""..sName.."\") given unrecognized datatype "..t.."; valid types are:\n int,integer,long,char,short,float,bool,boolean,str,string,ent,entity,pl,ply,player,vec,vector,ang, and angle\n");
+				ErrorNoHalt("Itemforge Items: CreateNWCommand (\""..sName.."\") given unrecognized datatype "..t.."; valid types are:\n int,integer,long,char,short,float,bool,boolean,str,string,ent,entity,pl,ply,player,vec,vector,ang,angle,item,inv,inventory,uchar,ushort, and ulong\n");
 				table.insert(newNWCommand.Datatypes,0);
 			end
 		end
@@ -723,7 +727,6 @@ function MODULE:CreateNWCommand(itemtype,sName,fHook,tDatatypes)
 	
 	return true;
 end
-
 
 --TODO I'm not satisfied with the way this function works; consider reworking it sometime
 --[[
@@ -869,10 +872,9 @@ function MODULE:Remove(item)
 	local s,r=pcall(item.OnRemove,item);
 	if !s then ErrorNoHalt(r.."\n") end
 	
-	--Stop thinking if we're thinking
+	--Stop thinking if we're thinking, stop all looping sounds and timers
 	item:StopThink();
-	
-	--Stop all timers
+	item:StopAllLoopingSounds();
 	item:RemoveAllTimers();
 	
 	--Hide the right click menu if it is open
@@ -880,10 +882,12 @@ function MODULE:Remove(item)
 	
 	--Unlink any inventories that are connected to this item (an inventory "belonging" to this item - ex: a backpack's inventory or a crate's inventory)
 	if item.Inventories then
-		for k,v in pairs(item.Inventories) do
-			if SERVER then
+		if SERVER then
+			for k,v in pairs(item.Inventories) do
 				v.Inv:SeverItem(v.ConnectionSlot,true);
-			else
+			end
+		else
+			for k,v in pairs(item.Inventories) do
 				v.Inv:SeverItem(v.ConnectionSlot);
 			end
 		end
@@ -1213,6 +1217,29 @@ function MODULE:CreateSameLocation(type,extItem)
 end
 
 --[[
+Starts the Itemforge Item's server-side tick
+]]--
+function MODULE:StartTick()
+	hook.Add("Tick","itemforge_tick",self.Tick,self)
+end
+
+--[[
+This runs the ServerTick() function on every active item on the server
+]]--
+function MODULE:Tick()
+	for k,v in pairs(ItemRefs) do
+		v:ServerTick();
+	end
+end
+
+--[[
+Stops the Itemforge Item's server-side tick
+]]--
+function MODULE:StopTick()
+	hook.Remove("Tick","itemforge_tick");
+end
+
+--[[
 Sends a full update on an item, as requested by a client usually.
 If the item doesn't exist serverside then instead of a full update, the client will be told to remove that item.
 This should not be used unless necessary.
@@ -1533,8 +1560,18 @@ function MODULE:HandleIFIMessages(msg)
 			self:Create(type,msg:ReadShort()+32768,true);
 		end
 	elseif msgType==IFI_MSG_CREATEININV then
-		--Macro
+		--TODO Macro
 		--self:
+	elseif msgType==IFI_MSG_MERGE then
+		local item=self:Get(id);
+		
+		local newAmt=msg:ReadLong();
+		local otherItem=msg:ReadShort()+32768;
+		
+		item:SetAmount(newAmt);
+		self:Remove(otherItem);
+	elseif msgType==IFI_MSG_PARTIALMERGE then
+	elseif msgType==IFI_MSG_SPLIT then
 	elseif msgType==IFI_MSG_SV2CLCOMMAND then
 		local item=self:Get(id);
 		if !item || !item:IsValid() then ErrorNoHalt("Itemforge Items: Tried to run a networked command on non-existent item with ID "..id..".\n"); return false; end

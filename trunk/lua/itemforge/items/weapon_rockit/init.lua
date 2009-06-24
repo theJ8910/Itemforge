@@ -10,9 +10,9 @@ AddCSLuaFile("cl_init.lua");
 
 include("shared.lua");
 
-ITEM.AutoUnloading=false;
+ITEM.HoldType="physgun";
 ITEM.AutoUnloadDelay=0.3;
-ITEM.LoopingSound=nil;
+ITEM.EjectFrom=Vector(9.2274,0.3052,5.4279);
 
 --[[
 Create an inventory for our gun
@@ -34,12 +34,23 @@ function ITEM:OnInit()
 	self.Inventory=inv;
 end
 
+function ITEM:OnReload()
+	if !self:CanReload() then return false end
+
+	return self:FindAmmo(function(self,item)
+		if self:Load(item,i) then
+			return true;
+		end
+		return false;
+	end);
+end
+
 --[[
 We have an auto-unload feature.
 ]]--
 function ITEM:OnThink()
 	self["base_ranged"].OnThink(self);
-	if self.AutoUnloading then self:UnloadLoop() end
+	if self:GetNWBool("Unloading") then self:UnloadLoop() end
 end
 
 --[[
@@ -49,8 +60,7 @@ When this function is called we load items into the gun's inventory instead of t
 function ITEM:Load(item,clip,amt)
 	if !self:CanReload() then return false end
 	
-	--Even though we don't use clips, the rock-it launcher does have a clip that says what items we can load. This is what it's good for.
-	if !self:CanLoadClipWith(item,1) then return false end
+	if !item || !item:IsValid() then return false end
 	
 	--Can't load items into a non-existent inventory
 	local inv=self:GetInventory();
@@ -73,12 +83,8 @@ Overridden from base_ranged.
 When this function is called, instead of instantly unloading the item in a clip, we turn on auto-unloading.
 ]]--
 function ITEM:Unload(clip)
-	self.AutoUnloading=true;
-	
-	if self:InWorld() && !self.LoopingSound then
-		self.LoopingSound=CreateSound(self:GetEntity(),self.UnloadSound);
-		self.LoopingSound:Play();
-	end
+	self:SetNWBool("Unloading",true);
+	self:LoopingSound(self.UnloadSound,"UnloadSound");
 	
 	return true;
 end
@@ -92,34 +98,18 @@ When all items are unloaded, this function will turn off auto-unloading.
 function ITEM:UnloadLoop()
 	if !self:CanPrimaryAttack() || !self:CanSecondaryAttack() then return false end
 	
-	--Can't unload items from a non-existant inventory
+	--Unload an item from the inventory, or stop if the inventory is empty (or doesn't exist)
 	local inv=self:GetInventory();
-	if !inv then
-		self.AutoUnloading=false;
+	if !inv || inv:IsEmpty() then
+		self:SetNWBool("Unloading",false);
+		self:StopLoopingSound("UnloadSound");
 		return false;
-	end
-	
-	--Unload an item from the inventory, or stop if the inventory is empty
-	local item=inv:GetLast();
-	if !item then
-		self.AutoUnloading=false;
-		if self.LoopingSound then
-			self.LoopingSound:Stop();
-			self.LoopingSound=nil;
-		end
-	else
-		item:ToSameLocationAs(self,true);
+	elseif inv then
+		inv:GetLast():ToSameLocationAs(self,true);
+		self:EmitSound(self.ReloadSounds[math.random(1,#self.ReloadSounds)]);
 		self:SetNextBoth(CurTime()+self.AutoUnloadDelay);
 	end
 	
-	return true;
-end
-
-function ITEM:OnWorldExit(ent,forced)
-	if self.LoopingSound then
-		self.LoopingSound:Stop();
-		self.LoopingSound=nil;
-	end
 	return true;
 end
 

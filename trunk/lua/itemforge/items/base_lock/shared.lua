@@ -187,6 +187,7 @@ function ITEM:OnEntityInit(entity)
 end
 
 function ITEM:OnWorldExit(ent,forced)
+	if !self["item"].OnWorldExit(self,ent,forced) then return false end
 	if self:GetAttachedEnt() then
 		self:Detach();
 	end

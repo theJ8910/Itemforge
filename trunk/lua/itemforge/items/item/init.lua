@@ -6,26 +6,30 @@ item is the default item. All items except item inherit from this item-type.
 NOTE: The item type is the name of the folder it is in (this is item/init.lua, so this item's type is "item")
 ]]--
 AddCSLuaFile("shared.lua");
-AddCSLuaFile("events_shared.lua");
+AddCSLuaFile("cl_init.lua");
+AddCSLuaFile("health.lua");
+AddCSLuaFile("stacks.lua");
+AddCSLuaFile("weight.lua");
 AddCSLuaFile("nwvars.lua");
 AddCSLuaFile("timers.lua");
-AddCSLuaFile("cl_init.lua");
+AddCSLuaFile("sounds.lua");
+AddCSLuaFile("events_shared.lua");
 AddCSLuaFile("events_client.lua");
 
 include("shared.lua");
 include("events_server.lua");
 
-ITEM.ThinkRate=0;									--Run think serverside every # of seconds set here.
+ITEM.ThinkRate=0;									--Run think serverside every # of seconds set here. If this is 0 it runs every frame serverside.
 
 --SWEP related
-ITEM.HoldType="pistol";								--How does a player hold this item when he is holding it as a weapon?
+ITEM.HoldType="pistol";								--How does a player hold this item when he is holding it as a weapon? Valid values: "pistol","smg","grenade","ar2","shotgun","rpg","physgun","crossbow","melee","slam","normal"
 
 --Don't modify/override these. They're either set automatically or don't need to be changed.
 
 --[[
-This doesn't actually set the owner, but it will publicize or privitize the item.
-lastOwner should be the player who owned this item previously. This can be a player, or nil. Doing item:GetOwner() or getting the owner of the old container should suffice in most cases.
-newOwner should be the player who now owns this item. This can be a player, or nil. The owner of an inventory the item is going in, or nil should work in most cases.
+This doesn't actually set the NetOwner, but it will publicize or privitize the item.
+lastOwner should be the player who was NetOwner of this item previously. This can be a player, or nil. Doing item:GetNetOwner() or getting the NetOwner of the old container should suffice in most cases.
+newOwner should be the player who now owns this item. This can be a player, or nil. The NetOwner of an inventory the item is going in, or nil should work in most cases.
 ]]--
 function ITEM:SetOwner(lastOwner,newOwner)
 	if newOwner!=nil then
@@ -58,10 +62,11 @@ This function puts an item inside of an inventory.
 inv is the inventory to add the item to.
 reqSlot is an optional number that requests a certain slot to insert the item into. This can be a number (to request the item be placed in a certain slot in the given inventory), or can be nil/not given.
 If pl is given, only that player will be told to add the item to the given inventory clientside.
-bNoMerge is an optional argument as well. If bNoMerge is:
+bNoMerge is an optional true/false. If bNoMerge is:
 	true, the item will not attempt to merge itself with existing items of the same type in the given inventory, even if it normally would.
-	false or not given, then this function calls the CanInventoryMerge of both this item and the item it's trying to merge with. If both items approve, the two are merged and this item removed as part of the merge. If for some reason a merge can't be done, false is returned.
-	
+	false or not given, then this function calls the CanInventoryMerge of both this item and the item it's trying to merge with.
+		If both items approve, the two are merged and this item removed as part of the merge.
+		If for some reason a merge can't be done, false is returned.
 This function calls this item's OnMove event if it's moving to a new inventory. OnMove can stop the move.
 
 If the item cannot be inserted for any reason, then false is returned. True is returned otherwise.
@@ -319,8 +324,6 @@ function ITEM:Hold(pl,bNoMerge)
 	end
 	
 	--local ent=ents.Create("itemforge_item_held");
-	local ent=pl:Give("itemforge_item_held");
-	if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Items: Tried to create itemforge_item_held entity for "..tostring(self).." but failed.\n"); return false end
 	
 	--[[
 	Send to void. False is returned in case of errors or if events stop the removal of the item from it's current medium.
@@ -328,9 +331,11 @@ function ITEM:Hold(pl,bNoMerge)
 	If we didn't... this could happen: We put the item in the void, then try to put it in the world but can't create the ent. So our item is stuck in the void. We try to avoid this.
 	]]--
 	if !self:ToVoid() then
-		ent:Remove();
 		return false;
 	end
+	
+	local ent=pl:Give("itemforge_item_held");
+	if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Items: Tried to create itemforge_item_held entity for "..tostring(self).." but failed.\n"); return false end
 	
 	--TODO sometimes the weapon isn't picked up, such as when noclipping, need to fix this. Temporary solution below.
 	--ent:SetPos(pl:GetPos()+Vector(0,0,64));
@@ -439,10 +444,7 @@ function ITEM:ToVoid(forced,bNotFromClient,vDoubleCheck)
 		if vDoubleCheck && ent!=vDoubleCheck then ErrorNoHalt("Itemforge Items: WARNING! Tried to take "..tostring(self).." out of the world, but the entity being removed ("..tostring(vDoubleCheck)..") didn't match the current world entity ("..tostring(ent).."). Old world entity?\n"); return false end
 		
 		--Give events a chance to stop the removal (or at least let them run if it's forced)
-		local s,r=pcall(self.OnWorldExit,self,ent,forced);
-		if !s then					ErrorNoHalt(r.."\n")
-		elseif !r && !forced then	return false
-		end
+		if !self:OnWorldExitSafe(ent,forced) && !forced then return false end
 		
 		self:ClearEntity();
 		ent:ExpectedRemoval();
@@ -493,10 +495,26 @@ end
 IF.Items:ProtectKey("ToVoid");
 
 --[[
+Protected OnWorldExit event.
+Stops all looping sounds and then runs the overridable OnWorldExit event and returns the result.
+]]--
+function ITEM:OnWorldExitSafe(ent,forced)
+	self:StopAllLoopingSounds();
+	
+	--Give events a chance to stop the removal (or at least let them run if it's forced)
+	local s,r=pcall(self.OnWorldExit,self,ent,forced);
+	if !s then					ErrorNoHalt(r.."\n")
+	elseif !r then				return false;
+	end
+	return true;
+end
+IF.Items:ProtectKey("OnWorldExitSafe");
+
+--[[
 This function returns true if this item can send information about itself to a given player.
 It will return true in two case:
-	This item's owner is nil
-	This item's owner is the same as the given player
+	This item's NetOwner is nil (this item is public)
+	This item's NetOwner is the same as the given player (this is a private item "owned" by this player)
 ]]--
 function ITEM:CanSendItemData(pl)
 	local owner=self:GetOwner();
@@ -504,189 +522,6 @@ function ITEM:CanSendItemData(pl)
 	return false;
 end
 IF.Items:ProtectKey("CanSendItemData");
-
---[[
-Merge this pile of items with another pile of items.
-
-bPartialMerge can be used to allow or disallow partial merges.
-	A partial merge is where some, but not all, of the items in a stack given to this function were moved.
-	If bPartialMerge is:
-		true, partial merges will be allowed. If a partial merge occurs, whatever is left of the stack will not removed. -1 will be returned instead of true or false. False will only be returned if none of the items were merged at all.
-		false, partial merges will NOT be allowed. It will return true if it merged all of the items in the stack given to it and then removed the stack, or false if this did not happen.
-
-You can give as many items as you want to this function. Ex:
-	myItem:Merge(true,otherItem);								--Merge otherStack with this stack
-	myItem:Merge(true,otherItem,anotherItem);					--Merge otherStack and anotherStack with this stack
-	myItem:Merge(true,otherItem,anotherItem,yetAnotherItem);	--Merge otherStack, anotherStack, and yetAnotherStack with this stack
-	myItem:Merge(false,otherItem);								--Merge otherStack with this stack; fails if it doesn't move EVERY item in that stack to this one
-The items given will be removed and their amounts added to this item's amount.
-This item's OnMerge or the other item's OnMerge can stop each individual merge.
-Items have to be the same type as this item.
-
-This function returns a series of trues and falses, based on the success of merges asked. Ex:
-	Lets say we want to merge this item with three items:
-		myItem:Merge(true,otherItem,anotherItem,yetAnotherItem);
-	If this function returns:
-						    true,      true,         true
-	It means, otherItem's whole stack merged, anotherItem's whole stack merged, and yetAnotherItem's whole stack merged. They all merged successfully.
-	
-	Another example...
-	Lets say we want to merge this item with three items:
-		myItem:Merge(true,otherItem,anotherItem,yetAnotherItem);
-	If this function returns:
-						    true,      -1,          false
-	It means, otherItem's whole stack merged, anotherItem PARTIALLY merged, and yetAnotherItem DIDN'T merge.
-	
-	Another example...
-	Lets say we want to merge this item with a complete stack:
-		myItem:Merge(false,otherItem,anotherItem);
-	If this function returns:
-							  true      false
-	It means, the whole stack of otherItem merged, but anotherItem's whole stack couldn't merge unfortunately.
-So, how do you put these values in vars?
-	local first,second,third=item:Merge(true,firstItem,secondItem,thirdItem);
-Hope this is an adequate explanation of how this works.
-]]--
-function ITEM:Merge(bPartialMerge,...)
-	
-	if !arg[1] then ErrorNoHalt("Itemforge Items: Couldn't merge "..tostring(self).." with another item. No item was given!\n"); return false end
-	
-	local SuccessTable={};
-	local max=self:GetMaxAmount();
-	local i=1;
-	while arg[i]!=nil do
-		if arg[i]:IsValid() then
-			if self!=arg[i] then
-				if self:GetType()==arg[i]:GetType() then
-					--Give merge events on both items a chance to stop the merge
-					local s,r1=pcall(self.OnMerge,self,arg[i]);
-					if !s then ErrorNoHalt(r1.."\n"); r1=false end
-					local s,r2=pcall(arg[i].OnMerge,arg[i],self);
-					if !s then ErrorNoHalt(r2.."\n"); r2=false end
-					
-					if r1 && r2 then
-						local fit=self:GetMaxAmount()-self:GetAmount();
-						
-						if self:SetAmount(self:GetAmount()+arg[i]:GetAmount()) then
-							arg[i]:Remove();
-							SuccessTable[i]=true;
-						elseif bPartialMerge && fit > 0 && arg[i]:GetAmount()>fit then
-							if self:SetAmount(self:GetMaxAmount()) then
-								arg[i]:SetAmount(arg[i]:GetAmount()-fit);
-								SuccessTable[i]=-1;
-							else
-								SuccessTable[i]=false;
-							end
-						else
-							SuccessTable[i]=false;
-						end
-					else
-						SuccessTable[i]=false;
-					end
-				else
-					ErrorNoHalt("Itemforge Items: Couldn't merge "..tostring(self).." with "..tostring(arg[i])..". These items are not the same type.\n");
-					SuccessTable[i]=false;
-				end
-			else
-				ErrorNoHalt("Itemforge Items: Couldn't merge "..tostring(self).." with "..tostring(arg[i]).." - can't merge an item with itself!\n");
-				SuccessTable[i]=false;
-			end
-		else
-			ErrorNoHalt("Itemforge Items: Couldn't merge "..tostring(self).." with an item. Item given was invalid!\n");
-			SuccessTable[i]=false;
-		end
-		
-		i=i+1;
-	end
-	return unpack(SuccessTable);
-end
-IF.Items:ProtectKey("Merge");
-
---[[
-Split this pile of items into two or more piles.
-
-This function can be used to split an item into:
-	Two stacks:		self:Split(true,5);			(make a new stack with 5 items from this stack)
-	Three stacks:	self:Split(true,5,7);		(make two new stacks: one with 5 items, another with 7)
-	Four stacks:	self:Split(true,5,7,12);	(make three new stacks: one with 5 items, another with 7, and another with 12)
-
-Really, however many stacks you want!
-The numbers in the examples above are how many items to transfer to new stacks.
-Each number you give this function tells it to split the stack into a new stack with that many items from the original stack.
-
-bSameLocation is an argument that determines where the item is placed.
-	If this is false, the new stack will be created in the void.
-	If this is true, the new stack will be created in:
-		the same container that this stack is in, if in a container.
-		the new stack will be created nearby this stack, if in the world.
-		dropped from where the player is looking.
-
-TODO return false if a stack can't be broken
-]]--
-function ITEM:Split(bSameLocation,...)
-	--Forgot to tell us how many items to split
-	if !arg[1] then ErrorNoHalt("Itemforge Items: Couldn't split "..tostring(self).." - number of items to transfer to a new stack into wasn't given!\n"); return false end
-	bSameLocation=bSameLocation or false;
-	
-	--Count how many items are trying to be taken out of the stack and sent to new stacks
-	local i=1;
-	local totalCount=0;
-	while type(arg[i])=="number" do
-		local howMany=math.floor(arg[i]);
-		
-		--And make sure we're not asking to split something impossible
-		if howMany<=0 then ErrorNoHalt("Itemforge Items: Couldn't split "..tostring(self).." - was trying to transfer 0 or less items to a new stack...\n"); return false end
-		
-		totalCount=totalCount+howMany;
-		i=i+1;
-	end
-	
-	--Total numbers of items possibly being transferred in range?
-	if totalCount<=0 then ErrorNoHalt("Itemforge Items: Couldn't split "..tostring(self).." - was trying to transfer 0 or less items to the new stack...\n"); return false end
-	local amt=self:GetAmount();
-	if totalCount>=amt then ErrorNoHalt("Itemforge Items: Couldn't split "..tostring(self).." - was trying to transfer all or too many ("..totalCount..") items total to new stacks. This stack only has "..amt.." items.\n"); return false end
-	
-	local i=1;
-	local newStacks={};
-	local totalAmountTransferred=0;
-	
-	while type(arg[i])=="number" do
-		local howMany=math.floor(arg[i]);
-		
-		--Will the event let the split happen (we run the event for each split)
-		local s,r=pcall(self.OnSplit,self,howMany);
-		if !s then ErrorNoHalt(r.."\n")
-		elseif r then
-			--Split the item. We'll create in same location as this stack if told to, or in the void if not told to.
-			local newStack=0;
-			if bSameLocation then
-				newStack=IF.Items:CreateSameLocation(self:GetType(),self);
-			else
-				newStack=IF.Items:Create(self:GetType());
-			end
-			
-			if newStack && newStack:IsValid() then
-				
-				--Adjust amounts
-				totalAmountTransferred=totalAmountTransferred+howMany;
-				newStack:SetAmount(howMany);
-				
-				--New stack created, call it's hook so it can decide what to do next.
-				local s,r=pcall(newStack.OnSplitFromStack,newStack,self,howMany);
-				if !s then ErrorNoHalt(r.."\n") end
-				
-				table.insert(newStacks,newStack);
-			end
-		end
-		
-		i=i+1;
-	end
-	
-	self:SetAmount(amt-totalAmountTransferred);
-	return unpack(newStacks);
-end
-IF.Items:ProtectKey("Split");
-
 
 --[[
 Run this function to use the item.
@@ -698,7 +533,7 @@ False is returned if the item is unable to be used for any reason.
 TODO: Possibly have the item used by something other than a player
 ]]--
 function ITEM:Use(pl)
-	if !pl || !pl:IsValid() || !pl:IsPlayer() || !pl:Alive() then return false end
+	if !pl || !pl:IsValid() || !pl:IsPlayer() || !self:CanPlayerInteract(pl) then return false end
 	
 	local s,r=pcall(self.OnUse,self,pl);
 	if !s then ErrorNoHalt(r.."\n")
@@ -740,6 +575,9 @@ function ITEM:OnStartTouchSafe(entity,activator,touchItem)
 end
 IF.Items:ProtectKey("OnStartTouchSafe");
 
+--[[
+Changes the item's world model.
+]]--
 function ITEM:SetWorldModel(sModel)
 	if !sModel then ErrorNoHalt("Itemforge Items: Couldn't change world model. No model was given.\n"); return false end
 	self:SetNWString("WorldModel",sModel);
@@ -767,112 +605,6 @@ function ITEM:SetViewModel(sModel)
 end
 IF.Items:ProtectKey("SetViewModel");
 
---[[
-This function Sets the number of items in the stack. If happening on the server, the clients are updated, and setting it to 0 or below removes the item.
-If the amount is set to 0 or below, the item is removed.
-True is returned if the stack's amount was successfully changed to the given number.
-False is returned in three cases:
-	The stack has run out of items and has been removed (amt was 0 or less)
-	The stack has a max amount and couldn't be changed because the new amount would have exceeded the max.
-	The stack was in an inventory, and the weight cap would have been exceeded if we had changed the size.
-]]--
-function ITEM:SetAmount(amt)
-	local max=self:GetMaxAmount();
-	if amt<=0 then
-		self:Remove();
-		return false;
-	elseif max!=0 && amt>max then
-		return false;
-	end
-	
-	local container=self:GetContainer();
-	if container then
-		local weightCap=container:GetWeightCapacity();
-		if weightCap>0 && container:GetWeightStored()-self:GetStackWeight()+(self:GetWeight()*amt)>weightCap then
-			return false;
-		end
-	end
-	
-	return self:SetNWInt("Amount",amt);
-end
-IF.Items:ProtectKey("SetAmount");
-
---[[
-Set max number of items in the stack.
-Give 0 for maxamount to allow an unlimited number of items in the stack.
-]]--
-function ITEM:SetMaxAmount(maxamount)
-	return self:SetNWInt("MaxAmount",maxamount);
-end
-IF.Items:ProtectKey("SetMaxAmount");
-
---[[
-Set HP of top item in stack
-who is the player or entity who changed the HP (who damaged or repaired it)
-TODO optimize
-]]--
-function ITEM:SetHealth(hp,who)
-	local shouldUp=true;
-	if hp<=0 then		--If HP falls below 0, subtract from the stack.
-		--[[
-		If maxhealth is 100
-		and hp is set to -92
-		
-		-92/100 = -.92
-		floored to 0
-		1 subtracted
-		-1
-		
-		1 item will be removed
-		
-		(1*100)-92
-		New HP will be 8
-		
-		hp is set to -100?
-		-100/100 = -1
-		floored to -1
-		1 subtracted
-		-2
-		
-		2 items will be removed
-		-(-2*100)-100 = 100
-		
-		New HP will be 100
-		]]--
-		
-		local SubtractHowMany=math.floor(hp/self:GetMaxHealth())-1;
-		local Remainder=(-(SubtractHowMany*self:GetMaxHealth()))+hp;
-		
-		hp=Remainder;
-		
-		local totalLoss=-SubtractHowMany;
-		if totalLoss > self:GetAmount() then
-			totalLoss=self:GetAmount();
-		end
-		
-		local s,r=pcall(self.OnBreak,self,totalLoss,(totalLoss==self:GetAmount()),who);
-		if !s then ErrorNoHalt(r.."\n") end
-		
-		shouldUp=self:SetAmount(self:GetAmount()+SubtractHowMany);
-	elseif hp>self:GetMaxHealth() then
-		hp=self:GetMaxHealth();
-	end
-	
-	--Update the client with this item's health - if there are no items left (all destroyed) don't bother.
-	if shouldUp==true then
-		self:SetNWInt("Health",hp);
-	end
-end
-IF.Items:ProtectKey("SetHealth");
-
---[[
-Set max health of all items in the stack.
-]]--
-function ITEM:SetMaxHealth(maxhp)
-	self:SetNWInt("MaxHealth",maxhp);
-end
-IF.Items:ProtectKey("SetMaxHealth");
-
 --Sends all of the necessary item data to a player. Triggers "OnSendFullUpdate" event.
 function ITEM:SendFullUpdate(pl)
 	
@@ -882,30 +614,7 @@ function ITEM:SendFullUpdate(pl)
 			--This shouldn't happen, but just in case.
 			if !self.NWVarsByName[k] then ErrorNoHalt("Itemforge Items: Couldn't send networked var \""..k.."\" via full update on "..tostring(self)..". This networked var has not been defined in the itemtype with IF.Items:CreateNWVar. This shouldn't be happening.\n"); end
 			
-			local iType=self.NWVarsByName[k].Type;	--We need to know what kind of data to send
-			local value=self:GetNWVar(k);			--We need to know the value of the NWVar
-			
-			if iType==1 then
-				self:SetNWInt(k,value,pl);
-			elseif iType==2 then
-				self:SetNWFloat(k,value,pl);
-			elseif iType==3 then
-				self:SetNWBool(k,value,pl);
-			elseif iType==4 then
-				self:SetNWString(k,value,pl);
-			elseif iType==5 then
-				self:SetNWEntity(k,value,pl);
-			elseif iType==6 then
-				self:SetNWVector(k,value,pl);
-			elseif iType==7 then
-				self:SetNWAngle(k,value,pl);
-			elseif iType==8 then
-				self:SetNWItem(k,value,pl);
-			elseif iType==9 then
-				self:SetNWInventory(k,value,pl);
-			else
-				self:SetNWBool(k,nil,pl);
-			end
+			if !self.NWVarsByName[k].HoldFromUpdate then self:SendNWVar(k,pl); end
 		end
 	end
 	
@@ -916,6 +625,31 @@ function ITEM:SendFullUpdate(pl)
 	if !s then ErrorNoHalt(r.."\n") end
 end
 IF.Items:ProtectKey("SendFullUpdate");
+
+--[[
+Runs every time the server ticks.
+]]--
+function ITEM:ServerTick()
+	--Send predicted network vars.
+	if self.NWVars then
+		for k,v in pairs(self.NWVars) do
+			--This shouldn't happen, but just in case.
+			if !self.NWVarsByName[k] then ErrorNoHalt("Itemforge Items: Couldn't send networked var \""..k.."\" via full update on "..tostring(self)..". This networked var has not been defined in the itemtype with IF.Items:CreateNWVar. This shouldn't be happening.\n"); end
+			
+			if self.NWVarsByName[k].Predicted then
+				--Create the "Last Tick" table if it hasn't been created yet
+				if !self.NWVarsLastTick then self.NWVarsLastTick={}; end
+				
+				--Only send networked vars that have changed since the last tick
+				if self.NWVars[k]!=self.NWVarsLastTick[k] then
+					self.NWVarsLastTick[k]=self.NWVars[k];
+					self:SendNWVar(k);
+				end
+			end
+		end
+	end
+end
+IF.Items:ProtectKey("ServerTick");
 
 --[[
 Triggers a Wire output on this item. This will not work if Wiremod is not installed.
@@ -1076,11 +810,11 @@ function ITEM:ReceiveNWCommand(fromPl,commandid,args)
 end
 IF.Items:ProtectKey("ReceiveNWCommand");
 
-
-function ITEM:PlayerSendToInventory(player,inv,invSlot)
-	if !self:CanPlayerInteract(player) then return false end
-	if !inv || !inv:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't move "..tostring(self).." to inventory as requested by player "..tostring(player)..", inventory given was not valid!\n"); return false end
-	if invSlot==nil then ErrorNoHalt("Itemforge Items: Couldn't move "..tostring(self).." to inventory "..inv:GetID().." as requested by player "..tostring(player)..", no slot was given!\n"); return false end
+--Runs when a client requests to send this item to an inventory
+function ITEM:PlayerSendToInventory(pl,inv,invSlot)
+	if !self:CanPlayerInteract(pl) then return false end
+	if !inv || !inv:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't move "..tostring(self).." to inventory as requested by player "..tostring(pl)..", inventory given was not valid!\n"); return false end
+	if invSlot==nil then ErrorNoHalt("Itemforge Items: Couldn't move "..tostring(self).." to inventory "..inv:GetID().." as requested by player "..tostring(pl)..", no slot was given!\n"); return false end
 	
 	if invSlot==0 then invSlot=nil end
 	
@@ -1089,18 +823,29 @@ function ITEM:PlayerSendToInventory(player,inv,invSlot)
 end
 IF.Items:ProtectKey("PlayerSendToInventory");
 
-function ITEM:PlayerSendToWorld(player,where)
-	if !self:CanPlayerInteract(player) then return false end
+--Runs when a client requests to send this item to the world somewhere
+--TODO range checking on "where"
+function ITEM:PlayerSendToWorld(pl,where)
+	if !self:CanPlayerInteract(pl) then return false end
 	self:ToWorld(where);
 end
 IF.Items:ProtectKey("PlayerSendToWorld");
 
-function ITEM:PlayerMerge(player,otherItem)
-	if !self:CanPlayerInteract(player) then return false end
+--Runs when a client requests to hold an item
+function ITEM:PlayerHold(pl)
+	if !self:CanPlayerInteract(pl) then return false end
+	self:Hold(pl);
+end
+IF.Items:ProtectKey("PlayerHold");
+
+--Runs when a client requests to merge this item and another item
+function ITEM:PlayerMerge(pl,otherItem)
+	if !self:CanPlayerInteract(pl) || !otherItem:CanPlayerInteract(pl) then return false end
 	self:Merge(true,otherItem);
 end
 IF.Items:ProtectKey("PlayerMerge");
 
+--Runs when a client requests to split this item
 function ITEM:PlayerSplit(player,amt)
 	if !self:CanPlayerInteract(player) then return false end
 	return self:Split(true,amt);
@@ -1112,9 +857,9 @@ IF.Items:CreateNWCommand(ITEM,"ToInventory",nil,{"inventory","short"});
 IF.Items:CreateNWCommand(ITEM,"RemoveFromInventory",nil,{"bool","inventory"});
 IF.Items:CreateNWCommand(ITEM,"TransferInventory",nil,{"inventory","inventory","short"});
 IF.Items:CreateNWCommand(ITEM,"TransferSlot",nil,{"inventory","short","short"});
-IF.Items:CreateNWCommand(ITEM,"Use",ITEM.Use);
-IF.Items:CreateNWCommand(ITEM,"Hold",ITEM.Hold);
-IF.Items:CreateNWCommand(ITEM,"PlayerSendToInventory",ITEM.PlayerSendToInventory,{"inventory","short"});
-IF.Items:CreateNWCommand(ITEM,"PlayerSendToWorld",ITEM.PlayerSendToWorld,{"vector"});
-IF.Items:CreateNWCommand(ITEM,"PlayerMerge",ITEM.PlayerMerge,{"item"});
-IF.Items:CreateNWCommand(ITEM,"PlayerSplit",ITEM.PlayerSplit,{"int"});
+IF.Items:CreateNWCommand(ITEM,"PlayerUse",function(self,...) self:Use(...) end);
+IF.Items:CreateNWCommand(ITEM,"PlayerHold",function(self,...) self:PlayerHold(...) end);
+IF.Items:CreateNWCommand(ITEM,"PlayerSendToInventory",function(self,...) self:PlayerSendToInventory(...) end,{"inventory","short"});
+IF.Items:CreateNWCommand(ITEM,"PlayerSendToWorld",function(self,...) self:PlayerSendToWorld(...) end,{"vector"});
+IF.Items:CreateNWCommand(ITEM,"PlayerMerge",function(self,...) self:PlayerMerge(...) end,{"item"});
+IF.Items:CreateNWCommand(ITEM,"PlayerSplit",function(self,...) self:PlayerSplit(...) end,{"int"});

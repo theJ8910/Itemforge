@@ -137,16 +137,30 @@ end
 IF.Items:ProtectKey("ToVoid");
 
 --[[
+Protected OnWorldExit event.
+Stops all looping sounds and then runs the overridable OnWorldExit event.
+]]--
+function ITEM:OnWorldExitSafe(ent)
+	self:StopAllLoopingSounds();
+	
+	--Give events a chance to stop the removal (or at least let them run if it's forced)
+	local s,r=pcall(self.OnWorldExit,self,ent);
+	if !s then					ErrorNoHalt(r.."\n")
+	end
+end
+IF.Items:ProtectKey("OnWorldExitSafe");
+
+--[[
 Run this function to use the item.
 It will trigger the OnUse event in the item.
-If this function is run on the client, the OnUse event can stop it clientside. If it isn't stopped, it requests to "Use" the item on the server.
+If this function is run on the client, the OnUse event can stop it clientside. If it isn't stopped, it requests to "PlayerUse" the item on the server.
 False is returned if the item is unable to be used for any reason.
 
 NOTE: If OnUse returns false clientside, "I can't use this!" does not appear, it simply stops the item from being used serverside.
 TODO: Possibly have the item used by something other than a player
 ]]--
 function ITEM:Use(pl)
-	if !pl || !pl:IsValid() || !pl:IsPlayer() || pl!=LocalPlayer() || !pl:Alive() then return false end
+	if !pl || !pl:IsValid() || !pl:IsPlayer() || !self:CanPlayerInteract(pl) then return false end
 	
 	local s,r=pcall(self.OnUse,self,pl);
 	if !s then ErrorNoHalt(r.."\n")
@@ -155,7 +169,7 @@ function ITEM:Use(pl)
 	end
 	
 	--After the event allows the item to be used clientside, ask the server to use the item.
-	self:SendNWCommand("Use");
+	self:SendNWCommand("PlayerUse");
 	
 	return true;
 end
@@ -169,42 +183,11 @@ False is returned if the item is unable to be held for any reason.
 function ITEM:Hold(pl)
 	if !pl || !pl:IsValid() || !pl:IsPlayer() || pl!=LocalPlayer() || !pl:Alive() then return false end
 	
-	self:SendNWCommand("Hold");
+	self:SendNWCommand("PlayerHold");
 	
 	return true;
 end
 IF.Items:ProtectKey("Hold");
-
---[[
-Sets the number of items in this stack.
-Clientside, this is only good for predicition purposes.
-amt is how many items you want this stack to have.
-	If amt is less than 1, amt will be changed to 1.
-	If this item has a max amount set, and amt is greater than that, amt will be set to the max amount.
-Returns true if the amount was changed successfully, or false otherwise.
-]]--
-function ITEM:SetAmount(amt)
-	local max=self:GetMaxAmount();
-	
-	if amt<1 then					amt=1;
-	elseif max!=0 && amt>max then	amt=max;
-	end
-	
-	return self:SetNWInt("Amount",amt);
-end
-IF.Items:ProtectKey("SetAmount");
-
---Set HP of top item in stack
-function ITEM:SetHealth(hp)
-	if hp<0 then		--Keep health in range clientside
-		hp=0;
-	elseif hp>self:GetMaxHealth() then
-		hp=self:GetMaxHealth();
-	end
-	
-	self:SetNWInt("Health",hp);
-end
-IF.Items:ProtectKey("SetHealth");
 
 --[[
 Returns this item's right click menu if one is currently open.
@@ -224,6 +207,19 @@ False is returned if the menu could not be opened. One possible reason this may 
 ]]--
 function ITEM:ShowMenu(x,y)
 	self.RCMenu=DermaMenu();
+	
+	--Grab the item's name.
+	local s,r=pcall(self.GetName,self)
+	if !s then
+		ErrorNoHalt(r.."\n");
+		r="Itemforge Item";
+	end
+	if self:IsStack() then r=r.." x "..self:GetAmount() end
+	
+	--Add header
+	local h=vgui.Create("ItemforgeMenuHeader");
+	h:SetText(r);
+	self.RCMenu:AddPanel(h);
 	
 	local s,r=pcall(self.OnPopulateMenu,self,self.RCMenu);
 	if !s then
@@ -507,8 +503,8 @@ IF.Items:CreateNWCommand(ITEM,"ToInventory",ITEM.ToInventory,{"inventory","short
 IF.Items:CreateNWCommand(ITEM,"RemoveFromInventory",ITEM.ToVoid,{"bool","inventory"});
 IF.Items:CreateNWCommand(ITEM,"TransferInventory",ITEM.TransInventory,{"inventory","inventory","short"});
 IF.Items:CreateNWCommand(ITEM,"TransferSlot",ITEM.TransSlot,{"inventory","short","short"});
-IF.Items:CreateNWCommand(ITEM,"Use");
-IF.Items:CreateNWCommand(ITEM,"Hold");
+IF.Items:CreateNWCommand(ITEM,"PlayerUse");
+IF.Items:CreateNWCommand(ITEM,"PlayerHold");
 IF.Items:CreateNWCommand(ITEM,"PlayerSendToInventory",nil,{"inventory","short"});
 IF.Items:CreateNWCommand(ITEM,"PlayerSendToWorld",nil,{"vector"});
 IF.Items:CreateNWCommand(ITEM,"PlayerMerge",nil,{"item"});
