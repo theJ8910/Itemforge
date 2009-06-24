@@ -22,9 +22,11 @@ ITEM.Spawnable=false;
 ITEM.AdminSpawnable=false;
 
 --Base Melee Weapon
-ITEM.HitRange=75;
-ITEM.HitForce=5;
-ITEM.HitDamage=25;
+ITEM.HitDamage=25;					--We do this much damage per hit
+ITEM.HitRange=75;					--We must be this close to attack with this weapon
+ITEM.HitForce=5;					--When a physics object is hit, it's hit with "x" times more power than it would if a bullet hit it.
+ITEM.ViewKickMin=Angle(0,0,0);
+ITEM.ViewKickMax=Angle(0,0,0);
 
 ITEM.HitSounds={
 	Sound("physics/flesh/flesh_impact_bullet1.wav"),
@@ -76,12 +78,14 @@ function ITEM:OnPrimaryAttack()
 			hitbullet.Damage = self:GetHitDamage(pOwner,traceRes.Entity);
 			
 			pOwner:FireBullets(hitbullet);
+			
 		end
 	else
 		--If he missed, we'll display him missing and play a miss sound
 		eWeapon:SendWeaponAnim(ACT_VM_MISSCENTER);
 		self:MissSound();
 	end
+	self:AddViewKick(self.ViewKickMin,self.ViewKickMax);
 	return true;
 end
 
@@ -95,6 +99,11 @@ end
 
 function ITEM:GetHitDamage()
 	return self.HitDamage;
+end
+
+function ITEM:AddViewKick(min,max)
+	if !self:IsHeld() then return false end
+	self:GetWOwner():ViewPunch(Angle(math.Rand(min.p,max.p),math.Rand(min.y,max.y),math.Rand(min.r,max.r)));
 end
 
 function ITEM:MissSound()

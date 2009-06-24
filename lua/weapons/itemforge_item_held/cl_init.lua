@@ -9,8 +9,8 @@ include("shared.lua")
 language.Add("itemforge_item_held","Item (held)");
 
 SWEP.PrintName			= "Itemforge Item";
-SWEP.Slot				= 5;
-SWEP.SlotPos			= 0;
+SWEP.Slot				= 0;
+SWEP.SlotPos			= 5;
 SWEP.DrawAmmo			= false;
 SWEP.DrawCrosshair		= true;
 SWEP.DrawWeaponInfoBox	= false;

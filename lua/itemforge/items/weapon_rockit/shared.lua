@@ -18,10 +18,6 @@ ITEM.PrimaryDelay=.4;
 ITEM.SecondaryDelay=.4;
 
 --Overridden Base Ranged stuff
-ITEM.Clips={};
-ITEM.Clips[1]={Type="item",Size=0};
-
-ITEM.PrimaryClip=1;
 ITEM.PrimaryFireSounds={
 Sound("weapons/physcannon/superphys_launch1.wav"),
 Sound("weapons/physcannon/superphys_launch2.wav"),
@@ -39,10 +35,11 @@ ITEM.ReloadSounds={
 	Sound("npc/dog/dog_pneumatic2.wav")
 }
 
-ITEM.MuzzleName="core";			--The gravity gun has "core" instead of "muzzle"
+ITEM.MuzzleName="core";			--The gravity gun model has "core" instead of "muzzle"
 
 --Rock-It Launcher
-ITEM.UnloadSound=Sound("npc/dog/dog_rollover_servos1.wav");
+ITEM.UnloadSound=Sound("weapons/physcannon/superphys_hold_loop.wav");
+
 
 --Returns the gun's inventory.
 function ITEM:GetInventory()
@@ -111,7 +108,7 @@ function ITEM:Chuck(speed)
 			phys:SetVelocity(fwd*speed);
 			phys:AddAngleVelocity(Angle(math.Rand(-100,100),math.Rand(-100,100),math.Rand(-100,100)));
 		end
-		ent:SetOwner(pOwner);
+		ent:SetPhysicsAttacker(pOwner);
 		
 		return true;
 	elseif self:InWorld() then
@@ -124,9 +121,9 @@ function ITEM:Chuck(speed)
 		local phys=ent:GetPhysicsObject();
 		if phys && phys:IsValid() then
 			phys:SetVelocity(fwd*speed);
-			phys:AddAngleVelocity(Angle(math.Rand(-100,100),math.Rand(-100,100),math.Rand(-100,100)));
+			phys:AddAngleVelocity(Angle(math.Rand(-200,200),math.Rand(-200,200),math.Rand(-200,200)));
 		end
-		ent:SetOwner(eEnt);
+		ent:SetPhysicsAttacker(eEnt);
 		
 		return true;
 	elseif self:InInventory() then
@@ -135,3 +132,5 @@ function ITEM:Chuck(speed)
 	end
 	return false;
 end
+
+IF.Items:CreateNWVar(ITEM,"Unloading","bool",false);

@@ -27,6 +27,11 @@ ITEM.BackCoords[6]=ITEM.BackCoords[1];
 ITEM.Back=NewMesh();
 ITEM.Back:BuildFromTriangles(ITEM.BackCoords);
 
+--[[
+Draws a back panel on an entity.
+This is necessary because the keypad doesn't have a back panel.
+That, and having a this in a function rather than a model means that we only draw the back when it needs to be drawn.
+]]--
 function ITEM:DrawBack(ent)
 	--Make world matrix (NOTE: weird, the transformations were in the opposite order I expected them to be in...)
 	local wm=Matrix();
@@ -60,9 +65,10 @@ function ITEM:OnSWEPDraw(eEntity,SWEP,bTranslucent)
 	end
 end
 
---Pose model in inventory
+--Pose model in inventory. I want it posed a certain way (standing upright)
 function ITEM:OnPose3D(eEntity,PANEL)
-	local r=RealTime()*20;
+	if !self.Rand then self.Rand=math.random()*100 end
+	local r=(RealTime()+self.Rand)*20;
 	
 	local min,max=eEntity:GetRenderBounds();
 	local center=max-((max-min)*.5);			--Center, used to position 
@@ -76,11 +82,18 @@ function ITEM:OnDraw3D(eEntity,PANEL,bTranslucent)
 	self:DrawBack(eEntity);
 end
 
+--[[
+The lock can have it's password set through it's right-click menu.
+Likewise it also has all the options the base_lock has.
+]]--
 function ITEM:OnPopulateMenu(pMenu)
 	self["base_lock"].OnPopulateMenu(self,pMenu);
 	pMenu:AddOption("Set Password",function(panel) self:SendNWCommand("SetPassword") end);
 end
 
+--[[
+Runs whenever the server requests this client to enter a password for this item.
+]]--
 function ITEM:AskForPassword(reqid,strQuestion)
 	Derma_StringRequest("Password Lock",strQuestion,"",function(str) self:SendNWCommand("ReturnPassword",reqid,str) end,nil,"OK","Cancel");
 end

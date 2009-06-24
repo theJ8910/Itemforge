@@ -161,18 +161,6 @@ These methods might be of some use:
 	pMenu:AddPanel(pnl);
 ]]--
 function ITEM:OnPopulateMenu(pMenu)
-	--Grab the item's name.
-	local s,r=pcall(self.GetName,self)
-	if !s then
-		ErrorNoHalt(r.."\n");
-		r="Itemforge Item";
-	end
-	
-	--Add header
-	local h=vgui.Create("ItemforgeMenuHeader");
-	h:SetText(r);
-	pMenu:AddPanel(h);
-	
 	--Add basic "Use" and "Hold" options
 	pMenu:AddOption("Use",function(panel) self:Use(LocalPlayer()) end);
 	pMenu:AddOption("Hold",function(panel) self:Hold(LocalPlayer()) end);

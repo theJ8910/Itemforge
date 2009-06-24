@@ -26,35 +26,12 @@ Some features the base_ranged has:
 ]]--
 AddCSLuaFile("shared.lua");
 AddCSLuaFile("cl_init.lua");
+AddCSLuaFile("findammo.lua");
 
 include("shared.lua");
-include("findammo.lua");
 
-ITEM.PrimaryAutoFiring=false;
-ITEM.SecondaryAutoFiring=false;
-
---[[
-This function is called when:
-	The player presses R to reload.
-	The player right clicks the weapon and chooses "Reload"
-	Wiremod triggers the "Reload" input
-It locates nearby ammo and tells the gun to load it.
-]]--
-function ITEM:OnReload()
-	if !self:CanReload() then return false end
-	if self.ReloadsSingly then return self:StartReload(); end
-	
-	for i=1,table.getn(self.Clips) do
-		local curAmmo=self:GetAmmo(i);
-		if !curAmmo || self.Clips[i].Size==0 || curAmmo:GetAmount()<self.Clips[i].Size then
-			local items=self:FindAmmo(i);
-			for k,v in pairs(items) do
-				if self:Load(v,i) then return true end
-			end
-		end
-	end
-	return false;
-end
+ITEM.PrimaryFiring=false;
+ITEM.SecondaryFiring=false;
 
 --[[
 Loads a clip with the given item.
@@ -76,26 +53,31 @@ function ITEM:Load(item,clip,amt)
 	
 	if !self:CanLoadClipWith(item,clip) then return false end
 	
-	--Get currently loaded ammo, if any
+	--How much ammo are we loading
+	amt=math.Clamp(amt or item:GetAmount(),1,item:GetAmount());
+	
+	local clipSize=self:GetClipSize(clip);
 	local currentAmmo=self:GetAmmo(clip);
 	local isOldAmmo=false;
+	
 	
 	--We don't have any ammo loaded
 	if !currentAmmo then
 		--We're loading too much ammo into our clip.
-		if self.Clips[clip].Size!=0 && item:GetAmount()>self.Clips[clip].Size then
-			local i=item:Split(false,self.Clips[clip].Size);
-			if !i then return false end
-		
-			return self:Load(i,clip,amt);
+		if clipSize!=0 && amt>clipSize then
+			item=item:Split(false,self.Clips[clip].Size);
+			if !item then return false end
 		end
 	
 	--We're loading more ammo of the same type
 	elseif currentAmmo:GetType()==item:GetType() then
-		isOldAmmo=currentAmmo:Merge(true,item);
-		
-		--If we failed to merge any items at all then we just fail
-		if isOldAmmo==false then return false end
+		if item:GetAmount()>amt then
+			if !item:Transfer(amt,currentAmmo) then return false end
+			isOldAmmo=true;
+		else
+			isOldAmmo=currentAmmo:Merge(true,item);
+			if isOldAmmo==false then return false end
+		end
 	
 	--We're loading in a different type of ammo; try to unload the clip to make room for it
 	elseif !self:Unload(clip) then
@@ -109,12 +91,18 @@ function ITEM:Load(item,clip,amt)
 	since it would only hold one item.
 	]]--
 	if isOldAmmo==false then
+		--If we're only loading a few items from the stack, split them off and load them instead
+		if item:GetAmount()>amt then
+			item=item:Split(false,amt);
+			if !item then return false end
+		end
+		
 		item:ToVoid();
 		--TODO Store old max amount
 		item:SetMaxAmount(self.Clips[clip].Size);
 
 		self.Clip[clip]=item;
-		self:SendNWCommand("Load",nil,item,clip);
+		self:SendNWCommand("SetClip",nil,item,clip);
 	end
 	
 	self:ReloadEffects();
@@ -125,9 +113,10 @@ function ITEM:Load(item,clip,amt)
 end
 
 --[[
-Consumes primary ammo; returns true if ammo was consumed, false otherwise
+Consumes the given amount of ammo from the given clip.
 One reason this could fail is if we're trying to take too much ammo.
 	For example, what if we have one shotgun shell and try to take two?
+Returns true if ammo was consumed, false otherwise
 ]]--
 function ITEM:TakeAmmo(amt,clip)
 	local ammo=self:GetAmmo(clip);
@@ -136,7 +125,7 @@ function ITEM:TakeAmmo(amt,clip)
 	local currentAmt=ammo:GetAmount();
 	if currentAmt<amt then return false end
 	
-	local s=ammo:SetAmount(currentAmt-amt);
+	local s=ammo:SubAmount(amt);
 	self:UpdateWireAmmoCount();
 	return s;
 end
@@ -185,14 +174,20 @@ end
 
 --Auto-attack if Wiremod has told us to
 function ITEM:OnThink()
-	if self.PrimaryAutoFiring==true		&& self:CanPrimaryAttackAuto()		then self:OnPrimaryAttack();	end
-	if self.SecondaryAutoFiring==true	&& self:CanSecondaryAttackAuto()	then self:OnSecondaryAttack();	end
+	if self.PrimaryFiring==true		&& self:CanPrimaryAttackAuto()			then
+		self:OnPrimaryAttack();
+	elseif self.SecondaryFiring==true	&& self:CanSecondaryAttackAuto()	then
+		self:OnSecondaryAttack();
+	elseif self:GetNWBool("InReload")==true									then
+		self:Reload();
+	end
 end
 
 --If the gun was firing on it's own it won't be any more; this only works while the item is in the world
 function ITEM:OnWorldExit(ent,forced)
-	self.PrimaryAutoFiring=false;
-	self.SecondaryAutoFiring=false;
+	if !self["item"].OnWorldExit(self,ent,forced) then return false end
+	self.PrimaryFiring=false;
+	self.SecondaryFiring=false;
 	return true;
 end
 
@@ -211,14 +206,15 @@ function ITEM:GetWireOutputs(entity)
 end
 
 --This function handles the wiremod requests to fire/reload the gun
+--TODO auto reloading
 function ITEM:OnWireInput(entity,inputName,value)
 	if inputName=="Fire Primary" then
-		if value==0 then	self.PrimaryAutoFiring=false;
-		else				self.PrimaryAutoFiring=true;
+		if value==0 then	self.PrimaryFiring=false;
+		else				self.PrimaryFiring=true;
 		end
 	elseif inputName=="Fire Secondary" then
-		if value==0 then	self.SecondaryAutoFiring=false;
-		else				self.SecondaryAutoFiring=true;
+		if value==0 then	self.SecondaryFiring=false;
+		else				self.SecondaryFiring=true;
 		end
 	elseif inputName=="Reload" && value!=0 then
 		self:OnReload();
@@ -235,7 +231,7 @@ function ITEM:UpdateWireAmmoCount()
 	end
 end
 
-IF.Items:CreateNWCommand(ITEM,"Load",nil,{"item","int"});
+IF.Items:CreateNWCommand(ITEM,"SetClip",nil,{"item","int"});
 IF.Items:CreateNWCommand(ITEM,"Unload",nil,{"int"});
 IF.Items:CreateNWCommand(ITEM,"PlayerFirePrimary",	function(self,...) self:OnPrimaryAttack(...)	end,{});
 IF.Items:CreateNWCommand(ITEM,"PlayerFireSecondary",function(self,...) self:OnSecondaryAttack(...)	end,{});

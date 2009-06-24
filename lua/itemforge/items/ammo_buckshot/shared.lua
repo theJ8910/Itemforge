@@ -166,32 +166,4 @@ end
 
 
 
-else
-
-
-
-
---Draw multiple shells if we're drawing a shell model
-function ITEM:OnEntityDraw(eEntity,ENT,bTranslucent)
-	--Do standard draw procedure
-	self["base_ammo"].OnEntityDraw(self,eEntity,ENT,bTranslucent);
-	
-	local amt=self:GetAmount();
-	
-	--No special effects if we're using a box for a model OR if we only have one shell
-	if amt>=self.TurnsBoxAt || amt<2 then return false end
-	
-	local oldpos,oldang=eEntity:GetPos(),eEntity:GetAngles();
-	eEntity:SetPos(oldpos+oldang:Right()*2);
-	eEntity:DrawModel();
-	if amt>5 then
-		eEntity:SetPos(oldpos+oldang:Up()*2);
-		eEntity:DrawModel();
-	end
-	eEntity:SetPos(oldpos);
-end
-
-
-
-
 end

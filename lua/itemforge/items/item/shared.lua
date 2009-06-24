@@ -6,8 +6,12 @@ item is the default item. All items except item inherit from this item-type.
 NOTE: The item type is the name of the folder it is in (this is item/shared.lua, so this item's type is "item")
 ]]--
 
+include("health.lua");
+include("stacks.lua");
+include("weight.lua");
 include("nwvars.lua");
 include("timers.lua");
+include("sounds.lua");
 include("events_shared.lua");
 
 --[[
@@ -22,10 +26,6 @@ ITEM.Description="This is the default description.";--An item's description give
 ITEM.Base=nil;										--The item is based off of this kind of item. Set this to nil if it's not based off of an item. Set it to the type of another item (ex: ITEM.Base="hammer") to base it off of that. (NOTE: This is useful for tools. For example: If you have an item called "Hammer" that "Stone Hammer" and "Iron Hammer" are based off of, and you have a combination that takes "Hammer" as one of it's ingredients, both the "Stone Hammer" and "Iron Hammer" can be used!)
 ITEM.WorldModel="models/dav0r/buttons/button.mdl";	--When dropped on the ground, held by a player, or viewed on some places on the UI (like an inventory icon), the world model is the model displayed.
 ITEM.ViewModel="models/weapons/v_pistol.mdl";		--When held by a player, the player holding it sees this model in first-person.
-ITEM.StartAmount=1;									--When we spawn this item, how many items will be in the stack by default? This shouldn't be larger than MaxAmount.
-ITEM.MaxAmount=1;									--How many items of this type will fit in a stack (by default - this can be changed with SetMaxAmount())? Set this to 0 to allow an unlimited amount of items of this type to be stored in a stack. Should 1000 shuriken be able to occupy a single slot in an inventory, or should 30 shuriken occupy one slot?
-ITEM.MaxHealth=100;									--How much health does a single item in the stack have when at full health (by default - this can be changed with SetMaxHealth())?
-ITEM.Weight=1;										--Default weight of one item in this stack, in kg. By default, I mean that the weight can be changed after the item is created. Note: this doesn't affect the physics weight when the item is on the ground, just the weight of the item in an inventory.
 ITEM.Size=1;										--Default size of a single item in this stack. Size has nothing to do with how big the item looks or how much it weighs. Instead, size determines if an item can be placed in an inventory or not. In my opinion, a good size can be determined if you put the item into the world and get the entity's bounding sphere size.
 ITEM.Color=Color(255,255,255,255);					--Default color of this item's model and icon. Can be changed.
 
@@ -46,14 +46,12 @@ ITEM.NWCommandsByID=nil;	--Networked commands are stored here. The key is the id
 
 --Belongs to individual items
 ITEM.ID=0;					--Item ID. Assigned automatically.
-ITEM.Container=nil;			--This is the inventory that the item is in. If the item is being held as a weapon or if it's in the world, this is nil.
-ITEM.Entity=nil;			--The entity that represents this item. If the item is on the ground, this is the SENT that represents the item. If the item is being held by a player, this is the SWEP entity. If the item is in an inventory, this is nil.
-ITEM.Weapon=nil;			--If the item is being held, this is the weapon.
-ITEM.Owner=nil;				--If the item is being held, this is the player holding it (NOTE: GetOwner() does not return this).
+ITEM.Container=nil;			--If the item is in an inventory, this is the inventory it is in.			Use self:GetContainer() to grab.
+ITEM.Entity=nil;			--If the item is on the ground, this is the SENT that represents the item.	Use self:GetEntity() to grab this.
+ITEM.Weapon=nil;			--If the item is being held by a player, this is the SWEP entity.			Use self:GetWeapon() to grab this.
+ITEM.Owner=nil;				--If the item is being held, this is the player holding it.					Use self:GetWOwner() to grab this. (NOTE: GetNetOwner() does not return this).
 ITEM.BeingRemoved=false;	--This will be true if the item is being removed.
 ITEM.Inventories=nil;		--Inventories connected to this item are stored here. The item 'has' these inventories (a backpack or a crate would store it's inventory here, for example). The key is the inventory's ID. The value is the actual inventory.
-
-
 
 --[[
 DEFAULT METHODS
@@ -95,47 +93,6 @@ end
 IF.Items:ProtectKey("InheritsFrom");
 
 --[[
-Hurt the top item on the stack however many points you want.
-Serverside, this will actually damage the item (reduce it's health), but it can be used clientside for prediction if you want.
-who is an optional entity that will be credited with causing damage to this item.
-
-ITEM.Damage is the same thing as ITEM.Hurt
-]]--
-function ITEM:Hurt(pts,who)
-	if !pts then ErrorNoHalt("Itemforge Items: Couldn't hurt/damage item, hitpoints to remove from item not given!\n") end
-	if pts<0 then pts=0 end
-	self:SetHealth(self:GetHealth()-pts,who);
-end
-IF.Items:ProtectKey("Hurt");
-ITEM.Damage=ITEM.Hurt;
-IF.Items:ProtectKey("Damage");
-
---[[
-Heals the top item on the stack however many points you want.
-Serverside, this will actually heal the item, but clientside it can be used for prediction.
-who is an optional entity that will be credited with healing the item.
-]]--
-function ITEM:Heal(pts,who)
-	if !pts then ErrorNoHalt("Itemforge Items: Couldn't heal/repair "..tostring(self)..", hitpoints to restore item not given!\n") end
-	if pts<0 then pts=0 end
-	self:SetHealth(self:GetHealth()+pts,who);
-end
-IF.Items:ProtectKey("Heal");
-ITEM.Repair=ITEM.Heal;
-IF.Items:ProtectKey("Repair");
-
---[[
-This sets the weight of each individual item in the stack.
-For example:
-	If there are 5 items in the stack, and you set the weight to 5kg, the stack now weighs 25kg (because 5kg*5 items = 25kg)
-	If there is only one item in the stack, and you set the weight to 20kg, the item now weighs 20kg (20kg * 1 item = 20kg).
-]]--
-function ITEM:SetWeight(kg)
-	self:SetNWInt("Weight",kg);
-end
-IF.Items:ProtectKey("SetWeight");
-
---[[
 Sets the size of every item in the stack.
 Size has nothing to do with weight or how big the item looks.
 The only thing size determines is if an item can be placed inside of an inventory that has a size limit.
@@ -175,47 +132,11 @@ function ITEM:GetID()
 end
 IF.Items:ProtectKey("GetID");
 
---Get HP of the top item in stack (the items beneath it are assumed to be at full health)
-function ITEM:GetHealth()
-	return self:GetNWInt("Health");
-end
-IF.Items:ProtectKey("GetHealth");
-
---Get the max HP of an item in the stack (they all have the same Max HP)
-function ITEM:GetMaxHealth()
-	return self:GetNWInt("MaxHealth");
-end
-IF.Items:ProtectKey("GetMaxHealth");
-
---Get the weight of an item in the stack (they all weigh the same).
-function ITEM:GetWeight()
-	return self:GetNWInt("Weight");
-end
-IF.Items:ProtectKey("GetWeight");
-
 --Get the size of an item in the stack (they all are the same size).
 function ITEM:GetSize()
 	return self:GetNWInt("Size");
 end
 IF.Items:ProtectKey("GetSize");
-
---Get the weight of all the items in the stack. This is the weight of an individual item times the amount.
-function ITEM:GetStackWeight()
-	return self:GetWeight()*self:GetAmount();
-end
-IF.Items:ProtectKey("GetStackWeight");
-
---Get the number of items in the stack.
-function ITEM:GetAmount()
-	return self:GetNWInt("Amount");
-end
-IF.Items:ProtectKey("GetAmount");
-
---Get the max number of items of the same type that can be in this stack.
-function ITEM:GetMaxAmount()
-	return self:GetNWInt("MaxAmount");
-end
-IF.Items:ProtectKey("GetMaxAmount");
 
 --[[
 Returns the world model.
@@ -242,9 +163,12 @@ end
 IF.Items:ProtectKey("GetColor");
 
 --[[
-Returns the player who "owns" this item or nil if the item has no owner
-The owner is the player who receives networked data about this item. If the owner is nil, everybody receives networked data about this item.
-The "owner" of the item depends on what inventory this item is in:
+Returns the player who is NetOwner of this item.
+The NetOwner is the player who receives networked data about this item.
+If the NetOwner is nil, everybody receives networked data about this item.
+Items with a NetOwner are called "Private Items".
+Items without a NetOwner are called "Public Items".
+The NetOwner of the item depends on what inventory this item is in:
 	If the item is not in an inventory (in the world, held as a weapon, or in the void) the owner is nil.
 	If the item is in a public inventory (an inventory not owned by a player), the owner is nil.
 	If the item is in a private inventory (an inventory owned by a player), the owner is the owner of the inventory.
@@ -355,40 +279,6 @@ function ITEM:GetPos()
 	return nil;
 end
 IF.Items:ProtectKey("GetPos");
-
---[[
-Causes the item to emit a sound.
-True is returned if the sound is played.
-False is returned if the sound couldn't be played (probably because the item is in the void or otherwise couldn't be located).
-]]--
-function ITEM:EmitSound(sound,amp,pitch)
-	--If the item is in the world, we'll emit from that entity.
-	if self:InWorld() then
-		local ent=self:GetEntity();
-		ent:EmitSound(sound,amp,pitch);
-		return true;
-	elseif self:IsHeld() then
-		local pl=self:GetWOwner();
-		if !pl then return false end
-		
-		pl:EmitSound(sound,amp,pitch);
-		return true;
-	elseif self:InInventory() then
-		local pos=self:GetPos();
-		local postype=type(pos);
-		if postype=="Vector" then
-			WorldSound(sound,pos,amp,pitch);
-		elseif postype=="table" then
-			for k,v in pairs(pos) do
-				WorldSound(sound,pos,amp,pitch);
-			end
-		end
-		return true;
-	end
-	
-	return false;
-end
-IF.Items:ProtectKey("EmitSound");
 
 --[[
 Is this item in an inventory? (a specific inventory?) (a specific slot?)
@@ -512,6 +402,7 @@ These functions are called internally by Itemforge. There should be no reason fo
 --[[
 This is called when the item is created. This is NOT called when the item is placed into the world.
 This function will call the item's OnInit event.
+
 This function is called internally by Itemforge. There should be no reason for a scripter to call this.
 ]]--
 function ITEM:Initialize(owner)
@@ -540,6 +431,8 @@ IF.Items:ProtectKey("SetEntity");
 
 --[[
 Clears the item's entity.
+
+This function is called internally by Itemforge. There should be no reason for a scripter to call this.
 ]]--
 function ITEM:ClearEntity()
 	self.Entity=nil;

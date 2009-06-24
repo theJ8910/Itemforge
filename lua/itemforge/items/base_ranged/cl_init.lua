@@ -31,8 +31,40 @@ local cDefaultBack=Color(200,150,0,255);
 local cDefaultBar =Color(255,204,0,255);
 local cDefaultLow =Color(255,0,0,255);
 
---Loads the given clip with the given item. Clientside it just sets the clip to the item no questions asked
-function ITEM:Load(item,clip)
+function ITEM:OnThink()
+	if self:GetNWBool("InReload")==true then
+		self:Reload();
+	end
+end
+
+--[[
+Loads a clip with the given item.
+clip tells us which clip to load. If this is 0, we'll try to load it in any available clip.
+item is the stack of ammo to load.
+amt is an optional amount indicating how many items from the stack to transfer.
+	If this is nil/not given, we'll try to load the whole stack (or we'll try to transfer as many as possible).
+Returns false if it couldn't be loaded for some reason, and true if it could.
+]]--
+function ITEM:Load(item,clip,amt)
+	if !self:CanReload() then return false end
+	
+	if !clip then
+		for i=1,table.getn(self.Clips) do
+			if self:Load(item,i,amt) then return true end
+		end
+		return false;
+	end
+	
+	if !self:CanLoadClipWith(item,clip) then return false end
+	
+	self:ReloadEffects();
+	self:SetNextBoth(CurTime()+self:GetReloadDelay());
+	
+	return true;
+end
+
+--Sets the ammo in the given clip to the given item no questions asked
+function ITEM:SetClip(item,clip)
 	self.Clip[clip]=item;
 	
 	return true;
@@ -50,6 +82,22 @@ function ITEM:TakeAmmo(amt,clip)
 	return true;
 end
 
+--[[
+Runs when a player wants to load this weapon with the given ammo (currently this is used when ammo is drag-dropped here).
+It doesn't actually load the ammo clientside; it requests the server to load the given ammo.
+There are a few checks here that can stop un-necessary requests from being sent:
+	We can make sure the player can interact with the gun
+	We can check if the given ammo is loadable into any clips clientside
+pl is the player who wants to load ammo; if this isn't the same as LocalPlayer() we fail (because it's this player who wants to load ammo, right?)
+ammo is the item we want to load.
+]]--
+function ITEM:PlayerLoadAmmo(pl,ammo)
+	if !self:CanPlayerInteract(pl) then return false end
+	for i=1,table.getn(self.Clips) do
+		if self:CanLoadClipWith(ammo,i) then return self:SendNWCommand("PlayerLoadAmmo",ammo); end
+	end
+end
+
 --We have a nice menu for ranged weapons!
 function ITEM:OnPopulateMenu(pMenu)
 	--We've got everything the base weapon has and more!
@@ -64,13 +112,29 @@ function ITEM:OnPopulateMenu(pMenu)
 	for i=1,table.getn(self.Clips) do
 		local ammo=self:GetAmmo(i);
 		if ammo then
+			local amt=ammo:GetAmount();
+			if amt<self.Clips[i].Size then hasEmptyClip=true end
+			
 			--Who says that gun ammo has to be a stack (e.g. bullets)? It could be a single item as far as we know (e.g. a battery, in the case of energy weapons)
 			local ammoStr=ammo:GetName();
-			if ammo:GetMaxAmount()!=1 then ammoStr=ammoStr.." x "..ammo:GetAmount(); end
+			if ammo:GetMaxAmount()!=1 then ammoStr=ammoStr.." x "..amt; end
 			
 			pMenu:AddOption("Unload "..ammoStr,function(panel)	self:SendNWCommand("PlayerUnloadAmmo",i)	end);
 		else
 			hasEmptyClip=true;
+		end
+	end
+	
+	--If we're holding ammo, we can load it on the right click menu
+	--TODO more than one clip
+	local wep=LocalPlayer():GetActiveWeapon();
+	if wep:IsValid() then
+		local ammo=IF.Items:GetWeaponItem(wep);
+		if self:CanLoadClipWith(ammo,1) then
+			local ammoStr=ammo:GetName();
+			if ammo:IsStack() then ammoStr=ammoStr.." x "..ammo:GetAmount(); end
+			
+			pMenu:AddOption("Load "..ammoStr,function(panel) return self:SendNWCommand("PlayerLoadAmmo",ammo); end);
 		end
 	end
 	
@@ -80,14 +144,13 @@ end
 
 --If usable ammo is dragged here we ask the server to load it
 function ITEM:OnDragDropHere(otherItem)
-	for i=1,table.getn(self.Clips) do
-		if self:CanLoadClipWith(otherItem,i) then return self:SendNWCommand("PlayerLoadAmmo",otherItem); end
-	end
+	self:PlayerLoadAmmo(LocalPlayer(),otherItem);
 	return false;
 end
 
 --Draw ammo bar(s)
 function ITEM:OnDraw2D(width,height)
+	self["base_weapon"].OnDraw2D(self,width,height);
 	local c=0;
 	
 	for i=table.getn(self.Clips),1,-1 do
@@ -140,7 +203,7 @@ function ITEM:DrawAmmoMeter(x,y,w,h,iAmmo,iMaxAmmo,cBack,cBar,cBarLow)
 	return true;
 end
 
-IF.Items:CreateNWCommand(ITEM,"Load",function(self,...) self:Load(...) end,{"item","int"});
+IF.Items:CreateNWCommand(ITEM,"SetClip",function(self,...) self:SetClip(...) end,{"item","int"});
 IF.Items:CreateNWCommand(ITEM,"Unload",function(self,...) self:Unload(...) end,{"int"});
 IF.Items:CreateNWCommand(ITEM,"PlayerFirePrimary",nil,{});
 IF.Items:CreateNWCommand(ITEM,"PlayerFireSecondary",nil,{});

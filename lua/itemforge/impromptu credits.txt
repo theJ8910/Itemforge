@@ -2,5 +2,7 @@ theJ89: Well duh, I made the system
 Azui-Sleet:  His world model correction code eventually lead me to a final solution to the itemforge_item_held world model issues.
 Night-Eagle: Solved my problem with drawing a texture in a circle in the inventory.
 Josh: Suggested the use of networking macros (that pass minimal information)
+Mr. Bix: Many, many suggestions for ways to improve the items and system in general. Dedicated playtester.
+NeoDement: Created the viewmodel for the sawblade (for a "Sawblade Thrower" SWEP)
 Random people that come into my server
 Other people I have forgot at the moment

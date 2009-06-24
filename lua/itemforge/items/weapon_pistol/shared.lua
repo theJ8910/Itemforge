@@ -31,14 +31,11 @@ ITEM.ViewKickMin=Angle(0.25,-.6,0);						--Taken directly from modcode. The view
 ITEM.ViewKickMax=Angle(0.5,.6,0);
 
 --Pistol Weapon
-ITEM.LastAttack=0;				--The last attack occured at this time
-ITEM.BulletsFired=0;			--This many bullets have been fired recently
 --[[
 The HL2 pistol does something irritating;
 The bullet spread varies from 1 to 6 degrees depending on an "accuracy penalty".
 This accuracy penalty increases when bullets are fired and degrades over time.
 ]]--
-ITEM.Penalty=0;
 ITEM.PenaltyPerShot=0.2;		--Add 0.2 seconds of accuracy penalty per shot
 ITEM.PenaltyMax=1.5;			--The max accuracy penality is 1.5 seconds
 
@@ -67,12 +64,12 @@ Add time to the accuracy penalty
 If amt is negative it subtracts accuracy penalty time instead
 ]]--
 function ITEM:AddPenalty(amt)
-	self.Penalty=math.Clamp(self.Penalty+amt,0,self.PenaltyMax);
+	self:SetNWFloat("Penalty",math.Clamp(self:GetNWFloat("Penalty")+amt,0,self.PenaltyMax));
 end
 
 --Bullet spread depends on penalty amount
 function ITEM:GetBulletSpread()
-	return self.BulletSpread+((self.BulletSpreadMax-self.BulletSpread)*(self.Penalty/self.PenaltyMax));
+	return self.BulletSpread+((self.BulletSpreadMax-self.BulletSpread)*(self:GetNWFloat("Penalty")/self.PenaltyMax));
 end
 
 --[[
@@ -83,13 +80,19 @@ In order for this function to work right, the last attack time and number of bul
 To do that I would have had to have rewritten the primary attack function; No use rewriting the whole function for something like this right?
 ]]--
 function ITEM:GetPrimaryActivity()
-	if self.LastAttack-CurTime()>0.5 then	self.BulletsFired=0;
-	else									self.BulletsFired=self.BulletsFired+1;
+	local BulletsFired=self:GetNWInt("BulletsFired");
+	local LastAttack=self:GetNWFloat("LastAttack");
+	if LastAttack-CurTime()>0.5 then	self:SetNWInt("BulletsFired",0);
+	else								self:SetNWInt("BulletsFired",BulletsFired+1);
 	end
-	self.LastAttack=CurTime();
+	self:SetNWFloat("LastAttack",CurTime());
 	
-	if		self.BulletsFired==0 then return ACT_VM_PRIMARYATTACK;
-	elseif	self.BulletsFired==1 then return ACT_VM_RECOIL1;
-	elseif	self.BulletsFired==2 then return ACT_VM_RECOIL2; end
+	if		BulletsFired==0 then return ACT_VM_PRIMARYATTACK;
+	elseif	BulletsFired==1 then return ACT_VM_RECOIL1;
+	elseif	BulletsFired==2 then return ACT_VM_RECOIL2; end
 	return ACT_VM_RECOIL3;
 end
+
+IF.Items:CreateNWVar(ITEM,"Penalty","float",0.0,true,true);
+IF.Items:CreateNWVar(ITEM,"LastAttack","float",0.0,true,true);
+IF.Items:CreateNWVar(ITEM,"BulletsFired","int",0,true,true);
