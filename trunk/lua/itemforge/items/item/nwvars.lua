@@ -51,8 +51,11 @@ You can also override networked vars inherited from other item types. For exampl
 ITEM.NWVarsByName=nil;		--List of Networked vars in this itemtype (key is name, value is id).
 ITEM.NWVarsByID=nil;		--List of Networked vars in this itemtype (key is id, value is name).
 ITEM.NWVars=nil;			--The current value for networked vars set on this particular item are stored here, both clientside and serverside.
+if SERVER then
 ITEM.NWVarsLastTick=nil;	--Last time the server ticked, the predicted networked vars had these values.
-
+else
+ITEM.NWVarsThisTick=nil;	--Next time the client ticks, the predicted networked vars will be set to this.
+end
 
 
 --[[
@@ -569,6 +572,30 @@ function ITEM:SendNWVar(sName,pTo)
 	end
 end
 IF.Items:ProtectKey("SendNWVar");
+
+
+
+
+else
+
+
+
+
+--[[
+Whenever a networked var is received from the server, this function is called.
+]]--
+function ITEM:ReceiveNWVar(sName,vVal)
+	if !sName then ErrorNoHalt("Itemforge Items: Couldn't receive network var from server. Name of network var wasn't given.\n"); return false end
+	if !self.NWVarsByName[sName] then ErrorNoHalt("Itemforge Items: Couldn't receive network var from server. Network var by name \""..sName.."\" doesn't exist clientside.\n"); return false end
+	
+	if self.NWVarsByName[sName].Predicted then
+		if !self.NWVarsThisTick then self.NWVarsThisTick={} end
+		self.NWVarsThisTick[sName]=vVal;
+	else
+		self:SetNWVar(sName,vVal);
+	end
+end
+IF.Items:ProtectKey("ReceiveNWVar");
 
 
 

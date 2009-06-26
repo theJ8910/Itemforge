@@ -356,6 +356,20 @@ end
 IF.Items:ProtectKey("PlayerSplit");
 
 --[[
+Runs every time the client ticks.
+]]--
+function ITEM:Tick()
+	--Set predicted network vars.
+	if self.NWVarsThisTick then
+		for k,v in pairs(self.NWVarsThisTick) do
+			self:SetNWVar(k,v);
+		end
+		self.NWVarsThisTick=nil;
+	end
+end
+IF.Items:ProtectKey("Tick");
+
+--[[
 Sends a networked command by name with the supplied arguments
 Clientside, this runs console commands (sending data to the server in the process)
 ]]--

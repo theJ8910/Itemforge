@@ -5,9 +5,6 @@ SHARED
 This module implements items. The purpose of this module is to load item types, keep track of created items and item types,
 handle inheritence between item types, handle networking of items between client and server, and much, much more.
 
-THINGS FOR TODAY:
-Shotgun reload loop.
-
 theJ89's Giant TODO list
 This is why the system hasn't been released yet:
 
@@ -21,6 +18,13 @@ TODO pay attention to function return values; false should be returned for failu
 TODO wire outputs are forgotten when the item is taken out of the world and put back in; make an item wrapper that remembers them, restore when entity enters world
 TODO change inventory functions from MoveSlot to SwapSlot
 TODO SetWorldModel and SetViewModel need to work clientside too
+TODO Inventory merge is causing splits to fail with "ToSameLocation" errors; ToSameLocation needs to Ignore Inventory Merge??
+TODO Shotgun reload loop is failing when trying to reload from a stack of 1 items
+TODO Unloading ammo into a container that already has that ammo causes SetMaxAmount errors in the gun; need better handling of removal actions
+TODO net_fakelag 500 produces noticable problems with weapons. *sigh*
+TODO Rock-It launcher reload sound isn't playing clientside, attack sound is always "fwoosh" sound (no dry fire)
+TODO Players are complaining about missing weapon icons, investigate
+TODO ranged weapons use ammo clientside, base_ammo should be given predictable amount
 
 Item Ideas
 TODO awesome idea! Been thinking about implementing "inventory locking" that prevents any player interaction for a while now, but what if we used the lock items for this? Password locked briefcase? Hell yeah!
@@ -30,9 +34,9 @@ Events related
 TODO consider rewriting events so "true" overrides and false/nil doesn't (garry does this already so lazy/ignorant coders don't accidentilly break something and spend hours trying to find what went wrong)
 TODO possibly make hooks for both items and item types (ex: ITEMTYPE:Hook() creates a hook for all items of that type)
 TODO Gravity Gun/Physgun hooks like in RPMod v2
-TODO OnChangeAmount with allow/disallow
-TODO OnNewWorldModel with allow/disallow
-TODO OnNewViewModel with allow/disallow
+TODO OnChangeAmount
+TODO OnNewWorldModel
+TODO OnNewViewModel
 TODO OnPopulateMenu is stupid, rename it to OnMakeMenu or OnRightClick
 TODO OnLeftClick/OnRightClick event for world entity & item icon??
 
@@ -279,9 +283,7 @@ function MODULE:Initialize()
 	self:FixItemTypeMissingData();
 	self:SetItemTypeBases();
 	self:SetItemTypeNWVarAndCommandIDs();
-	if SERVER then
-		self:StartTick();
-	end
+	self:StartTick();
 end
 
 --Clean up the items module. Removes all items. Currently I have this done prior to a refresh. It will remove any items and clean up any local stuff stored here.
@@ -753,6 +755,29 @@ function MODULE:FindEmptySlot(iFrom)
 end
 
 --[[
+Starts Itemforge Item's tick
+]]--
+function MODULE:StartTick()
+	hook.Add("Tick","itemforge_tick",self.Tick,self)
+end
+
+--[[
+This runs the Tick() function on every active item on the server (Serverside and Clientside)
+]]--
+function MODULE:Tick()
+	for k,v in pairs(ItemRefs) do
+		v:Tick();
+	end
+end
+
+--[[
+Stops Itemforge Item's tick
+]]--
+function MODULE:StopTick()
+	hook.Remove("Tick","itemforge_tick");
+end
+
+--[[
 Creates an item of this type. This should only be called on the server by a scripter. Clientside, this is called to sync creation.
 id is only required clientside. This is the item id to create.
 fullUpd is only used on the client. This will be true only if creating the item is part of a full update.
@@ -1206,7 +1231,7 @@ function MODULE:CreateSameLocation(type,extItem)
 	local item=self:Create(type,nil);
 	if !item || !item:IsValid() then return nil end
 	
-	if !item:ToSameLocationAs(extItem) then
+	if !item:ToSameLocationAs(extItem,nil,true) then
 		--DEBUG
 		Msg("Couldn't create in same location, removing.\n");
 		item:Remove();
@@ -1214,29 +1239,6 @@ function MODULE:CreateSameLocation(type,extItem)
 	end
 	
 	return item;
-end
-
---[[
-Starts the Itemforge Item's server-side tick
-]]--
-function MODULE:StartTick()
-	hook.Add("Tick","itemforge_tick",self.Tick,self)
-end
-
---[[
-This runs the ServerTick() function on every active item on the server
-]]--
-function MODULE:Tick()
-	for k,v in pairs(ItemRefs) do
-		v:ServerTick();
-	end
-end
-
---[[
-Stops the Itemforge Item's server-side tick
-]]--
-function MODULE:StopTick()
-	hook.Remove("Tick","itemforge_tick");
 end
 
 --[[
@@ -1589,71 +1591,71 @@ function MODULE:HandleIFIMessages(msg)
 		if msgType==IFI_MSG_SETANGLE then
 			local vVal=msg:ReadAngle();
 			
-			item:SetNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETBOOL then
 			local vVal=msg:ReadBool();
 			
-			item:SetNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETCHAR then
 			local vVal=msg:ReadChar();
 			
-			item:SetNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETCOLOR then
 			local vVal=Color(msg:ReadChar()+128,msg:ReadChar()+128,msg:ReadChar()+128,msg:ReadChar()+128);
 			
-			item:SetNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETENTITY then
 			local vVal=msg:ReadEntity();
 			
-			item:SetNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETFLOAT then
 			local vVal=msg:ReadFloat();
 			
-			item:SetNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETLONG then
 			local vVal=msg:ReadLong();
 			
-			item:SetNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETSHORT then
 			local vVal=msg:ReadShort();
 			
-			item:SetNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETSTRING then
 			local vVal=msg:ReadString();
 			
-			item:SetNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETVECTOR then
 			local vVal=msg:ReadVector();
 			
-			item:SetNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETITEM then
 			local vVal=msg:ReadShort()+32768;
 			iItem=IF.Items:Get(vVal);
 			
 			if !iItem || !iItem:IsValid() then ErrorNoHalt("Itemforge Items: Tried to set a networked item (var ID "..VarID..") on "..tostring(item).." to non-existent item with ID "..vVal..".\n"); return false end
 			
-			item:SetNWVar(sName,iItem);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETINV then
 			local vVal=msg:ReadShort()+32768;
 			iInv=IF.Inv:Get(vVal);
 			
 			if !iInv || !iInv:IsValid() then ErrorNoHalt("Itemforge Items: Tried to set a networked inventory (var ID "..VarID..") on "..tostring(item).." to non-existent inventory with ID "..vVal..".\n"); return false end
 			
-			item:SetNWVar(sName,iInv);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETUCHAR then
 			local vVal=msg:ReadChar()+128;
 			
-			item:SetNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETULONG then
 			local vVal=msg:ReadLong()+2147483648;
 			
-			item:SetNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETUSHORT then
 			local vVal=msg:ReadShort()+32768;
 			
-			item:SetNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETNIL then
-			item:SetNWVar(sName,nil);
+			item:ReceiveNWVar(sName,nil);
 		end
 	elseif msgType==IFI_MSG_STARTFULLUPALL then
 		self:OnStartFullUpdateAll(id);

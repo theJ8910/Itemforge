@@ -35,16 +35,14 @@ function ITEM:OnPopulateMenu(pMenu)
 	--Options to unload ammo
 	local inv=self:GetInventory(i);
 	if inv then
-		local ammoCount=inv:GetCount()
+		local ammoCount=inv:GetCount();
 		if ammoCount>0 then
 			local ammoStr;
 			if ammoCount>1 then ammoStr=ammoCount.." items";
 			else
 				local firstItem=inv:GetFirst();
 				ammoStr=firstItem:GetName();
-				if firstItem:GetMaxAmount()!=1 then
-					ammoStr=ammoStr.." x "..firstItem:GetAmount();
-				end
+				if firstItem:IsStack() then ammoStr=ammoStr.." x "..firstItem:GetAmount(); end
 			end
 			
 			pMenu:AddOption("Unload "..ammoStr,function(panel)	self:SendNWCommand("PlayerUnloadAmmo",i)	end);

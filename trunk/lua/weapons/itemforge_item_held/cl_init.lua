@@ -154,8 +154,8 @@ end
 
 --Weapon is being swapped to
 function SWEP:Deploy()
+	--DEBUG
 	Msg("Deploying weapon!\n");
-	
 	
 	--Whenever the owner swaps to this weapon, we change his viewmodel to the item's viewmodel.
 	if LocalPlayer()==self.Owner then self.Owner:GetViewModel():SetModel(self.ViewModel); end

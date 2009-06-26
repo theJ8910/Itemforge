@@ -199,6 +199,88 @@ function ITEM:OnReload()
 end
 
 --[[
+Loads a clip with the given item.
+clip tells us which clip to load. If this is 0, we'll try to load it in any available clip.
+item is the stack of ammo to load.
+amt is an optional amount indicating how many items from the stack to transfer.
+	If this is nil/not given, we'll try to load the whole stack (or we'll try to transfer as many as possible).
+Returns false if it couldn't be loaded for some reason, and true if it could.
+]]--
+function ITEM:Load(item,clip,amt)
+	if !self:CanReload() then return false end
+	
+	if !clip then
+		for i=1,table.getn(self.Clips) do
+			if self:Load(item,i,amt) then return true end
+		end
+		return false;
+	end
+	
+	if !self:CanLoadClipWith(item,clip) then return false end
+	
+	if SERVER then
+		--How much ammo are we loading
+		amt=math.Clamp(amt or item:GetAmount(),1,item:GetAmount());
+		
+		local clipSize=self:GetClipSize(clip);
+		local currentAmmo=self:GetAmmo(clip);
+		local isOldAmmo=false;
+		
+		
+		--We don't have any ammo loaded
+		if !currentAmmo then
+			--We're loading too much ammo into our clip.
+			if clipSize!=0 && amt>clipSize then
+				item=item:Split(false,self.Clips[clip].Size);
+				if !item then return false end
+			end
+		
+		--We're loading more ammo of the same type
+		elseif currentAmmo:GetType()==item:GetType() then
+			if item:GetAmount()>amt then
+				if !item:Transfer(amt,currentAmmo) then return false end
+				isOldAmmo=true;
+			else
+				isOldAmmo=currentAmmo:Merge(true,item);
+				if isOldAmmo==false then return false end
+			end
+		
+		--We're loading in a different type of ammo; try to unload the clip to make room for it
+		elseif !self:Unload(clip) then
+			return false;
+		end
+		
+		--[[
+		When we are loading a clip with "new" ammo, meaning the clip was empty or the ammo in it was swapped out,
+		we void the ammo. This is how Itemforge's guns are loaded with ammo.
+		I could have given guns an inventory to hold their ammo but that would be somewhat pointless
+		since it would only hold one item.
+		]]--
+		if isOldAmmo==false then
+			--If we're only loading a few items from the stack, split them off and load them instead
+			if item:GetAmount()>amt then
+				item=item:Split(false,amt);
+				if !item then return false end
+			end
+			
+			item:ToVoid();
+			--TODO Store old max amount
+			item:SetMaxAmount(self.Clips[clip].Size);
+
+			self.Clip[clip]=item;
+			self:SendNWCommand("SetClip",nil,item,clip);
+		end
+		
+		self:UpdateWireAmmoCount();
+	end
+	
+	self:ReloadEffects();
+	self:SetNextBoth(CurTime()+self:GetReloadDelay());
+	
+	return true;
+end
+
+--[[
 If a player [USE]s this gun while holding some ammo (an item based off of base_ammo), we'll try to load this gun with it.
 If the gun is used clientside, we won't actually load the gun, we'll just return true to indiciate we want the server to load the gun.
 TODO check clips instead of checking for base_ammo
@@ -320,6 +402,7 @@ function ITEM:Reload()
 	local curAmmo=self:GetAmmo(self.ReloadClip);
 	
 	--If our ammo source disappeared or we're full we can stop
+	--TODO clip holds unlimited ammo??
 	if !self:GetNWBool("InReload") || (SERVER && (!self.ReloadSource || !self.ReloadSource:IsValid())) || (curAmmo && curAmmo:GetAmount()>=self:GetClipSize(self.ReloadClip)) then
 		self:FinishReload();
 	end

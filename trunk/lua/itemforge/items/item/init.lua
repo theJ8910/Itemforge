@@ -362,17 +362,21 @@ Scatter is an optional true/false.
 	and the position will be chosen randomly from inside of extItem's bounding box,
 	rather than spawning at the entity's center.
 
+bNoMerge is an optional true/false. If extItem is in an inventory, then the auto-merge will be disabled.
+
 true is returned if the item was successfully moved to the same location as extItem. false is returned if the item could not be moved for any reason.
 TODO sometimes the items fall through the world, could probably fix by taking the bounding box size of this item into consideration when picking a scatter location
 ]]--
-function ITEM:ToSameLocationAs(extItem,scatter)
+function ITEM:ToSameLocationAs(extItem,scatter,bNoMerge)
 	if !extItem or !extItem:IsValid() then ErrorNoHalt("Itemforge Items: Tried to move "..tostring(self).." to same location as another item, but the other item wasn't given!\n"); return nil end
 	
-	local scatter=scatter or false;
+	scatter=scatter or false;
+	bNoMerge=bNoMerge or false;
 	
 	local container=extItem:GetContainer();
 	if container then
-		if !self:ToInventory(container) then
+		--Sometimes we'll inventory merge, which returns false in :ToInventory but also removes this item TODO make it return true instead
+		if !self:ToInventory(container,nil,nil,bNoMerge) && self:IsValid() then
 			--If we can't move the item to the container that extItem was in, we'll try moving it to the same place as that container's connected item.
 			local t=container:GetConnectedItems();
 			local c=table.getn(t);
@@ -629,27 +633,27 @@ IF.Items:ProtectKey("SendFullUpdate");
 --[[
 Runs every time the server ticks.
 ]]--
-function ITEM:ServerTick()
+function ITEM:Tick()
+	if !self.NWVars then return false end
+	
 	--Send predicted network vars.
-	if self.NWVars then
-		for k,v in pairs(self.NWVars) do
-			--This shouldn't happen, but just in case.
-			if !self.NWVarsByName[k] then ErrorNoHalt("Itemforge Items: Couldn't send networked var \""..k.."\" via full update on "..tostring(self)..". This networked var has not been defined in the itemtype with IF.Items:CreateNWVar. This shouldn't be happening.\n"); end
+	for k,v in pairs(self.NWVars) do
+		--This shouldn't happen, but just in case.
+		if !self.NWVarsByName[k] then ErrorNoHalt("Itemforge Items: Couldn't send networked var \""..k.."\" via tick on "..tostring(self)..". This networked var has not been defined in the itemtype with IF.Items:CreateNWVar. This shouldn't be happening.\n"); return false end
+		
+		if self.NWVarsByName[k].Predicted then
+			--Create the "Last Tick" table if it hasn't been created yet
+			if !self.NWVarsLastTick then self.NWVarsLastTick={}; end
 			
-			if self.NWVarsByName[k].Predicted then
-				--Create the "Last Tick" table if it hasn't been created yet
-				if !self.NWVarsLastTick then self.NWVarsLastTick={}; end
-				
-				--Only send networked vars that have changed since the last tick
-				if self.NWVars[k]!=self.NWVarsLastTick[k] then
-					self.NWVarsLastTick[k]=self.NWVars[k];
-					self:SendNWVar(k);
-				end
+			--Only send networked vars that have changed since the last tick
+			if self.NWVars[k]!=self.NWVarsLastTick[k] then
+				self.NWVarsLastTick[k]=self.NWVars[k];
+				self:SendNWVar(k);
 			end
 		end
 	end
 end
-IF.Items:ProtectKey("ServerTick");
+IF.Items:ProtectKey("Tick");
 
 --[[
 Triggers a Wire output on this item. This will not work if Wiremod is not installed.

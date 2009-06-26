@@ -34,85 +34,6 @@ ITEM.PrimaryFiring=false;
 ITEM.SecondaryFiring=false;
 
 --[[
-Loads a clip with the given item.
-clip tells us which clip to load. If this is 0, we'll try to load it in any available clip.
-item is the stack of ammo to load.
-amt is an optional amount indicating how many items from the stack to transfer.
-	If this is nil/not given, we'll try to load the whole stack (or we'll try to transfer as many as possible).
-Returns false if it couldn't be loaded for some reason, and true if it could.
-]]--
-function ITEM:Load(item,clip,amt)
-	if !self:CanReload() then return false end
-	
-	if !clip then
-		for i=1,table.getn(self.Clips) do
-			if self:Load(item,i,amt) then return true end
-		end
-		return false;
-	end
-	
-	if !self:CanLoadClipWith(item,clip) then return false end
-	
-	--How much ammo are we loading
-	amt=math.Clamp(amt or item:GetAmount(),1,item:GetAmount());
-	
-	local clipSize=self:GetClipSize(clip);
-	local currentAmmo=self:GetAmmo(clip);
-	local isOldAmmo=false;
-	
-	
-	--We don't have any ammo loaded
-	if !currentAmmo then
-		--We're loading too much ammo into our clip.
-		if clipSize!=0 && amt>clipSize then
-			item=item:Split(false,self.Clips[clip].Size);
-			if !item then return false end
-		end
-	
-	--We're loading more ammo of the same type
-	elseif currentAmmo:GetType()==item:GetType() then
-		if item:GetAmount()>amt then
-			if !item:Transfer(amt,currentAmmo) then return false end
-			isOldAmmo=true;
-		else
-			isOldAmmo=currentAmmo:Merge(true,item);
-			if isOldAmmo==false then return false end
-		end
-	
-	--We're loading in a different type of ammo; try to unload the clip to make room for it
-	elseif !self:Unload(clip) then
-		return false;
-	end
-	
-	--[[
-	When we are loading a clip with "new" ammo, meaning the clip was empty or the ammo in it was swapped out,
-	we void the ammo. This is how Itemforge's guns are loaded with ammo.
-	I could have given guns an inventory to hold their ammo but that would be somewhat pointless
-	since it would only hold one item.
-	]]--
-	if isOldAmmo==false then
-		--If we're only loading a few items from the stack, split them off and load them instead
-		if item:GetAmount()>amt then
-			item=item:Split(false,amt);
-			if !item then return false end
-		end
-		
-		item:ToVoid();
-		--TODO Store old max amount
-		item:SetMaxAmount(self.Clips[clip].Size);
-
-		self.Clip[clip]=item;
-		self:SendNWCommand("SetClip",nil,item,clip);
-	end
-	
-	self:ReloadEffects();
-	self:SetNextBoth(CurTime()+self:GetReloadDelay());
-	self:UpdateWireAmmoCount();
-	
-	return true;
-end
-
---[[
 Consumes the given amount of ammo from the given clip.
 One reason this could fail is if we're trying to take too much ammo.
 	For example, what if we have one shotgun shell and try to take two?
@@ -144,6 +65,14 @@ function ITEM:Unload(clip)
 	self:SendNWCommand("Unload",nil,clip);
 	
 	return true;
+end
+
+--[[
+This function runs serverside after a player chooses "reload" from the menu.
+]]--
+function ITEM:PlayerReload(pl)
+	if !self:CanPlayerInteract(pl) then return false end
+	return self:OnReload();
 end
 
 --[[
@@ -235,6 +164,6 @@ IF.Items:CreateNWCommand(ITEM,"SetClip",nil,{"item","int"});
 IF.Items:CreateNWCommand(ITEM,"Unload",nil,{"int"});
 IF.Items:CreateNWCommand(ITEM,"PlayerFirePrimary",	function(self,...) self:OnPrimaryAttack(...)	end,{});
 IF.Items:CreateNWCommand(ITEM,"PlayerFireSecondary",function(self,...) self:OnSecondaryAttack(...)	end,{});
-IF.Items:CreateNWCommand(ITEM,"PlayerReload",		function(self,...) self:OnReload(...)			end,{});
+IF.Items:CreateNWCommand(ITEM,"PlayerReload",		function(self,...) self:PlayerReload(...)		end,{});
 IF.Items:CreateNWCommand(ITEM,"PlayerLoadAmmo",		function(self,...) self:PlayerLoadAmmo(...)		end,{"item"});
 IF.Items:CreateNWCommand(ITEM,"PlayerUnloadAmmo",	function(self,...) self:PlayerUnloadAmmo(...)	end,{"int"});

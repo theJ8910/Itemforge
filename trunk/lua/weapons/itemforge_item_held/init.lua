@@ -89,12 +89,19 @@ end
 
 --Weapon is being put away
 function SWEP:Holster(wep)
+	--DEBUG
 	Msg("Holstering weapon!\n");
 	return true
 end
 
 --Weapon is being swapped to
 function SWEP:Deploy()
+	--DEBUG
+	Msg("Deploying weapon!\n");
+	
+	--Whenever the owner swaps to this weapon, we change his viewmodel to the item's viewmodel.
+	if self.Owner then self.Owner:GetViewModel():SetModel(self.ViewModel); end
+	
 	return true;
 end
 
