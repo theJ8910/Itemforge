@@ -11,6 +11,8 @@ AddCSLuaFile("cl_init.lua");
 include("shared.lua");
 
 ITEM.HoldType="physgun";
+
+--Rock-It Launcher
 ITEM.AutoUnloadDelay=0.3;
 ITEM.EjectFrom=Vector(9.2274,0.3052,5.4279);
 
@@ -34,17 +36,6 @@ function ITEM:OnInit()
 	self.Inventory=inv;
 end
 
-function ITEM:OnReload()
-	if !self:CanReload() then return false end
-
-	return self:FindAmmo(function(self,item)
-		if self:Load(item,i) then
-			return true;
-		end
-		return false;
-	end);
-end
-
 --[[
 We have an auto-unload feature.
 ]]--
@@ -52,31 +43,6 @@ function ITEM:OnThink()
 	self["base_ranged"].OnThink(self);
 	if self:GetNWBool("Unloading") then self:UnloadLoop() end
 end
-
---[[
-Overridden from base_ranged.
-When this function is called we load items into the gun's inventory instead of the clip.
-]]--
-function ITEM:Load(item,clip,amt)
-	if !self:CanReload() then return false end
-	
-	if !item || !item:IsValid() then return false end
-	
-	--Can't load items into a non-existent inventory
-	local inv=self:GetInventory();
-	if !inv then return false end
-	
-	--If we don't insert the item successfully we fail.
-	if !item:ToInv(inv) then return false end
-	
-	self:ReloadEffects();
-	self:SetNextBoth(CurTime()+self:GetReloadDelay());
-	self:UpdateWireAmmoCount();
-	
-	return true;
-end
-
-
 
 --[[
 Overridden from base_ranged.

@@ -37,32 +37,6 @@ function ITEM:OnThink()
 	end
 end
 
---[[
-Loads a clip with the given item.
-clip tells us which clip to load. If this is 0, we'll try to load it in any available clip.
-item is the stack of ammo to load.
-amt is an optional amount indicating how many items from the stack to transfer.
-	If this is nil/not given, we'll try to load the whole stack (or we'll try to transfer as many as possible).
-Returns false if it couldn't be loaded for some reason, and true if it could.
-]]--
-function ITEM:Load(item,clip,amt)
-	if !self:CanReload() then return false end
-	
-	if !clip then
-		for i=1,table.getn(self.Clips) do
-			if self:Load(item,i,amt) then return true end
-		end
-		return false;
-	end
-	
-	if !self:CanLoadClipWith(item,clip) then return false end
-	
-	self:ReloadEffects();
-	self:SetNextBoth(CurTime()+self:GetReloadDelay());
-	
-	return true;
-end
-
 --Sets the ammo in the given clip to the given item no questions asked
 function ITEM:SetClip(item,clip)
 	self.Clip[clip]=item;

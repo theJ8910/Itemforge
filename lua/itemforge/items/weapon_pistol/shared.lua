@@ -82,7 +82,7 @@ To do that I would have had to have rewritten the primary attack function; No us
 function ITEM:GetPrimaryActivity()
 	local BulletsFired=self:GetNWInt("BulletsFired");
 	local LastAttack=self:GetNWFloat("LastAttack");
-	if LastAttack-CurTime()>0.5 then	self:SetNWInt("BulletsFired",0);
+	if CurTime()-LastAttack>0.5 then	self:SetNWInt("BulletsFired",0);
 	else								self:SetNWInt("BulletsFired",BulletsFired+1);
 	end
 	self:SetNWFloat("LastAttack",CurTime());

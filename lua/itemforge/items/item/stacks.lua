@@ -94,6 +94,9 @@ False is returned in three cases:
 	The stack was in an inventory, and the weight cap would have been exceeded if we had changed the size.
 ]]--
 function ITEM:SetAmount(amt)
+	local cur=self:GetAmount();
+	if cur==amt then return true end
+	
 	local max=self:GetMaxAmount();
 	if amt<=0 then
 		self:Remove();
@@ -317,15 +320,18 @@ else
 --[[
 Sets the number of items in this stack.
 Clientside, this is only good for predicition purposes.
+NOTE: It's important to realize an item's amount could be 0 clientside!
+	Serverside, if the item amount is set to 0, the item is immediately removed.
+	Clientside, however, we can't immediately remove the item. As a compromise, the amount can be set to 0.
 amt is how many items you want this stack to have.
-	If amt is less than 1, amt will be changed to 1.
+	If amt is less than 0, amt will be changed to 0.
 	If this item has a max amount set, and amt is greater than that, amt will be set to the max amount.
 Returns true if the amount was changed successfully, or false otherwise.
 ]]--
 function ITEM:SetAmount(amt)
 	local max=self:GetMaxAmount();
 	
-	if amt<1 then					amt=1;
+	if amt<0 then					amt=0;
 	elseif max!=0 && amt>max then	amt=max;
 	end
 	

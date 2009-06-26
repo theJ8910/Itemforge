@@ -18,6 +18,9 @@ ITEM.PrimaryDelay=.4;
 ITEM.SecondaryDelay=.4;
 
 --Overridden Base Ranged stuff
+ITEM.PrimaryClip=1;					--This gun doesn't use clips, but if PrimaryClip is 0, base_ranged thinks the primary doesn't use ammo. We override :GetAmmo so it looks in the clip instead.
+ITEM.PrimaryTakes=0;				--This gun doesn't require the item to have any amount
+
 ITEM.PrimaryFireSounds={
 Sound("weapons/physcannon/superphys_launch1.wav"),
 Sound("weapons/physcannon/superphys_launch2.wav"),
@@ -41,15 +44,6 @@ ITEM.MuzzleName="core";			--The gravity gun model has "core" instead of "muzzle"
 ITEM.UnloadSound=Sound("weapons/physcannon/superphys_hold_loop.wav");
 
 
---Returns the gun's inventory.
-function ITEM:GetInventory()
-	if self.Inventory && !self.Inventory:IsValid() then
-		self.Inventory=nil;
-	end
-	return self.Inventory;
-end
-
-
 --[[
 When a player is holding it and tries to primary attack
 ]]--
@@ -67,6 +61,50 @@ TODO rightclick loads
 ]]--
 function ITEM:OnSecondaryAttack()
 	return false;
+end
+
+function ITEM:OnReload()
+	if !self:CanReload() then return false end
+
+	return self:FindAmmo(function(self,item)
+		if self:Load(item,i) then
+			return true;
+		end
+		return false;
+	end);
+end
+
+--[[
+Overridden from base_ranged.
+When this function is called we load items into the gun's inventory instead of the clip.
+]]--
+function ITEM:Load(item,clip,amt)
+	if !self:CanReload() then return false end
+	
+	if !item || !item:IsValid() then return false end
+	
+	--Can't load items into a non-existent inventory
+	local inv=self:GetInventory();
+	if !inv then return false end
+	
+	--If we don't insert the item successfully we fail.
+	if SERVER then
+		if !item:ToInv(inv) then return false end
+		self:UpdateWireAmmoCount();
+	end
+	
+	self:ReloadEffects();
+	self:SetNextBoth(CurTime()+self:GetReloadDelay());
+	
+	return true;
+end
+
+--Returns the gun's inventory.
+function ITEM:GetInventory()
+	if self.Inventory && !self.Inventory:IsValid() then
+		self.Inventory=nil;
+	end
+	return self.Inventory;
 end
 
 --[[
