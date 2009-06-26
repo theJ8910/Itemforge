@@ -280,7 +280,7 @@ Return false to tell the player the item cannot be used
 ]]--
 function ITEM:OnUse(pl)
 	local ent=self:GetEntity();
-	if self:InWorld() && self:CanPlayerInteract(pl) then
+	if self:InWorld() then
 		self:Hold(pl);
 		
 		return true;

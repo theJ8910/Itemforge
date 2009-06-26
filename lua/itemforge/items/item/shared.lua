@@ -442,7 +442,7 @@ IF.Items:ProtectKey("ClearEntity");
 --[[
 Sets this item's weapon. Whenever an item is held, an SWEP is created.
 We need to link this SWEP with the item, so the item can refer to it later.
-ent must be a valid "itemforge_item_held" entity, or this function will fail. If for some reason a different SWEP needs to be used, I'll consider allowing different SWEPs to be used.
+ent must be a valid itemforge_item_held_* entity, or this function will fail. If for some reason a different SWEP needs to be used, I'll consider allowing different SWEPs to be used.
 
 This function is called internally by Itemforge. There should be no reason for a scripter to call this.
 ]]--

@@ -83,12 +83,41 @@ list.Add("Itemforge_BaseRanged_FindAmmo",function(self,fCallback)
 end);
 
 --[[
-This function searches the area around the player holding this weapon for nearby ammo.
+If the player is looking directly at some ammo, we'll try to load that first before searching the nearby ammo.
+If the player is holding ammo (in his weapon menu), we'll try to load that.
+If both of those fail, we'll try searching the area around the player instead.
 TODO: THIS IS CRAP, REDO IT
 ]]--
 list.Add("Itemforge_BaseRanged_FindAmmo",function(self,fCallback)
 	local pOwner=self:GetWOwner();
 	if !pOwner then return false end
+	
+	--Is the player looking directly at an item?
+	local i=IF.Items:GetEntItem(v);
+	local tr={};
+	tr.start=pOwner:GetShootPos();
+	tr.endpos=tr.start+(pOwner:EyeAngles():Forward()*64);
+	tr.filter=pOwner;
+	local traceRes=util.TraceLine(tr);
+	local i=IF.Items:GetEntItem(traceRes.Entity);
+	if i && fCallback(self,i) then return true end
+	
+	if SERVER then
+		for i=1,IF.Items.MaxHeldItems do
+			local heldWeapon=pOwner:GetWeapon("itemforge_item_held_"..i);
+			if heldWeapon && heldWeapon:IsValid() then
+				local item=heldWeapon:GetItem();
+				if item && fCallback(self,item) then return true end
+			end
+		end
+	else
+		for k,v in pairs(pOwner:GetWeapons()) do
+			if string.find(v:GetClass(),"itemforge_item_held_[1-"..IF.Items.MaxHeldItems.."]") then
+				local item=v:GetItem();
+				if item && fCallback(self,item) then return true end
+			end
+		end
+	end
 	
 	--TODO use IF.Items:GetWorldItems() instead of this
 	for k,v in pairs(ents.FindByClass("itemforge_item")) do

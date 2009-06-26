@@ -1,12 +1,12 @@
 --[[
-itemforge_item_held
+itemforge_item_held_1
 CLIENT
 
 This SWEP is an 'avatar' of an item. When an item is held, this weapon represents that item.
 ]]--
 include("shared.lua")
 
-language.Add("itemforge_item_held","Item (held)");
+language.Add("itemforge_item_held_1","Item (held)");
 
 SWEP.PrintName			= "Itemforge Item";
 SWEP.Slot				= 0;
