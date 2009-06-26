@@ -25,6 +25,7 @@ TODO net_fakelag 500 produces noticable problems with weapons. *sigh*
 TODO Rock-It launcher reload sound isn't playing clientside, attack sound is always "fwoosh" sound (no dry fire)
 TODO Players are complaining about missing weapon icons, investigate
 TODO ranged weapons use ammo clientside, base_ammo should be given predictable amount
+TODO multiple items held by players
 
 Item Ideas
 TODO awesome idea! Been thinking about implementing "inventory locking" that prevents any player interaction for a while now, but what if we used the lock items for this? Password locked briefcase? Hell yeah!
@@ -90,6 +91,7 @@ MODULE.Disabled=false;										--Our module will be loaded
 MODULE.ItemsDirectory="itemforge/items/";					--What folder are the different item types stored in relative to the garrysmod/lua/ directory
 MODULE.ExtensionsDirectory="extend"							--What folder are extensions for item types stored in relative to the item-type's folder (ex: if this is "extend" it means extensions for "item_crowbar" are stored in "garrysmod/lua/itemforge/items/item_crowbar/extend")?
 MODULE.MaxItems=65535;										--WARNING: Item IDs beyond this value CANNOT be sent through networking! DO NOT CHANGE. How many unique items can exist at a single time (a stack of items count as one unique item)?
+MODULE.MaxHeldItems=32;										--How many items can be held by a player at a single time (in the player's weapon menu)? This should NOT exceed 32. If your gamemode wants to set this, use this in your init: IF.Items:SetMaxHeld(amt)
 
 if CLIENT then
 
@@ -546,6 +548,19 @@ function MODULE:SetItemTypeNWVarAndCommandIDs()
 end
 
 --[[
+Sets the max number of holdable items (how many items can be held in the player's weapon menu at any given time).
+amt is how many weapons you want the players to hold at any given time. This will be clamped between 0 and 32.
+	If this is 0, no items can be held; any time an item tries to be held, it will return false.
+	The absolute limit to this is 32.
+]]--
+function MODULE:SetMaxHeld(amt)
+	if !amt then ErrorNoHalt("Itemforge Items: Couldn't set max holdable items. No amount was given!\n"); return false end
+	self.MaxHeldItems=math.Clamp(amt,0,32);
+	
+	return true;
+end
+
+--[[
 Protects a key in the base item-type
 Stops items from overriding these keys by removing overrides after parsing item-types (and additionally if a protected key is being overwritten on an item, such as... myItem.Use="TEST").
 Additionally this will alert the scripter that he's tried to override a protected key.
@@ -944,6 +959,49 @@ function MODULE:Remove(item)
 end
 
 --[[
+Returns true if the given entity is actually an item in the world (an "itemforge_item" entity).
+Returns false otherwise.
+]]--
+function MODULE:IsEntItem(eEnt)
+	if !eEnt || !eEnt:IsValid() then return false end
+	if eEnt:GetClass()=="itemforge_item" then return true end
+	return false;
+end
+
+--[[
+Returns true if the given weapon is actually an item being held by a player (an "itemforge_item_held*" entity)
+]]--
+function MODULE:IsWeaponItem(eWep)
+	if !eWep || !eWep:IsValid() then return false end
+	for i=1,self.MaxHeldItems do
+		if eWep:GetClass()=="itemforge_item_held_"..i then return true end
+	end
+	return false;
+end
+
+--[[
+If the given entity is actually an item in the world, returns the item.
+Returns nil otherwise.
+]]--
+function MODULE:GetEntItem(eEnt)
+	if !eEnt || !eEnt:IsValid() then return nil end
+	if eEnt:GetClass()!="itemforge_item" then return nil end
+	return eEnt:GetItem();
+end
+
+--[[
+If the given weapon is actually an item being held by a player, returns the item.
+Returns nil otherwise.
+]]--
+function MODULE:GetWeaponItem(eWep)
+	if !eWep || !eWep:IsValid() then return nil end
+	for i=1,self.MaxHeldItems do
+		if eWep:GetClass()=="itemforge_item_held_"..i then return eWep:GetItem() end
+	end
+	return nil;
+end
+
+--[[
 This returns a reference to an item with the given ID.
 For all effective purposes this is the same thing as returning the actual item,
 except it doesn't hinder garbage collection,
@@ -1027,44 +1085,7 @@ function MODULE:DumpItem(id)
 	dumpTable(Items[id]);
 end
 
---[[
-Returns true if the given entity is actually an item in the world (an "itemforge_item" entity).
-Returns false otherwise.
-]]--
-function MODULE:IsEntItem(eEnt)
-	if !eEnt || !eEnt:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't determine if an entity was an item in the world; an invalid entity was given.\n"); return false end
-	if eEnt:GetClass()=="itemforge_item" then return true end
-	return false;
-end
 
---[[
-Returns true if the given weapon is actually an item being held by a player (an "itemforge_item_held*" entity)
-]]--
-function MODULE:IsWeaponItem(eWep)
-	if !eWep || !eWep:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't determine if a weapon was actually an item being held; an invalid weapon was given.\n"); return false end
-	if eWep:GetClass()=="itemforge_item_held" then return true end
-	return false;
-end
-
---[[
-If the given entity is actually an item in the world, returns the item.
-Returns nil otherwise.
-]]--
-function MODULE:GetEntItem(eEnt)
-	if !eEnt || !eEnt:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't get entity's item. The given entity was invalid.\n"); return nil end
-	if eEnt:GetClass()!="itemforge_item" then return nil end
-	return eEnt:GetItem();
-end
-
---[[
-If the given weapon is actually an item being held by a player, returns the item.
-Returns nil otherwise.
-]]--
-function MODULE:GetWeaponItem(eWep)
-	if !eWep || !eWep:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't get entity's item. The given entity was invalid.\n"); return nil end
-	if eWep:GetClass()!="itemforge_item_held" then return nil end
-	return eWep:GetItem();
-end
 
 
 --Server only

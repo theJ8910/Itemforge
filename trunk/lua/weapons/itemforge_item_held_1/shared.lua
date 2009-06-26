@@ -1,5 +1,5 @@
 --[[
-itemforge_item_held
+itemforge_item_held_1
 SHARED
 
 This SWEP is an 'avatar' of an item. When an item is held, this weapon represents that item.

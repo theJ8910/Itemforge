@@ -303,27 +303,35 @@ function ITEM:Hold(pl,bNoMerge)
 	elseif !r then return false
 	end
 	
-	--Make sure an item isn't being held by this player already
-	local currentlyHeld=pl:GetWeapon("itemforge_item_held");
-	if !bNoMerge && currentlyHeld && currentlyHeld:IsValid() then
-		--Or we can pull a trick here. If we're trying to hold the same type of item that's already being held, we can merge the two stacks, if the items allow it.
-		local heldItem=currentlyHeld:GetItem();
-		
-		if heldItem && self:GetType()==heldItem:GetType() then
-			local s,r1=pcall(self.CanHoldMerge,self,heldItem,pl);
-			if !s then ErrorNoHalt(r1.."\n"); r1=false end
+	--Here we determine two things: Do we have an empty slot, and can we merge already holding an item of this type?
+	local iEmptySlot=0;
+	for i=1,IF.Items.MaxHeldItems do
+		local currentlyHeld=pl:GetWeapon("itemforge_item_held_"..i);
+		if !currentlyHeld || !currentlyHeld:IsValid() then
+			iEmptySlot=i;
+		elseif !bNoMerge then
+			local heldItem=currentlyHeld:GetItem();
 			
-			local s,r2=pcall(heldItem.CanHoldMerge,heldItem,self,pl);
-			if !s then ErrorNoHalt(r2.."\n"); r2=false end
-			
-			if r1 && r2 && heldItem:Merge(true,self) then return false end
+			if heldItem && self:GetType()==heldItem:GetType() then
+				local s,r1=pcall(self.CanHoldMerge,self,heldItem,pl);
+				if !s then ErrorNoHalt(r1.."\n"); r1=false end
+				
+				local s,r2=pcall(heldItem.CanHoldMerge,heldItem,self,pl);
+				if !s then ErrorNoHalt(r2.."\n"); r2=false end
+				
+				if r1 && r2 && heldItem:Merge(true,self) then return false end
+			end
 		end
-		
-		ErrorNoHalt("Itemforge Items: Could not hold "..tostring(self).." as weapon. Player "..pl:Name().." is already holding an item. Release that item first.\n");
+	end
+	
+	--Can't hold an item if the player is holding the max number of items already
+	if iEmptySlot==0 then
+		--ErrorNoHalt("Itemforge Items: Could not hold "..tostring(self).." as weapon. Player "..pl:Name().." is already holding an item. Release that item first.\n");
 		return false;
 	end
 	
-	--local ent=ents.Create("itemforge_item_held");
+	
+	--local ent=ents.Create("itemforge_item_held_"..iEmptySlot);
 	
 	--[[
 	Send to void. False is returned in case of errors or if events stop the removal of the item from it's current medium.
@@ -334,7 +342,7 @@ function ITEM:Hold(pl,bNoMerge)
 		return false;
 	end
 	
-	local ent=pl:Give("itemforge_item_held");
+	local ent=pl:Give("itemforge_item_held_"..iEmptySlot);
 	if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Items: Tried to create itemforge_item_held entity for "..tostring(self).." but failed.\n"); return false end
 	
 	--TODO sometimes the weapon isn't picked up, such as when noclipping, need to fix this. Temporary solution below.

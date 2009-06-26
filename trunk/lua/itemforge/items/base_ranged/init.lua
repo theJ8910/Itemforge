@@ -56,7 +56,7 @@ function ITEM:Unload(clip)
 	local ammo=self:GetAmmo(clip);
 	if !ammo then return false end
 	
-	if !ammo:ToSameLocationAs(self) then return false end
+	if !ammo:ToSameLocationAs(self) || !ammo:IsValid() then return false end
 	
 	--TODO this needs to be the old max
 	ammo:SetMaxAmount(0);
