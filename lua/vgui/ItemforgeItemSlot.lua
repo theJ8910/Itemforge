@@ -44,8 +44,7 @@ local SlotPaint=function(self,item)
 	local x,y=self:LocalToScreen(0,0);
 	
 	--Pose the entity for the shot (we ask the item to do that)
-	local s,r=pcall(item.OnPose3D,item,self.Entity,self);
-	if !s then ErrorNoHalt(r.."\n") end;
+	item:Event("OnPose3D",nil,self.Entity,self);
 	
 	--Set up the camera and set the screen space that the drawing will occur in
 	cam.Start3D(self.vCamPos,(self.vLookatPos-self.vCamPos):Angle(),self.fFOV,x,y,self:GetWide(),self:GetTall());
@@ -61,24 +60,17 @@ local SlotPaint=function(self,item)
 	--Clears the model lighting of any pre-existing lights and sets the light to an ambient value (all values are between 0 and 1)
 	render.ResetModelLighting( self.colAmbientLight.r/255, self.colAmbientLight.g/255, self.colAmbientLight.b/255 )
 	
-	--Sets the model's color
-	render.SetColorModulation( self.colColor.r/255, self.colColor.g/255, self.colColor.b/255 )
-	
-	--Apparantly sets the model's opacity
-	render.SetBlend( self.colColor.a/255 )
-	
 	--sets up 7 "directional" lights. You got me on this one. I don't know how source does it's lighting so I'm leaving this in here.
-	for i=0, 6 do
-		local col = self.DirectionalLight[ i ]
-		if ( col ) then
-			render.SetModelLighting( i, col.r/255, col.g/255, col.b/255 )
+	for i=0,6 do
+		local col=self.DirectionalLight[i];
+		if (col) then
+			render.SetModelLighting(i,col.r/255,col.g/255,col.b/255);
 		end
 	end
 	
 	--We use the item's Draw3D function on _this_ entity!
 	--Whether bTranslucent is true or not depends on if the alpha is 255 or not.
-	local s,r=pcall(item.OnDraw3D,item,self.Entity,self,(self.colColor.a<255));
-	if !s then ErrorNoHalt(r.."\n") end;
+	item:Event("OnDraw3D",nil,self.Entity,false);
 	
 	--Clean up before the frame ends
 	render.SuppressEngineLighting(false);
@@ -163,10 +155,7 @@ function PANEL:SetItem(item)
 	if !item:IsValid() then ErrorNoHalt("Itemforge Item Slot: Couldn't set item on Item Slot; given item was invalid.\n"); return false end
 	self.Item=item;
 	
-	local s,r=pcall(item.ShouldUseModelFor2D,item);
-	if !s then
-		ErrorNoHalt(r.."\n");
-	elseif s && r==true then
+	if item:Event("ShouldUseModelFor2D",true) then
 		self:RemoveModelPanel();
 		
 		self.ModelPanel=vgui.Create("DModelPanel",self);
@@ -271,7 +260,7 @@ function PANEL:OnCursorExited()
 end
 
 function PANEL:OnMousePressed(mc)
-	if !self.SlotOpen ||mc==MOUSE_RIGHT then return false end
+	if !self.SlotOpen || mc==MOUSE_RIGHT then return false end
 	
 	--Record that the mouse has been pressed and where it has been pressed (used in drag code)
 	self.MouseDown=true;
@@ -312,9 +301,7 @@ function PANEL:Paint()
 		--Draw item in both 3D and 2D
 		if item then
 			if self.ModelPanel && self.ModelPanel:IsValid() then self.ModelPanel:Paint(item) end
-			
-			local s,r=pcall(item.OnDraw2D,item,self:GetWide(),self:GetTall());
-			if !s then ErrorNoHalt(r.."\n") end
+			item:Event("OnDraw2D",nil,self:GetWide(),self:GetTall());
 		end
 		
 		--Draw slot border

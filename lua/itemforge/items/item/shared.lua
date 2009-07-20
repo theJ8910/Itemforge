@@ -21,37 +21,38 @@ This section is good for things that don't change often but need to be known to 
 ]]--
 
 --Basic info
-ITEM.Name="Default Item Name";						--An item's name is displayed by the UI in several different locations, such as the weapon selection menu (when the item is held), or displayed when selected in an inventory.
-ITEM.Description="This is the default description.";--An item's description gives additional details about the item. One place it is displayed is in the inventory when selected.
-ITEM.Base=nil;										--The item is based off of this kind of item. Set this to nil if it's not based off of an item. Set it to the type of another item (ex: ITEM.Base="hammer") to base it off of that. (NOTE: This is useful for tools. For example: If you have an item called "Hammer" that "Stone Hammer" and "Iron Hammer" are based off of, and you have a combination that takes "Hammer" as one of it's ingredients, both the "Stone Hammer" and "Iron Hammer" can be used!)
-ITEM.WorldModel="models/dav0r/buttons/button.mdl";	--When dropped on the ground, held by a player, or viewed on some places on the UI (like an inventory icon), the world model is the model displayed.
-ITEM.ViewModel="models/weapons/v_pistol.mdl";		--When held by a player, the player holding it sees this model in first-person.
-ITEM.Size=1;										--Default size of a single item in this stack. Size has nothing to do with how big the item looks or how much it weighs. Instead, size determines if an item can be placed in an inventory or not. In my opinion, a good size can be determined if you put the item into the world and get the entity's bounding sphere size.
-ITEM.Color=Color(255,255,255,255);					--Default color of this item's model and icon. Can be changed.
+ITEM.Name="Default Item Name";							--An item's name is displayed by the UI in several different locations, such as the weapon selection menu (when the item is held), or displayed when selected in an inventory.
+ITEM.Description="This is the default description.";	--An item's description gives additional details about the item. One place it is displayed is in the inventory when selected.
+ITEM.Base=nil;											--The item is based off of this kind of item. Set this to nil if it's not based off of an item. Set it to the type of another item (ex: ITEM.Base="hammer") to base it off of that. (NOTE: This is useful for tools. For example: If you have an item called "Hammer" that "Stone Hammer" and "Iron Hammer" are based off of, and you have a combination that takes "Hammer" as one of it's ingredients, both the "Stone Hammer" and "Iron Hammer" can be used!)
+ITEM.WorldModel="models/dav0r/buttons/button.mdl";		--When dropped on the ground, held by a player, or viewed on some places on the UI (like an inventory icon), the world model is the model displayed.
+ITEM.ViewModel="models/weapons/v_pistol.mdl";			--When held by a player, the player holding it sees this model in first-person.
+ITEM.Size=1;											--Default size of a single item in this stack. Size has nothing to do with how big the item looks or how much it weighs. Instead, size determines if an item can be placed in an inventory or not. In my opinion, a good size can be determined if you put the item into the world and get the entity's bounding sphere size.
+ITEM.Color=Color(255,255,255,255);						--Default color of this item's model and icon. Can be changed.
 
 --Restrictions on who can spawn
-ITEM.Spawnable=false;								--Can this item be spawned by any player via the spawn menu on the items tab?
-ITEM.AdminSpawnable=false;							--Can this item be spawned by an admin via the spawn menu on the items tab?
+ITEM.Spawnable=false;									--Can this item be spawned by any player via the spawn menu on the items tab?
+ITEM.AdminSpawnable=false;								--Can this item be spawned by an admin via the spawn menu on the items tab?
 
 --SWEP related
-ITEM.PrimaryAuto=false;								--If this item is held as a weapon, is it's primary fire automatic? Or, in other words, do I have to keep clicking to attack?
-ITEM.SecondaryAuto=false;							--If this item is held as a weapon, is it's secondary fire automatic? Or, in other words, do I have to keep right-clicking to attack?
+ITEM.PrimaryAuto=false;									--If this item is held as a weapon, is it's primary fire automatic? Or, in other words, do I have to keep clicking to attack?
+ITEM.SecondaryAuto=false;								--If this item is held as a weapon, is it's secondary fire automatic? Or, in other words, do I have to keep right-clicking to attack?
 
 --Don't modify/override these. They're either set automatically, don't need to be changed, or are listed here so I can keep track of them.
 --Belongs to item-type
-ITEM.Type="";				--The item-type. This is the same as the name of the folder these files are in. This is set automatically when loading item-types.
-ITEM.BaseClass=nil;			--Set to the Item-Type that ITEM.Base identifies after loading all item-types
-ITEM.NWCommandsByName=nil;	--Networked commands are stored here. The key is the name, value is the command. These trigger networked hooks on the other side (Client to Server or Server to Client).
-ITEM.NWCommandsByID=nil;	--Networked commands are stored here. The key is the id, value is the command. These trigger networked hooks on the other side (Client to Server or Server to Client).
+ITEM.Type="";											--The item-type. This is the same as the name of the folder these files are in. This is set automatically when loading item-types.
+ITEM.BaseClass=nil;										--Set to the Item-Type that ITEM.Base identifies after loading all item-types
+ITEM.NWCommandsByName=nil;								--Networked commands are stored here. The key is the name, value is the command. These trigger networked hooks on the other side (Client to Server or Server to Client).
+ITEM.NWCommandsByID=nil;								--Networked commands are stored here. The key is the id, value is the command. These trigger networked hooks on the other side (Client to Server or Server to Client).
 
 --Belongs to individual items
-ITEM.ID=0;					--Item ID. Assigned automatically.
-ITEM.Container=nil;			--If the item is in an inventory, this is the inventory it is in.			Use self:GetContainer() to grab.
-ITEM.Entity=nil;			--If the item is on the ground, this is the SENT that represents the item.	Use self:GetEntity() to grab this.
-ITEM.Weapon=nil;			--If the item is being held by a player, this is the SWEP entity.			Use self:GetWeapon() to grab this.
-ITEM.Owner=nil;				--If the item is being held, this is the player holding it.					Use self:GetWOwner() to grab this. (NOTE: GetNetOwner() does not return this).
-ITEM.BeingRemoved=false;	--This will be true if the item is being removed.
-ITEM.Inventories=nil;		--Inventories connected to this item are stored here. The item 'has' these inventories (a backpack or a crate would store it's inventory here, for example). The key is the inventory's ID. The value is the actual inventory.
+ITEM.ID=0;												--Item ID. Assigned automatically.
+ITEM.Container=nil;										--If the item is in an inventory, this is the inventory it is in.			Use self:GetContainer() to grab.
+ITEM.Entity=nil;										--If the item is on the ground, this is the SENT that represents the item.	Use self:GetEntity() to grab this.
+ITEM.Weapon=nil;										--If the item is being held by a player, this is the SWEP entity.			Use self:GetWeapon() to grab this.
+ITEM.Owner=nil;											--If the item is being held, this is the player holding it.					Use self:GetWOwner() to grab this. (NOTE: GetNetOwner() does not return this).
+ITEM.BeingRemoved=false;								--This will be true if the item is being removed.
+ITEM.Inventories=nil;									--Inventories connected to this item are stored here. The item 'has' these inventories (a backpack or a crate would store it's inventory here, for example). The key is the inventory's ID. The value is the actual inventory.
+ITEM.Rand=nil;											--Every item has a random number. This is mostly used for adding some variety to different effects, such as the model spinning. Use self:GetRand() to grab this.
 
 --[[
 DEFAULT METHODS
@@ -69,6 +70,510 @@ function ITEM:Remove()
 	return IF.Items:Remove(self);
 end
 IF.Items:ProtectKey("Remove");
+
+--[[
+Calls an event on the item.
+If there is an error calling the event, a non-halting error message is generated and a default value is returned.
+
+sEventName is a string which should be the name of the event to call (EX: "OnDraw2D", "OnThink", etc)
+vDefaultReturn is what will be returned in case of errors calling the hook.
+... - You can pass arguments to the hook here
+
+This function returns two values: vReturn,bSuccess
+	vReturn will be what the event returned, or if there were errors, then it will be vDefaultReturn.
+	bSuccess will be true if the event was called successfully or false if there were errors.
+
+Example: I want to call this item's CanEnterWorld event:
+	self:Event("CanEnterWorld",false,vPos,aAng);
+	This runs the item's CanEnterWorld and gives it vPos and aAng as arguments.
+	If there's a problem running the event, we want false to be returned.
+]]--
+function ITEM:Event(sEventName,vDefaultReturn,...)
+	local f=self[sEventName];
+	if !f then ErrorNoHalt("Itemforge Items: "..sEventName.." ("..tostring(self)..") failed: This event does not exist.\n"); return vDefaultReturn,false end
+		
+	local s,r=pcall(f,self,...);
+	if !s then ErrorNoHalt("Itemforge Items: "..sEventName.." ("..tostring(self)..") failed: "..r.."\n"); return vDefaultReturn,false end
+	
+	return r,true;
+end
+IF.Items:ProtectKey("Event");
+
+--[[
+This function puts an item inside of an inventory.
+inv is the inventory to add the item to.
+slot is an optional number that requests a certain slot to insert the item into. This should be the slot number you want to place the item in (starting at 1), or nil if any slot will do.
+	false is returned if the item cannot be placed in the requested slot.
+If pl is given, only that player will be told to add the item to the given inventory clientside.
+	This is useful for sending an update of what inventory the item is in to a specific player.
+bNoMerge is an optional true/false. If bNoMerge is:
+	true, the item won't automatically merge itself with existing items of the same type in the given inventory, even if it normally would.
+	false or not given, then this function calls the CanInventoryMerge of both this item and the item it's trying to merge with.
+		If both items approve, the two are merged and this item removed as part of the merge.
+		If for some reason a merge can't be done, false is returned.
+bPredict is an optional true/false that defaults to false on the server and true on the client. If bPredict is:
+	false, then we will actually insert the item into the inventory.
+	true, instead we are predicting whether or not we can insert the item into the inventory.
+
+This function calls this item's CanMove event. CanMove can stop the item from being inserted into / being moved to an inventory.
+When this item is successfully moved to the inventory, the OnMove event is called.
+
+If the item cannot be inserted for any reason, then false is returned. True is returned otherwise.
+NOTE: If this item merges with an existing item in the inventory, false is returned, and this item is removed.
+TODO: This function needs to be reworked to reduce it's complexity
+]]--
+function ITEM:ToInventory(inv,slot,pl,bNoMerge,bPredict)
+	if self.BeingRemoved then return false end
+	if !inv || !inv:IsValid() then ErrorNoHalt("Itemforge Items: Could not insert "..tostring(self).." into an inventory - given inventory was invalid!\n"); return false end
+	if pl!=nil then
+		if !pl:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't insert "..tostring(self).." into "..tostring(inv)..". Player given is not valid!\n"); return false;
+		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Items: Couldn't insert "..tostring(self).." into "..tostring(inv)..". The player given is not a player.\n"); return false;
+		elseif !inv:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Items: Couldn't insert "..tostring(self).." into "..tostring(inv)..". The inventory given is private, and the player given is not the owner of the inventory.\n"); return false;
+		end
+	end
+	
+	if bPredict==nil then bPredict=CLIENT end
+	local oldinv,oldslot=self:GetContainer();
+	
+	if SERVER || bPredict then
+		local bSameInv=(oldinv==inv);
+		if bSameInv && !slot then ErrorNoHalt("Itemforge Items: Couldn't insert "..tostring(self).." into "..tostring(inv)..". The item is already in this inventory. No slot was given, so the item can't be moved to a different slot, either.\n"); return false; end
+		
+		local bSameSlot=(oldslot==slot);
+		local bSendingUpdate=(bSameInv && bSameSlot);
+		if !bSendingUpdate && !self:Event("CanMove",true,oldinv,oldslot,inv,slot) then return false end	
+		
+		--We're moving the item from one slot to another in the same inv
+		if bSameInv then
+			if !bSameSlot then
+				if !inv:MoveItem(self,oldslot,slot,bPredict) then return false end
+			
+				--Ask client to transfer slots too
+				if SERVER && !bPredict then self:SendNWCommand("TransferSlot",nil,inv,oldslot,slot); end
+				return true;
+			end
+		
+		--Since we're not moving items around, that means the item has just entered this inventory.
+		--We'll merge this stack with as many existing stacks of items as possible (unless told not to).
+		--False is returned if/when this whole stack has been merged into other stacks of items.
+		elseif !bNoMerge then
+			
+			--TODO prediction will fail if we have to merge across several stacks of items
+			for k,v in pairs(inv:GetItemsByType(self:GetType())) do if self:Event("CanInventoryMerge",false,v,inv) && v:Event("CanInventoryMerge",false,self,inv) && v:Merge(self,nil,bPredict)==true then return false end end
+		end
+	else
+		--We don't stop insertion clientside if the item has an entity or another container already, but we bitch about it so the scripter knows something isn't right
+		if slot==nil then ErrorNoHalt("Itemforge Items: Could not add "..tostring(self).." to "..tostring(inv).." clientside! slot was not given!\n"); return false end
+		if oldinv && oldinv!=inv then ErrorNoHalt("Itemforge Items: Warning! "..tostring(self).." is already in "..tostring(oldinv).." clientside, but is being inserted into "..tostring(inv).." anyway! Not supposed to happen!\n"); end
+	end
+	
+	local slotid=inv:InsertItem(self,slot,nil,bPredict);
+	if slotid==false || (slot!=nil && slotid!=slot) then return false end
+	
+	if !bPredict then
+		self:SetContainer(inv);
+		self:Event("OnMove",nil,oldinv,oldslot,inv,slotid,false);
+		
+		if SERVER then
+			--This was a real headache to do but I think I maxed out the efficency
+			local newOwner=inv:GetOwner();
+			local lastOwner=self:GetOwner();
+			if bSendingUpdate then
+				self:SendNWCommand("ToInventory",pl,inv,slotid);
+			else
+				--Publicize or privitize the item
+				self:SetOwner(lastOwner,newOwner);
+			
+				--Is the item going public?
+				if newOwner==nil then
+					
+					--From a public...
+					if lastOwner==nil then
+						--container?
+						if oldinv then
+							self:SendNWCommand("TransferInventory",nil,oldinv,inv,slotid);
+						
+						--...setting (void, world, held)?
+						else
+							self:SendNWCommand("ToInventory",nil,inv,slotid);
+						end
+					
+					--...from a private inventory? 
+					elseif lastOwner!=nil then
+						--Insert it into the given inventory clientside on everybody but the last owner.
+						for k,v in pairs(player.GetAll()) do if v!=lastOwner then self:SendNWCommand("ToInventory",v,inv,slotid); end end
+						
+						--On the last owner, transfer to the new inventory.
+						self:SendNWCommand("TransferInventory",lastOwner,oldinv,inv,slotid);
+					end
+					
+				--or private?
+				else
+					--...from a public...
+					if lastOwner==nil then
+						--container?
+						if oldinv then
+							--Transfer from the old inventory to the new inventory on the new owner.
+							self:SendNWCommand("TransferInventory",newOwner,oldinv,inv,slotid);
+							
+						--setting?
+						else
+							--Insert it on the new owner.
+							self:SendNWCommand("ToInventory",newOwner,inv,slotid);
+						end
+						
+						
+					--...from a private inventory owned by the same guy?
+					elseif lastOwner==newOwner then
+					
+						--Transfer from the old inventory to the new inventory.
+						self:SendNWCommand("TransferInventory",newOwner,oldinv,inv,slotid);
+						
+					--...from a private inventory not owned by the same guy?
+					else
+						--Insert it on the new owner.
+						self:SendNWCommand("ToInventory",newOwner,inv,slotid);
+					end
+				end
+			end
+		end
+	end
+	return true;
+end
+IF.Items:ProtectKey("ToInventory");
+
+--A shorter alias
+ITEM.ToInv=ITEM.ToInventory;
+IF.Items:ProtectKey("ToInv");
+
+--[[
+Serverside, this function places the item in the world (as an entity).
+Clientside, this function is called when the item binds with it's world entity.
+vPos is a Vector() describing the position in the world the entity should be created at.
+aAng is an optional Angle() describing the angles it should be created at.
+If the item is already in the world, the item's world entity will be teleported to the given position and angles.
+	If for some reason you want to actually want to re-send it to the world with a new entity instead of just teleporting it,
+	send it to the void first with :ToVoid() and then :ToWorld() it where you want it.
+eEnt is only necessary clientside. This is the entity the item is binding with.
+bPredict is an optional true/false that defaults to false on the server and true on the client. If bPredict is true:
+	false, we'll send the item to the world. Serverside, this creates an entity. Clientside, this sets the item's entity to eEnt. OnEnterWorld events are called in both cases.
+	true, instead of sending the item to the world, we'll return true if the item can be sent to the world, or false if it can't be for some reason.
+
+This function calls the CanEnterWorld event. This event has a chance to stop the move.
+If the item had a new world entity created, then:
+	The item's OnEntityInit event is called, which is used to set up the entity after it's been created.
+	The item's OnEnterWorld event is called.
+False is returned if the item cannot be moved to the world for any reason. Otherwise, the entity created is returned.
+]]--
+function ITEM:ToWorld(vPos,aAng,eEnt,bPredict)
+	if self.BeingRemoved then return false end
+	
+	if bPredict==nil then bPredict=CLIENT end
+	
+	local ent=self:GetEntity();
+	local bTeleport=(ent!=nil);
+	
+	if SERVER || bPredict then
+		if vPos==nil then ErrorNoHalt("Itemforge Items: Could not create an entity for "..tostring(self)..", position to create item at was not given.\n"); return false end
+		aAng=aAng or Angle(0,0,0);
+		
+		--Give events a chance to stop the item from moving to the world there
+		if !self:Event("CanEnterWorld",true,vPos,aAng,bTeleport) then return false end
+		
+		--Just teleport this item's ent if it's already in the world
+		if bTeleport then
+			if bPredict then return true end
+			
+			ent:SetPos(vPos);
+			ent:SetAngles(aAng);
+			
+			local phys=ent:GetPhysicsObject();
+			if phys && phys:IsValid() then
+				phys:Wake();
+			end
+		else
+			--Before we send the item to the world we have to remove it from where it was (or fail if we couldn't)
+			if !self:ToVoid(false,nil,nil,bPredict) then return false end
+			
+			if bPredict then
+				return true;
+			else
+				ent=ents.Create("itemforge_item");
+				if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Items: Tried to create itemforge_item entity for "..tostring(self).." but failed.\n"); return false end
+				
+				ent:SetItem(self);
+				ent:SetPos(vPos);
+				ent:SetAngles(aAng);
+				
+				self:SetEntity(ent);
+			end
+		end
+	else
+		if !eEnt || !eEnt:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't set entity for "..tostring(self).." clientside... no valid entity was given.\n"); return false end
+		if bTeleport then ErrorNoHalt("Itemforge Items: Warning! Setting entity of "..tostring(self).." to "..tostring(eEnt).." even though it already has an entity ("..tostring(ent)..")!\n"); end
+		
+		ent=eEnt;
+		self:SetEntity(ent);
+	end
+	
+	--Run events to indicate a :ToWorld() occured
+	self:Event("OnEnterWorld",nil,ent,vPos,aAng,bTeleport);
+	return ent;
+end
+IF.Items:ProtectKey("ToWorld");
+
+--[[
+This function makes the given player hold this item as a weapon. 
+pl should be a player entity.
+bNoMerge is an optional true/false. If the player given is already holding a stack of items of this type (ex: player is holding a handful of pebbles, and is trying to :Hold() more pebbles), and bNoMerge is:
+	false or not given, and both items CanHoldMerge events allow it, then the two stacks will attempt to merge. False is returned if this item __successfully__ merged with another stack. 
+	true, then no attempt to merge the two items into one stack will be made, even if it normally would. Rather than merge the two stacks, we'll attempt to hold this stack as a seperate weapon in the weapon menu.
+bPredict is an optional true/false that defaults to false on the server and true on the client. If bPredict is:
+	false, then we're actually trying to hold the weapon.
+	true, then we're predicting whether or not we will be allowed to hold the weapon. true/false is returned if the weapon can/can't be held.
+wep is only necessary clientside. This will be the SWEP created for this item.
+This function calls the CanHold event, which has a chance to stop the item from being held.
+If the item is successfully held:
+	The item's OnSWEPInit event is called to initialize the SWEP.
+	The item's OnHold event is called.
+
+False is returned if the item can't be held for any reason. Otherwise, the newly created weapon entity is returned.
+]]--
+function ITEM:Hold(pl,bNoMerge,wep,bPredict)
+	if self.BeingRemoved then return false end
+	
+	if bNoMerge==nil then bNoMerge=false end
+	if bPredict==nil then bPredict=CLIENT end
+	
+	local ent;
+	
+	if SERVER || bPredict then
+		if !pl || !pl:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't hold "..tostring(self).." as weapon. Player given is not valid!\n"); return false
+		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Items: Couldn't hold "..tostring(self).." as weapon. The player given is not a player.\n"); return false
+		elseif !pl:Alive() then return false end
+		
+		--We can allow the events a chance to stop the item from being held
+		if !self:Event("CanHold",true,pl) then return false end
+		
+		
+		
+		--Here we determine two things: Do we have an empty slot, and can we merge this stack of items with a stack we're holding?
+		local iEmptySlot=0;
+		
+		--TODO pl:GetWeapon is SERVER ONLY ARGhdhsgsgdjlk garry/valve you cocksuckers
+		if SERVER then
+			for i=1,IF.Items.MaxHeldItems do
+				local currentlyHeld=pl:GetWeapon("itemforge_item_held_"..i);
+				if !currentlyHeld || !currentlyHeld:IsValid() then
+					iEmptySlot=i;
+				elseif !bNoMerge then
+					local heldItem=currentlyHeld:GetItem();
+					if heldItem && self:Event("CanHoldMerge",false,heldItem,pl) && heldItem:Event("CanHoldMerge",false,self,pl) && heldItem:Merge(self,nil,bPredict) then
+						return false;
+					end
+				end
+			end
+		end
+		
+		--Can't hold an item if the player is holding the max number of items already
+		if iEmptySlot==0 then
+			--ErrorNoHalt("Itemforge Items: Could not hold "..tostring(self).." as weapon. Player "..pl:Name().." is already holding an item. Release that item first.\n");
+			return false;
+		end
+		
+		
+		--[[
+		Send to void. False is returned in case of errors or if events stop the removal of the item from it's current medium.
+		We try to send an item to the void when all other possible errors have been ruled out.
+		If we didn't... this could happen: We put the item in the void, then try to put it in the world but can't create the ent. So our item is stuck in the void. We try to avoid this.
+		]]--
+		if !self:ToVoid(false,nil,nil,bPredict) then return false end
+		
+		if bPredict then
+			return true;
+		else
+			ent=pl:Give("itemforge_item_held_"..iEmptySlot);
+			--local ent=ents.Create("itemforge_item_held_"..iEmptySlot);
+			--ent:SetPos(pl:GetPos()+Vector(0,0,64));
+		
+			if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Items: Tried to create itemforge_item_held entity for "..tostring(self).." but failed.\n"); return false end
+		
+			--This function triggers the item's OnSWEPInit hook.
+			ent:SetItem(self);
+		end
+	else
+		ent=wep;
+	end
+	
+	self:SetWeapon(ent);
+	self:SetWOwner(pl);
+	
+	--Run OnHold event
+	self:Event("OnHold",nil,pl,ent);	
+	
+	return ent;
+end
+IF.Items:ProtectKey("Hold");
+
+--[[
+Moves this item to the same location as another item
+extItem should be an existing item. If extItem is:
+	In the world, this item is moved to the world at the exact same position and angles. Additionally, this item will be travelling at the same velocity as extItem when it is created.
+	In an inventory, this item is moved to the inventory that extItem is in. If we can't fit the item in that inventory, we try to send it to the same location as the item/entity it's connected to.
+	Held by a player, this item is also held by the player. If the player cannot hold any more items, then the item is moved to the world, at the shoot location of the player holding it.
+	In the void, this item is moved to the void.
+
+Scatter is an optional true/false.
+	If scatter is true and extItem is in the world,
+	the angles the items are placed in the world at will be random,
+	and the position will be chosen randomly from inside of extItem's bounding box,
+	rather than spawning at the entity's center.
+
+bNoMerge is an optional true/false. If extItem is in held or in an inventory, then the auto-merge will be disabled.
+
+bPredict is an optional true/false that defaults to false on the server and true on the client. If bPredict is:
+	false, we are actually sending the item to the same location as another item.
+	true, we are predicting whether or not we can send the item to the same location as another item.
+
+true is returned if the item was successfully moved to the same location as extItem. false is returned if the item could not be moved for any reason.
+TODO sometimes the items fall through the world, could probably fix by taking the bounding box size of this item into consideration when picking a scatter location
+]]--
+function ITEM:ToSameLocationAs(extItem,scatter,bNoMerge,bPredict)
+	if !extItem or !extItem:IsValid() then ErrorNoHalt("Itemforge Items: Tried to move "..tostring(self).." to same location as another item, but the other item wasn't given / was invalid!\n"); return nil end
+	
+	if scatter==nil then scatter=false end
+	if bNoMerge==nil then bNoMerge=false end
+	if bPredict==nil then bPredict=CLIENT end
+	
+	local container=extItem:GetContainer();
+	if container then
+		--Sometimes we'll inventory merge, which returns false in :ToInventory but also removes this item TODO make it return true instead
+		if !self:ToInventory(container,nil,nil,bNoMerge,bPredict) && self:IsValid() then
+			--If we can't move the item to the container that extItem was in, we'll try moving it to the same place as that container's connected item.
+			local t=container:GetConnectedItems();
+			local c=table.getn(t);
+			
+			--If this inventory isn't connected to anything we fail
+			if c==0 then return false end
+			
+			--If it is though, we'll pick one of the connections randomly and send the item to that location
+			return self:ToSameLocationAs(t[math.random(1,c)],scatter,bNoMerge,bPredict);
+		end
+		
+		return true;
+	elseif extItem:InWorld() then
+		local ent=extItem:GetEntity();
+		local newEnt=0;
+		if scatter then
+			local min=ent:OBBMins();
+			local max=ent:OBBMaxs();
+			local where=ent:LocalToWorld(Vector(math.random(min.x,max.x),math.random(min.y,max.y),math.random(min.z,max.z)));
+			local whereAng=Angle(math.random(0,360),math.random(0,360),math.random(0,360));
+			
+			newEnt=self:ToWorld(where,whereAng,nil,bPredict);
+			if !newEnt then return false end
+		else
+			newEnt=self:ToWorld(ent:GetPos(),ent:GetAngles(),nil,bPredict);
+			if !newEnt then return false end
+		end
+		
+		if !bPredict then
+			local newEntPhys=newEnt:GetPhysicsObject();
+			if newEntPhys && newEntPhys:IsValid() then newEntPhys:SetVelocity(ent:GetVelocity()); end
+		end
+		
+		return true;
+	elseif extItem:IsHeld() then
+		local pl=extItem:GetWOwner();
+		if !pl then ErrorNoHalt("Itemforge Items: ERROR! Trying to move "..tostring(self).." failed. The item given, "..tostring(extItem).." is being held, but player holding it could not be determined.\n"); return nil end
+		
+		if self:Hold(pl,bNoMerge,nil,bPredict) || !self:IsValid() || self:ToWorld(pl:GetShootPos(),pl:GetAimVector(),nil,bPredict)	then return true end
+		
+		return false;
+	end
+	
+	if !self:ToVoid(nil,nil,nil,bPredict) then return false end
+	return true;
+end
+IF.Items:ProtectKey("ToSameLocationAs");
+
+--[[
+ToVoid releases a held item, removes the item from the world, or takes an item out of an inventory. Or in other words, it places the item in the void.
+It isn't necessary to send an item to the void after it's created - the item is already in the void.
+
+forced is an optional argument that should be true if you want the removal to ignore events that say not to release/remove/etc. This should only be true if the item has to come out, like if the item is being removed.
+vDoubleCheck is an optional variable.
+	You can give this if you want to make sure that the item is being removed from the right inventory, entity, or weapon.
+	Sometimes, an item will be added to an inventory or something before the entity it was using is removed. When the entity gets removed, it voids the item. vDoubleCheck helps ensure we don't accidentilly take it out of the new location it's in when the entity gets removed.
+	This can be nil, an inventory, or an Itemforge SENT/SWEP. There's really no reason for a scripter to have to use this; Itemforge uses this internally.
+bNotFromClient is an optional true/false that only applies if this item is being removed from an inventory serverside. If bNotFromClient is:
+	true, the item will not be instructed to remove itself clientside. When utilized properly this can be used to save bandwidth with networking macros.
+	false, or not given, it will automatically be removed clientside.
+bPredict is an optional true/false that defaults to false on the server and true on the client. If bPredict is:
+	false, then we will actually void the item.
+	true, then instead of actually voiding the item we'll just return whether it's possible or not.
+
+true is returned if the item was placed in the void, or is in the void already.
+false is returned if the item couldn't be placed in the void.
+]]--
+function ITEM:ToVoid(forced,vDoubleCheck,bNotFromClient,bPredict)
+	if forced==nil then			forced=false			end
+	if bNotFromClient==nil then	bNotFromClient=false	end
+	if bPredict==nil then		bPredict=CLIENT			end
+	
+	--Is the item in the world?
+	if self:InWorld() then
+		local ent=self:GetEntity();
+		if vDoubleCheck && ent!=vDoubleCheck then return false end
+		
+		if !forced && (SERVER || bPredict) && !self:Event("CanExitWorld",true,ent) then return false end
+		if !bPredict then
+			self:ClearEntity();
+			if SERVER then ent:ExpectedRemoval(); end
+			
+			--TODO: DETERMINE IF SERVER FORCED REMOVAL
+			self:OnExitWorldSafe(forced);
+		end
+	--Maybe it's being held.
+	elseif self:IsHeld() then
+		local ent=self:GetWeapon();
+		if vDoubleCheck && ent!=vDoubleCheck then return false end
+		local pOwner=self:GetWOwner();
+		
+		if !forced && (SERVER || bPredict) && !self:Event("CanRelease",true,pOwner) then return false end
+		if !bPredict then
+			self:ClearWeapon(vDoubleCheck);
+			if SERVER then ent:ExpectedRemoval(); end
+			
+			--TODO: DETERMINE IF SERVER FORCED REMOVAL
+			self:Event("OnRelease",nil,pOwner,forced);
+		end
+		
+	--So we're not in the world or held; How about a container?
+	elseif self:InInventory() then
+		local container,cslot=self:GetContainer();
+		if vDoubleCheck && container!=vDoubleCheck then return false end
+		
+		--If removal isn't forced our events can stop the removal
+		if !forced && (SERVER || bPredict) && !self:Event("CanMove",true,container,cslot) then return false end
+		if !container:RemoveItem(self:GetID(),forced,bPredict) && !forced && (SERVER || bPredict) then return false end
+		
+		if !bPredict then
+			self:ClearContainer();
+			self:Event("OnMove",nil,container,cslot,nil,nil,forced);
+		
+			--Tell clients to remove this item from the inventory (unless specifically told not to)
+			if SERVER && !bNotFromClient then
+				local oldOwner=container:GetOwner();
+				self:SetOwner(oldOwner,nil);
+				self:SendNWCommand("RemoveFromInventory",oldOwner,forced,container);
+			end
+		end
+	end
+	
+	return true;
+end
+IF.Items:ProtectKey("ToVoid");
 
 --[[
 This function can determine if this item is based off of the given type in any way.
@@ -131,6 +636,15 @@ function ITEM:GetID()
 	return self.ID;
 end
 IF.Items:ProtectKey("GetID");
+
+--[[
+Returns this item's random number. Generates a random number for the item if it doesn't have one yet.
+]]--
+function ITEM:GetRand()
+	if !self.Rand then self.Rand=math.random()*100 end
+	return self.Rand;
+end
+IF.Items:ProtectKey("GetRand");
 
 --Get the size of an item in the stack (they all are the same size).
 function ITEM:GetSize()
@@ -361,6 +875,18 @@ function ITEM:InVoid()
 end
 IF.Items:ProtectKey("InVoid");
 
+--[[
+Protected OnExitWorld event.
+Stops all looping sounds and then runs the overridable OnExitWorld event.
+]]--
+function ITEM:OnExitWorldSafe(forced)
+	self:StopAllLoopingSounds();
+	
+	--Run the event
+	self:Event("OnExitWorld",nil,forced);
+end
+IF.Items:ProtectKey("OnExitWorldSafe");
+
 --Run this to start the item's Think event. Think is off by default.
 function ITEM:StartThink()
 	timer.Create("if_itemthink_"..self:GetID(),self.ThinkRate,0,self.OnThink,self);
@@ -406,8 +932,7 @@ This function will call the item's OnInit event.
 This function is called internally by Itemforge. There should be no reason for a scripter to call this.
 ]]--
 function ITEM:Initialize(owner)
-	local s,r=pcall(self.OnInit,self,owner);
-	if !s then ErrorNoHalt(r.."\n") end
+	self:Event("OnInit",nil,owner);
 	
 	return true;
 end
@@ -532,9 +1057,8 @@ function ITEM:ConnectInventory(inv,conslot)
 	self.Inventories[inv:GetID()]=newRecord;
 	
 	--We have events that detect connections of inventories both serverside and clientside
-	local s,r=pcall(self.OnConnectInventory,self,inv,conslot);
-	if !s then ErrorNoHalt(r.."\n") end
-	
+	self:Event("OnConnectInventory",nil,inv,conslot);
+		
 	return true;
 end
 IF.Items:ProtectKey("ConnectInventory");
@@ -552,8 +1076,7 @@ function ITEM:SeverInventory(inv)
 	self.Inventories[inv:GetID()]=nil;
 	
 	--We have events that detect severing of inventories both serverside and clientside
-	local s,r=pcall(self.OnSeverInventory,self,inv);
-	if !s then ErrorNoHalt(r.."\n") end
+	self:Event("OnSeverInventory",nil,inv);
 	
 	return true;
 end

@@ -4,7 +4,7 @@ CLIENT
 
 Creates the ItemforgeImageButton VGUI control.
 This inherits from the Button control.
-This button has a total of three materials - an "pressed" and "released" material for the background of the button, and an icon displayed on top of that.
+This button has a total of three materials - a "pressed" and "released" material for the background of the button, and an icon displayed on top of that.
 */
 local PANEL = {}
 

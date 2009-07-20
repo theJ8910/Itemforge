@@ -96,13 +96,7 @@ Return a string here to decide what the Wire debug name is.
 WIRE
 ]]--
 function ITEM:GetWireDebugName()
-	local s,r=pcall(self.GetName,self);
-	if s then
-		return r;
-	else
-		ErrorNoHalt(r.."\n");
-		return "Itemforge Item";
-	end
+	return self:Event("GetName","Itemforge Item");
 end
 
 --[[
@@ -173,19 +167,12 @@ SWEP SPECIFIC EVENTS
 --[[
 Whenever an item is held as a weapon, an SWEP is created to represent it. This function will be run while SetItem is being run on the SWEP.
 SWEP is the SWEP table. It's the same as eWeapon:GetTable().
-eWeapon is the SENT that is created to hold the object.
+eWeapon is the SWEP entity itself.
 ]]--
 function ITEM:OnSWEPInit(SWEP,eWeapon)
-	--We'll grab and set the world model and view models of the weapon first
-	local s,r=pcall(self.GetWorldModel,self);
-	if !s then ErrorNoHalt(r.."\n")
-	else SWEP.WorldModel=r;
-	end
-	
-	local s,r=pcall(self.GetViewModel,self);
-	if !s then ErrorNoHalt(r.."\n")
-	else SWEP.ViewModel=r;
-	end
+	--We'll set the world model and view models of the weapon first
+	SWEP.WorldModel=self:GetWorldModel();
+	SWEP.ViewModel=self:GetViewModel();
 	
 	--TODO use hooks
 	SWEP.Primary.Automatic=self.PrimaryAuto;
@@ -200,6 +187,7 @@ end
 --[[
 This is run when a player is holding the item as an SWEP and presses the left mouse button (primary attack).
 The default action is to use the item.
+NOTE: If ITEM.PrimaryAuto is true, then this event runs every frame the player has his Left Mouse button pressed!
 ]]--
 function ITEM:OnPrimaryAttack()
 	self:Use(self:GetWOwner());
@@ -208,6 +196,7 @@ end
 --[[
 This is run when a player is holding the item as an SWEP and presses the right mouse button (secondary attack).
 The default action is to use the item.
+NOTE: If ITEM.SecondaryAuto is true, then this event runs every frame the player has his Right Mouse button pressed!
 ]]--
 function ITEM:OnSecondaryAttack()
 	self:Use(self:GetWOwner());
@@ -216,9 +205,30 @@ end
 --[[
 This is run when a player is holding the item as an SWEP and presses the reload button (usually the "R" key).
 Nothing happens by default.
+NOTE: OnReload is called every frame that the player has his [R] key pressed!
 ]]--
 function ITEM:OnReload()
 	
+end
+
+--[[
+This is run when a player is holding the item as a weapon and swaps from a different weapon to this weapon.
+]]--
+function ITEM:OnDeploy()
+	--DEBUG
+	Msg("Itemforge Items: Deploying "..tostring(self).."!\n");
+	
+	return true;
+end
+
+--[[
+This is run when a player is holding the item as a weapon and swaps from this weapon to a different weapon.
+]]--
+function ITEM:OnHolster()
+	--DEBUG
+	Msg("Itemforge Items: Holstering "..tostring(self).."!\n");
+	
+	return true;
 end
 
 
@@ -327,85 +337,17 @@ function ITEM:OnSendFullUpdate(pl)
 end
 
 --[[
-This is run when you hold the item as a weapon.
-Can the item be held as a weapon? If this returns false, attempts to hold the item will fail.
-
-pl is the player who wants to hold the item
-Return true to allow the item to be held, or false to stop any attempts to hold.
+This function is run periodically (when the server ticks).
 ]]--
-function ITEM:OnHold(pl)
-	return true;
-end
-
---[[
-This is run when you release the item. 
-pl is the player who is currently holding the item.
-forced is a true/false indicating whether or not we can stop the item from being released.
-	If forced is true, returning false in this event will not stop the item from being released.
-	forced will be true if the release has to happen. A couple of cases that this apply are death of a player or removal of the item.
-Return false to prevent from releasing.
-]]--
-function ITEM:OnRelease(pl,forced)
-	return true;
-end
-
---[[
-This is run when the item is moved from one inventory to another (or from one slot in an inventory to another).
-The purpose of this event is to give the item a chance to allow it to choose where it can and can't go.
-
-If the item is being moved from one inventory to a different inventory(ex: moving an item from a player's inventory to a crate): 
-	OldInv and OldSlot will be the inventory and slot it was in.
-	NewInv and NewSlot will be the inventory and slot it's going to.
-If the item is moving from one slot to another in the same inventory:
-	OldInv and NewInv will be the same inventory.
-	OldSlot will be where the item is moving from.
-	NewSlot is where the item wants to move to.
-If the item isn't in an inventory but is being moved to one:
-	OldInv and OldSlot will be nil.
-	NewInv and NewSlot will be the inventory and slot it's moving to.
-If the item is being removed from an inventory but isn't going to one:
-	OldInv and OldSlot will be the inventory and slot it was in.
-	NewInv and NewSlot will be nil.
-
-Returning true will allow the item to be placed in and/or removed from an inventory with the given slot.
-Returning false will stop the item from moving from inventory to inventory / slot to slot.
-
-If forced is true (usually due to forced removal from an inventory because the item is being removed), then returning false will not stop the item from being moved.
-TODO this event needs to be called in more places, and PROPERLY for that matter
-]]--
-function ITEM:OnMove(OldInv,OldSlot,NewInv,NewSlot,forced)
-	--If we're moving the item to an inventory
-	if NewInv then return true end
+function ITEM:OnTick()
 	
-	return true;
 end
 
 --[[
-This function is called when the item is trying to enter the world.
-Can the item be placed in the world as an entity? If this returns false, attempts to place the item in the world will fail.
-
-vPos is the position it's trying to be inserted at.
-aAng is the angle it's trying to be inserted at.
-
-Return false to stop the item from entering the world, or return true to allow it to enter the world.
+This function is run periodically.
+You can set how often it runs by setting the think rate at the top of the script, or with self:SetThinkRate().
+You need to tell the item to self:StartThink() to start the item thinking.
 ]]--
-function ITEM:OnWorldEntry(vPos,aAng)
-	return true;
-end
-
---[[
-This function is called when the item is trying to leaving the world.
-ent is the item's world entity. It should be the same as self.Entity.
-forced is true if the removal of the item from the world is being forced (with good reason usually, such as the item itself being removed) - in the case that it is, the removal cannot be stopped by returning false here.
-
-Return false to stop the item from leaving the world, or return true to allow it to enter the world.
-]]--
-function ITEM:OnWorldExit(ent,forced)
-	if !forced && ent:IsConstrained() then return false end
-	return true;
-end
-
---This function is run periodically. You can set how often it runs by setting the think rate at the top of the script, or with self:SetThinkRate(). You need to tell the item to self:StartThink() to start the item thinking.
 function ITEM:OnThink()
 	
 end
@@ -419,85 +361,6 @@ TODO Item combinations module
 ]]--
 function ITEM:OnCombination(itemset,combination)
 	return true;
-end
-
---[[
-This runs when this stack of items tries to merge with another stack of items. You can return false to stop the merge from happening.
-]]--
-function ITEM:OnMerge(otherItem)
-	return true;
-end
-
---[[
-This is called when two items of the same type bump into each other in the world.
-If this item is in the world (as an ent), and another item of the same type bumps into it, should the two items merge into a stack?
-	Ex: You have a sheet of paper. Another sheet of paper falls on top of it.
-	Should the two sheets of paper remain seperate, or should they form a stack of 2 papers?
-
-This event can decide whether or not this item can be merged with other items in the world.
-Note that if OnMerge returns false, it stops all merges.
-
-otherItem is the other item that this item is attempting to merge with.
-
-Return true to allow the item to merge together as a single stack with another item,
-or false to keep the item seperate from the other item.
-]]--
-function ITEM:CanWorldMerge(otherItem)
-	return true;
-end
-
---[[
-This is called when an item is inserted into an inventory with an item of the same type.
-If this item is in an inventory, and an item of the same type is placed in the inventory, should the two items merge?
-	Ex: You have 30 grapes in a barrel. You put in 56 grapes.
-	Should they merge into one stack of 86 grapes, or should the two stacks remain seperate (a stack of 30 grapes and a seperate stack of 56 grapes)?
-This hook can decide whether or not this item can be merged with other items in inventories.
-Note that if OnMerge returns false, it stops all merges.
-
-otherItem is the other item that this item is attempting to merge with.
-inventory is the inventory that this item is being inserted into.
-
-Return true to allow the item to merge together as a single stack with another item,
-or false to keep the item stacks seperate from each other.
-]]--
-function ITEM:CanInventoryMerge(otherItem,inventory)
-	return true;
-end
-
---[[
-This is called when an item tries to be picked up, but an item of the same type is being held as a weapon.
-Should the item you're trying to pick up be merged with the item you're holding?
-	Ex: You're holding 5 rocks. You see a rock on the ground and want to pick it up, giving you 6 rocks. Can you?
-This hook can decide whether or not this item can be merged with the item currently being held as a weapon.
-Note that if OnMerge returns false, it stops all merges.
-
-otherItem is the other item that this item is attempting to merge with.
-player is the player currently holding an item that is going to be merged.
-
-Return true to allow the item to merge together as a single stack held by the player,
-or false to keep the items stacks seperate (which will stop the item from being held)
-]]--
-function ITEM:CanHoldMerge(otherItem,player)
-	return true;
-end
-
---[[
-This runs when this stack of items is split into another stack of items.
-You can return false to stop the split from happening.
-]]--
-function ITEM:OnSplit(howMany)
-	return true;
-end
-
---[[
-Whenever a stack is split, a new stack is created. If this item is the new stack created by splitting from another stack of items, this function is called.
-This function runs right after this stack has been created. Again, this function only runs if this item results from splitting from another stack of items.
-originItem will be the original stack that this item split from.
-howMany is how many items were transferred to this stack from originItem's stack.
-TODO copy network vars from originItem
-]]--
-function ITEM:OnSplitFromStack(originItem,howMany)
-
 end
 
 --This runs when a networked var is set on this item (with SetNW*).

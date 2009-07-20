@@ -117,20 +117,11 @@ function MODULE:Drop()
 		local droppedItem=self.DragPanel:GetItem();
 		if droppedItem then
 			--If we dropped onto an item in the world
-			if traceRes.Entity && traceRes.Entity:IsValid() && traceRes.Entity:GetClass()=="itemforge_item" then
-				local item=traceRes.Entity:GetItem();
-				
-				if item then
-					local s,r=pcall(item.OnDragDropHere,item,droppedItem);
-					if !s then ErrorNoHalt(r);
-					elseif r then
-						local s,r=pcall(droppedItem.OnDragDropToItem,droppedItem,item);
-						if !s then ErrorNoHalt(r); end
-					end
-				end
+			local item=IF.Items:GetEntItem(traceRes.Entity);
+			if item && item:Event("OnDragDropHere",false,droppedItem) then
+				droppedItem:Event("OnDragDropToItem",nil,item);
 			else
-				local s,r=pcall(droppedItem.OnDragDropToWorld,droppedItem,traceRes);
-				if !s then ErrorNoHalt(r); end
+				droppedItem:Event("OnDragDropToWorld",nil,traceRes);
 			end
 		end
 	end

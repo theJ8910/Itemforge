@@ -274,7 +274,7 @@ function PANEL:Paint()
 			surface.SetFont("ItemforgeInventoryFont");
 			surface.SetTextColor(WeightLabelTextColor.r,WeightLabelTextColor.g,WeightLabelTextColor.b,WeightLabelTextColor.a);
 			surface.SetTextPos(WeightLabelX,WeightLabelY);
-			surface.DrawText(self.Inventory:GetWeightFree().."kg/"..self.Inventory:GetWeightCapacity().."kg");
+			surface.DrawText(self.Inventory:GetWeightFree().."g/"..self.Inventory:GetWeightCapacity().."g");
 		end
 		
 		local selected=self.Slots:GetSelectedItem()
@@ -459,7 +459,7 @@ function PANEL:PlayerHoldItem()
 	local item=self.Slots:GetSelectedItem();
 	if !item then return false end
 	
-	item:Hold(LocalPlayer());
+	item:PlayerHold(LocalPlayer());
 end
 
 

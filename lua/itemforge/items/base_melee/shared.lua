@@ -107,11 +107,11 @@ function ITEM:AddViewKick(min,max)
 end
 
 function ITEM:MissSound()
-	return self:EmitSound(self.MissSounds[math.random(1,#self.MissSounds)]);
+	return self:EmitSound(self.MissSounds[math.random(1,#self.MissSounds)],true);
 end
 
 function ITEM:HitSound(traceRes)
-	return self:EmitSound(self.HitSounds[math.random(1,#self.HitSounds)]);
+	return self:EmitSound(self.HitSounds[math.random(1,#self.HitSounds)],true);
 end
 
 --[[

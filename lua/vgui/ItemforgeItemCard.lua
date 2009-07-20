@@ -19,7 +19,6 @@ function PANEL:Init()
 	--Create size limit icon
 	self.SizeIcon=vgui.Create("ItemforgeSizeIcon",self);
 	self.SizeIcon:SetPos(self.SizeIconX,self.SizeIconY);
-	self:SetAutoDelete(true);
 end
 
 function PANEL:Paint()

@@ -72,7 +72,7 @@ function ITEM:UnloadLoop()
 		return false;
 	elseif inv then
 		inv:GetLast():ToSameLocationAs(self,true);
-		self:EmitSound(self.ReloadSounds[math.random(1,#self.ReloadSounds)]);
+		self:EmitSound(self.ReloadSounds[math.random(1,#self.ReloadSounds)],true);
 		self:SetNextBoth(CurTime()+self.AutoUnloadDelay);
 	end
 	

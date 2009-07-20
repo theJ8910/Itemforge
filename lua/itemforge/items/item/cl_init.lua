@@ -13,50 +13,8 @@ ITEM.UseModelFor2D=true;							--If this is true, when displaying the item in an
 ITEM.WorldModelNudge=Vector(0,0,0);					--The item's world model is shifted by this amount relative to the player's right hand. This is only used if this item's world model is a non-standard weapon model (doesn't have a "ValveBiped.Bip01_R_Hand" bone like the HL2 pistol, crowbar, smg, etc).
 ITEM.WorldModelRotate=Angle(0,0,0);					--The item's world model is rotated by this amount relative to the player's right hand. This is only used if this item's world model is a non-standard weapon model (doesn't have a "ValveBiped.Bip01_R_Hand" bone like the HL2 pistol, crowbar, smg, etc).
 ITEM.RCMenu=nil;									--Our right click menu (a DMenu).
-ITEM.Rand=nil;										--This number adds some random spin when posing this item's world model in 3D.
-
---[[
-This adds the item to an inventory and sets the item's inventory
-Clientside, this just sets the inventory the item is in and adds it to that inventory clientside. slot is required.
-If the item cannot be inserted (inventory doesn't exist or inventory wouldn't allow the item to be added for some reason) then false is returned.
-]]--
-function ITEM:ToInventory(inv,slot)
-	if !inv || !inv:IsValid() then ErrorNoHalt("Itemforge Items: Could not insert "..tostring(self).." into an inventory, inventory given is not valid.\n"); return false end
-	if slot==nil then ErrorNoHalt("Itemforge Items: Could not add "..tostring(self).." to inventory "..inv:GetID().." clientside! slot was not given!\n"); return false end
-	
-	local container=self:GetContainer();
-	
-	--We don't stop insertion clientside if the item has an entity or another container already, but we bitch about it so the scripter knows something isn't right
-	if container && container!=inv then ErrorNoHalt("Itemforge Items: Warning! "..tostring(self).." is already in an inventory clientside, but is being inserted into inventory "..inv:GetID().." anyway! Not supposed to happen!\n"); end
-	
-	--We can safely ignore these...
-	--Tested this way: Held an item as weapon, then sent to inventory. On server, it removed the entity and then sent to inventory. On client, messages were out of order - instruction to add item to inventory arrived before instruction to remove entity. Interesting.
-	--[[
-	local ent=self:GetEntity();
-	if ent then
-		local c=ent:GetClass();
-		if c=="itemforge_item" then
-			ErrorNoHalt("Itemforge Items: Warning! Item "..self:GetID().." is in the world clientside, but is being inserted into inventory "..inv:GetID().."! Not supposed to happen!\n");
-		elseif c=="itemforge_item_held" then
-			ErrorNoHalt("Itemforge Items: Warning! Item "..self:GetID().." is being held by a player clientside, but is being inserted into inventory "..inv:GetID().."! Not supposed to happen!\n");
-		else
-			ErrorNoHalt("Itemforge Items: Warning! Item "..self:GetID().." is in an entity unrelated to Itemforge clientside, but is being inserted into inventory "..inv:GetID().."... Not supposed to happen.\n");
-		end
-	end
-	]]--
-	local n=inv:InsertItem(self,slot);
-	
-	--This will fail if there are insertion errors, not because events deny it (events will still run clientside, though)
-	if !n then return false end
-	self:SetContainer(inv);
-	
-	return true;
-end
-IF.Items:ProtectKey("ToInventory");
---A shorter alias
-ITEM.ToInv=ITEM.ToInventory
-IF.Items:ProtectKey("ToInv");
-
+ITEM.ItemSlot=nil;									--When the item is held, this will be a panel displaying this item.
+ITEM.WorldModelAttach=nil;							--When the item is held, this will be an attached model (a GearAttach object specifically) attached to the player's right hand.
 
 --[[
 Transfer from one inventory to another.
@@ -70,13 +28,14 @@ function ITEM:TransInventory(old,new,newSlot)
 	if !new || !new:IsValid() then ErrorNoHalt("Itemforge Items: Could not transfer "..tostring(self).." from inventory "..old:GetID().." to another inventory clientside, 'new' inventory given is not valid.\n"); return false end
 	if newSlot==nil then ErrorNoHalt("Itemforge Items: Could not transfer "..tostring(self).." from inventory "..old:GetID().." to inventory "..newInv:GetID().." clientside! newSlot was not given!\n"); return false end
 	
-	if old!=new && !self:ToVoid(false,old) then end
+	if old!=new && !self:ToVoid(false,old,nil,false) then end
 	if !self:ToInventory(new,newSlot) then return false end
 end
 IF.Items:ProtectKey("TransInventory");
 
 --[[
 Transfer from one slot to another.
+This function is designed to save bandwidth.
 True is returned if the move was successful. False is returned otherwise.
 ]]--
 function ITEM:TransSlot(inv,oldslot,newslot)
@@ -84,71 +43,6 @@ function ITEM:TransSlot(inv,oldslot,newslot)
 	if !inv:MoveItem(self,oldslot,newslot) then return false end
 end
 IF.Items:ProtectKey("TransSlot");
-
---[[
-Clientside, the ToVoid function clears the entity/weapon associated with this item, or takes the item out of the inventory it's in clientside.
-forced is a true/false that indiciates if a removal was graceful or forceful.
-	The only reason this will be true is if the server forced the removal.
-	Unlike on the server, "forced" doesn't make much of a difference clientside;
-	Events cannot stop an item from being voided clientside, but they can know whether or not the server forced the removal or not.
-vDoubleCheck is optional; This value should be given by networked functions (or when a SENT/SWEP is removed clientside). ToVoid will check for netsync errors by comparing the given entity/inventory to the current entity/inventory.
-
-true is returned if the item was placed in the void, or is in the void already.
-false is returned if the item couldn't be placed in the void.
-]]--
-function ITEM:ToVoid(forced,vDoubleCheck)
-	if self:InWorld() then
-		local ent=self:GetEntity();
-		
-		if vDoubleCheck && ent!=vDoubleCheck then ErrorNoHalt("Itemforge Items: WARNING! Tried to take "..tostring(self).." out of the world, but the entity being removed ("..tostring(vDoubleCheck)..") didn't match the current world entity ("..tostring(ent).."). Old world entity?\n"); return false end
-		
-		--Let events run
-		local s,r=pcall(self.OnWorldExit,self,ent);
-		if !s then					ErrorNoHalt(r.."\n")
-		end
-		
-		self:ClearEntity();
-	elseif self:IsHeld() then
-		local ent=self:GetWeapon();
-		
-		if vDoubleCheck && ent!=vDoubleCheck then ErrorNoHalt("Itemforge Items: WARNING! Tried to stop holding "..tostring(self).." clientside, but the SWEP given ("..tostring(vDoubleCheck)..") didn't match the current SWEP ("..tostring(ent).."). Old weapon?\n"); return false end
-		
-		--Let events run
-		local s,r=pcall(self.OnRelease,self,self:GetWOwner());
-		if !s then					ErrorNoHalt(r.."\n")
-		end
-		
-		self:ClearWeapon();
-	elseif self:InInventory() then
-		local container,cslot=self:GetContainer();
-		if vDoubleCheck && container!=vDoubleCheck then ErrorNoHalt("Itemforge Items: WARNING! Tried to remove "..tostring(self).." from "..tostring(vDoubleCheck)..", but the item is in "..tostring(container).."! Netsync error?\n"); return false end
-		
-		--Let events run
-		local s,r=pcall(self.OnMove,self,container,cslot,nil,nil,forced);
-		if !s then					ErrorNoHalt(r.."\n")
-		end
-		
-		container:RemoveItem(self:GetID(),forced);
-		self:ClearContainer();
-	end
-	
-	return true;
-end
-IF.Items:ProtectKey("ToVoid");
-
---[[
-Protected OnWorldExit event.
-Stops all looping sounds and then runs the overridable OnWorldExit event.
-]]--
-function ITEM:OnWorldExitSafe(ent)
-	self:StopAllLoopingSounds();
-	
-	--Give events a chance to stop the removal (or at least let them run if it's forced)
-	local s,r=pcall(self.OnWorldExit,self,ent);
-	if !s then					ErrorNoHalt(r.."\n")
-	end
-end
-IF.Items:ProtectKey("OnWorldExitSafe");
 
 --[[
 Run this function to use the item.
@@ -160,13 +54,7 @@ NOTE: If OnUse returns false clientside, "I can't use this!" does not appear, it
 TODO: Possibly have the item used by something other than a player
 ]]--
 function ITEM:Use(pl)
-	if !pl || !pl:IsValid() || !pl:IsPlayer() || !self:CanPlayerInteract(pl) then return false end
-	
-	local s,r=pcall(self.OnUse,self,pl);
-	if !s then ErrorNoHalt(r.."\n")
-	elseif !r then
-		return false;
-	end
+	if !pl || !pl:IsValid() || !pl:IsPlayer() || !self:Event("CanPlayerInteract",false,pl) || !self:Event("OnUse",true,pl) then return false end
 	
 	--After the event allows the item to be used clientside, ask the server to use the item.
 	self:SendNWCommand("PlayerUse");
@@ -180,14 +68,14 @@ Run this function to hold the item.
 It requests to "Hold" the item on the server.
 False is returned if the item is unable to be held for any reason.
 ]]--
-function ITEM:Hold(pl)
-	if !pl || !pl:IsValid() || !pl:IsPlayer() || pl!=LocalPlayer() || !pl:Alive() then return false end
+function ITEM:PlayerHold(pl)
+	if !pl || !pl:IsValid() || !pl:IsPlayer() || !self:Event("CanPlayerInteract",false,pl) then return false end
 	
 	self:SendNWCommand("PlayerHold");
 	
 	return true;
 end
-IF.Items:ProtectKey("Hold");
+IF.Items:ProtectKey("PlayerHold");
 
 --[[
 Returns this item's right click menu if one is currently open.
@@ -208,22 +96,16 @@ False is returned if the menu could not be opened. One possible reason this may 
 function ITEM:ShowMenu(x,y)
 	self.RCMenu=DermaMenu();
 	
-	--Grab the item's name.
-	local s,r=pcall(self.GetName,self)
-	if !s then
-		ErrorNoHalt(r.."\n");
-		r="Itemforge Item";
-	end
-	if self:IsStack() then r=r.." x "..self:GetAmount() end
+	local name=self:Event("GetName","Itemforge Item");
+	if self:IsStack() then name=name.." x "..self:GetAmount() end
 	
 	--Add header
 	local h=vgui.Create("ItemforgeMenuHeader");
-	h:SetText(r);
+	h:SetText(name);
 	self.RCMenu:AddPanel(h);
 	
-	local s,r=pcall(self.OnPopulateMenu,self,self.RCMenu);
+	local r,s=self:Event("OnPopulateMenu",nil,self.RCMenu);
 	if !s then
-		ErrorNoHalt(r.."\n");
 		self.RCMenu:Remove();
 		return false;
 	end
@@ -248,17 +130,16 @@ end
 IF.Items:ProtectKey("KillMenu");
 
 function ITEM:PlayerSplit(pl)
-	if !self:CanPlayerInteract(pl) then return false end
+	if !self:Event("CanPlayerInteract",false,pl) || !self:Event("CanPlayerSplit",true,pl) then return false end
 	
 	--Can't split 1 item
 	local amt=self:GetAmount();
 	if amt==1 then return false end
 	
-	local s,r=pcall(self.GetName,self);
-	if !s then ErrorNoHalt(r.."\n"); r="Itemforge Item" end
+	local name=self:Event("GetName","Itemforge Item");
 	
 	local Window = vgui.Create("DFrame");
-		Window:SetTitle("Split "..r);
+		Window:SetTitle("Split "..name);
 		Window:SetDraggable(false);
 		Window:ShowCloseButton(false);
 		Window:SetBackgroundBlur(true);
@@ -366,6 +247,8 @@ function ITEM:Tick()
 		end
 		self.NWVarsThisTick=nil;
 	end
+	
+	self:Event("OnTick");
 end
 IF.Items:ProtectKey("Tick");
 
@@ -514,7 +397,7 @@ IF.Items:ProtectKey("ReceiveNWCommand");
 
 --Place networked commands here in the same order as in init.lua.
 IF.Items:CreateNWCommand(ITEM,"ToInventory",ITEM.ToInventory,{"inventory","short"});
-IF.Items:CreateNWCommand(ITEM,"RemoveFromInventory",ITEM.ToVoid,{"bool","inventory"});
+IF.Items:CreateNWCommand(ITEM,"RemoveFromInventory",function(self,forced,inv) self:ToVoid(forced,inv,nil,false) end,{"bool","inventory"});
 IF.Items:CreateNWCommand(ITEM,"TransferInventory",ITEM.TransInventory,{"inventory","inventory","short"});
 IF.Items:CreateNWCommand(ITEM,"TransferSlot",ITEM.TransSlot,{"inventory","short","short"});
 IF.Items:CreateNWCommand(ITEM,"PlayerUse");

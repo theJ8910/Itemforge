@@ -186,12 +186,8 @@ function ITEM:OnEntityInit(entity)
 	return true;
 end
 
-function ITEM:OnWorldExit(ent,forced)
-	if !self["item"].OnWorldExit(self,ent,forced) then return false end
-	if self:GetAttachedEnt() then
-		self:Detach();
-	end
-	return true;
+function ITEM:OnExitWorld(forced)
+	if self:GetAttachedEnt() then self:Detach(); end
 end
 
 

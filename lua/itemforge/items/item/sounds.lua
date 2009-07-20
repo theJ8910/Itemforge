@@ -12,15 +12,22 @@ ITEM.LoopingSounds=nil;		--Whenever looping sounds are created, they are kept tr
 Causes the item to emit a sound.
 True is returned if the sound is played.
 False is returned if the sound couldn't be played (probably because the item is in the void or otherwise couldn't be located).
+bPredicted is an optional true/false. If the item is being held as a weapon bPredicted is:
+	true, when :EmitSound runs on the server it will play the sound on everybody except the owner, whose client is expected to play the sound seperately.
+	false or not given, when :EmitSound runs on the server, the sound is played for everybody.
+	The advantage of bPredicted is that it saves some bandwidth and the sound is heard immediately on the client if you predict it correctly.
 ]]--
-function ITEM:EmitSound(sound,amp,pitch)
+function ITEM:EmitSound(sound,bPredicted,amp,pitch)
 	--If the item is in the world, we'll emit from that entity.
 	if self:InWorld() then
 		local ent=self:GetEntity();
 		ent:EmitSound(sound,amp,pitch);
 		return true;
-	elseif self:IsHeld() then
-		local w=self:GetWeapon();
+	elseif self:IsHeld() then	
+		local w;
+		if bPredicted then	w=self:GetWeapon();
+		else				w=self:GetWOwner();
+		end
 		if !w then return false end
 		
 		w:EmitSound(sound,amp,pitch);
@@ -53,12 +60,13 @@ Returns true if the sound was created successfully.
 Returns false otherwise
 ]]--
 function ITEM:LoopingSound(sound,uniqueID)
-	if !self:InWorld() then return false end
-	
 	--Create the looping sounds table if it hasn't been created already
 	if !self.LoopingSounds then self.LoopingSounds={}; end
 	
-	local newSound=CreateSound(self:GetEntity(),sound);
+	local ent=self:GetEntity() or self:GetWOwner();
+	if !ent then return false end
+	
+	local newSound=CreateSound(ent,sound);
 	newSound:Play();
 	if self:IsLoopingSound(uniqueID) then
 		self:StopLoopingSound(uniqueID);

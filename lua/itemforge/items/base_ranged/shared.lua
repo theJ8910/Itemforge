@@ -118,7 +118,7 @@ end
 When the player is holding it and tries to primary attack
 ]]--
 function ITEM:OnPrimaryAttack()
-	if !self:CanPrimaryAttack() || (self:IsHeld() && self:GetWOwner():KeyDownLast(IN_ATTACK) && !self:CanPrimaryAttackAuto()) then return false; end
+	if !self:CanPrimaryAttack() || (self:IsHeld() && self:GetWOwner():KeyDownLast(IN_ATTACK) && !self:CanPrimaryAttackAuto()) then return false end
 	
 	if !self.PrimaryFiresUnderwater && self:GetWaterLevel()==3 then
 		self:DryFire();
@@ -145,7 +145,7 @@ end
 When the player is holding it and tries to secondary attack
 ]]--
 function ITEM:OnSecondaryAttack()
-	if !self:CanSecondaryAttack() || (self:IsHeld() && self:GetWOwner():KeyDownLast(IN_ATTACK2) && !self:CanSecondaryAttackAuto()) then return false; end
+	if !self:CanSecondaryAttack() || (self:IsHeld() && self:GetWOwner():KeyDownLast(IN_ATTACK2) && !self:CanSecondaryAttackAuto()) then return false end
 	
 	if !self.SecondaryFiresUnderwater && self:GetWaterLevel()==3 then
 		self:DryFire();
@@ -231,7 +231,7 @@ function ITEM:Load(item,clip,amt)
 		if !currentAmmo then
 			--We're loading too much ammo into our clip.
 			if clipSize!=0 && amt>clipSize then
-				item=item:Split(false,self.Clips[clip].Size);
+				item=item:Split(self.Clips[clip].Size,false);
 				if !item then return false end
 			end
 		
@@ -241,7 +241,7 @@ function ITEM:Load(item,clip,amt)
 				if !item:Transfer(amt,currentAmmo) then return false end
 				isOldAmmo=true;
 			else
-				isOldAmmo=currentAmmo:Merge(true,item);
+				isOldAmmo=currentAmmo:Merge(item);
 				if isOldAmmo==false then return false end
 			end
 		
@@ -259,12 +259,13 @@ function ITEM:Load(item,clip,amt)
 		if isOldAmmo==false then
 			--If we're only loading a few items from the stack, split them off and load them instead
 			if item:GetAmount()>amt then
-				item=item:Split(false,amt);
+				item=item:Split(amt,false);
 				if !item then return false end
 			end
 			
-			item:ToVoid();
-			--TODO Store old max amount
+			if !item:ToVoid() then return false end
+			
+			item.OldMaxAmount=item:GetMaxAmount();
 			item:SetMaxAmount(self.Clips[clip].Size);
 
 			self.Clip[clip]=item;
@@ -307,7 +308,7 @@ Plays a random sound for the primary fire.
 Also plays the primary attack animation, both on the weapon and player himself
 ]]--
 function ITEM:PrimaryFireEffects()
-	if #self.PrimaryFireSounds>0 then self:EmitSound(self.PrimaryFireSounds[math.random(1,#self.PrimaryFireSounds)]); end
+	if #self.PrimaryFireSounds>0 then self:EmitSound(self.PrimaryFireSounds[math.random(1,#self.PrimaryFireSounds)],true); end
 	
 	if self:IsHeld() then
 		self:GetWOwner():SetAnimation(PLAYER_ATTACK1);
@@ -329,7 +330,7 @@ It plays the weapon's secondary fire sound.
 It plays the secondary attack animation on both the player and the viewmodel.
 ]]--
 function ITEM:SecondaryFireEffects()
-	if #self.SecondaryFireSounds>0 then self:EmitSound(self.SecondaryFireSounds[math.random(1,#self.SecondaryFireSounds)]); end
+	if #self.SecondaryFireSounds>0 then self:EmitSound(self.SecondaryFireSounds[math.random(1,#self.SecondaryFireSounds)],true); end
 	
 	if self:IsHeld() then
 		self:GetWOwner():SetAnimation(PLAYER_ATTACK2);
@@ -368,8 +369,8 @@ function ITEM:StartReload()
 	
 	--Determine what clip needs to be loaded and locate ammo for it
 	for i=1,table.getn(self.Clips) do
-		local clipsize=self:GetClipSize(clip);
-		local curAmmo=self:GetAmmo(clip);
+		local clipsize=self:GetClipSize(i);
+		local curAmmo=self:GetAmmo(i);
 		if clipsize==0 || !curAmmo || curAmmo:GetAmount()<clipsize then
 			local canUseAmmo=function(self,item)
 				if self:CanLoadClipWith(item,i) then
@@ -387,6 +388,10 @@ function ITEM:StartReload()
 	
 	--If we couldn't find any ammo then stop
 	if self.ReloadSource==nil then return false end
+	
+	--Show shotgun shell (I'm not sure this even works? But it's in the modcode so uhh)
+	local wep=self:GetWeapon();
+	if wep then wep:SetBodygroup(1,0) end
 	
 	self:SetNWBool("InReload",true);
 	self:SetNextBoth(CurTime()+self.ReloadStartDelay);
@@ -407,6 +412,7 @@ function ITEM:Reload()
 		self:FinishReload();
 	end
 	
+	--TODO if ammo is unloadable (ex can't split a shell from the stack) it keeps trying to reload; fix this
 	if !self:Load(self.ReloadSource,self.ReloadClip,1) then return false end
 	
 	return true;
@@ -420,6 +426,10 @@ function ITEM:FinishReload()
 	self.ReloadSource=nil;
 	self.ReloadClip=nil;
 	
+	--Hide shotgun shell (I'm not sure this even works? But it's in the modcode so uhh)
+	local wep=self:GetWeapon();
+	if wep then wep:SetBodygroup(1,1) end
+	
 	self:SetNWBool("InReload",false);
 	self:SetNextBoth(CurTime()+self.ReloadFinishDelay);
 	return true;
@@ -429,7 +439,7 @@ end
 Plays a reload sound and plays the reload animation (both on the weapon and player himself).
 ]]--
 function ITEM:ReloadEffects()
-	if #self.ReloadSounds>0 then self:EmitSound(self.ReloadSounds[math.random(1,#self.ReloadSounds)]); end
+	if #self.ReloadSounds>0 then self:EmitSound(self.ReloadSounds[math.random(1,#self.ReloadSounds)],true); end
 	
 	if !self:IsHeld() then return false end
 	self:GetWeapon():SendWeaponAnim(ACT_VM_RELOAD);
@@ -454,7 +464,7 @@ It plays the weapon's dry-fire sound and plays the dry-fire viewmodel animation.
 It also cools the weapon down; the length of the cooldown is determined by the dry-fire delay.
 ]]--
 function ITEM:DryFire()
-	if #self.DryFireSounds>0 then self:EmitSound(self.DryFireSounds[math.random(1,#self.DryFireSounds)]); end
+	if #self.DryFireSounds>0 then self:EmitSound(self.DryFireSounds[math.random(1,#self.DryFireSounds)],true); end
 	if self:IsHeld() then
 		self:GetWeapon():SendWeaponAnim(ACT_VM_DRYFIRE);
 	end
@@ -491,7 +501,7 @@ Returns true otherwise.
 ]]--
 function ITEM:CanLoadClipWith(item,clip)
 	--Don't bother loading if we don't use ammo in that clip or if it's the wrong type of ammo for that clip
-	if !self.Clips[clip] || !item || !item:IsValid() || !item:InheritsFrom(self.Clips[clip].Type) then return false end
+	if !self.Clips[clip] || !item || !item:IsValid() || self==item || !item:InheritsFrom(self.Clips[clip].Type) then return false end
 	
 	return true;
 end
@@ -515,6 +525,7 @@ Returns how submerged the gun is in water, between 0 and 3.
 If the item is held, we use the player to calculate water level.
 If the item is in the world, we use the item's world entity to calculate water level.
 Returns 0 if not submerged, returns 3 if fully submerged.
+NOTE: The item is considered to be dry if it is in the void or in an inventory.
 ]]--
 function ITEM:GetWaterLevel()
 	if self:IsHeld() then

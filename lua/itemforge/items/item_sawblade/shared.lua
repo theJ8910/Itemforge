@@ -31,6 +31,7 @@ ITEM.ViewModel="models/weapons/v_sawblade.mdl";
 if SERVER then
 	ITEM.HoldType="slam";
 else
+	ITEM.Icon=Material("itemforge/items/item_sawblade");
 	ITEM.WorldModelNudge=Vector(18,0,0);
 	ITEM.WorldModelRotate=Angle(0,45,0);
 end
@@ -69,11 +70,8 @@ function ITEM:OnUse(pl)
 end
 
 --Unstick without sounds when we leave the world
-function ITEM:OnWorldExit(ent,forced)
-	if !self["item"].OnWorldExit(self,ent,forced) then return false end
-	
+function ITEM:OnExitWorld(forced)
 	self:Unstick();
-	return true;
 end
 
 --[[
@@ -116,7 +114,7 @@ function ITEM:OnPhysicsCollide(entity,CollisionData,HitPhysObj)
 		
 		local effectdata = EffectData();
 		effectdata:SetEntity(ent);
-		effectdata:SetAngle(( ent:GetPos()-CollisionData.HitPos ):Angle() );
+		effectdata:SetAngle(( CollisionData.HitPos-ent:GetPos() ):Angle() );
 		util.Effect("BladeBlood",effectdata,true,true);
 		
 	--Otherwise, stick in whatever we hit
@@ -162,21 +160,22 @@ function ITEM:StickTo(ent,bone,str,lpos,lang)
 	local eEnt=self:GetEntity();
 	if !eEnt || !ent || !ent:IsValid() then return false end
 	
+	local phys=ent:GetPhysicsObjectNum(bone);
+	if !phys || !phys:IsValid() then return false end
+	
 	--Create the "Sticking To" table if it hasn't been created yet
 	if !self.StickingTo then self.StickingTo={} end
 	
 	--Since the sawblade or what it was sticking to might have moved we set the local pos/ang here
-	eEnt:SetPos(ent:GetPhysicsObjectNum(bone):LocalToWorld(lpos));
+	eEnt:SetPos(phys:LocalToWorld(lpos));
 	eEnt:SetAngles(ent:LocalToWorldAngles(lang));
 	
 	--Weld to what we want, fail if we couldn't
 	local weld=constraint.Weld(eEnt,ent,0,bone,str,true);
 	if !weld || !weld:IsValid() then return false end
 	
-	
-	
 	--Add the weld
-	local id=table.insert(self.StickingTo,weld);
+	local id=table.insert(self.StickingTo,{weld,ent});
 	weld:CallOnRemove("Unstuck",self.Unstuck,self,id);
 	
 	return true;
@@ -189,7 +188,7 @@ This doesn't count for things like toolgun welds
 function ITEM:IsStuck()
 	if !self.StickingTo then return false end
 	for k,v in pairs(self.StickingTo) do
-		if v:IsValid() then return true end
+		if v[1]:IsValid() then return true end
 	end
 	return false;
 end
@@ -199,11 +198,14 @@ Unwelds the item from anything it was stuck to with StickTo.
 ]]--
 function ITEM:Unstick()
 	if !self.StickingTo then return true end
-	
+	local ent=self:GetEntity();
 	for k,v in pairs(self.StickingTo) do
-		if v:IsValid() then
-			v:RemoveCallOnRemove("Unstuck");
-			v:Remove();
+		if v[1]:IsValid() then
+			v[1]:RemoveCallOnRemove("Unstuck");
+			v[1]:Remove();
+		end
+		if v[2]:IsValid() then
+			v[2]:TakeDamage(10,ent,ent);
 		end
 	end
 	
@@ -227,7 +229,31 @@ id is where the sawblade recorded weld in self.StickingTo.
 ]]--
 function ITEM.Unstuck(weld,self,id)
 	self:UnstickSound();
+	local ent=self:GetEntity();
+	self.StickingTo[id][2]:TakeDamage(10,ent,ent);
 	self.StickingTo[id]=nil;
+end
+
+
+
+
+else
+
+
+
+
+--The sawblade icon moves in an elliptical way on the weapons menu
+function ITEM:OnSWEPDrawMenu(x,y,w,h,a)
+	local icon,s=self:Event("GetIcon");
+	if !s then return false end
+	
+	local t=CurTime()*10;
+	local c=self:GetColor();
+	surface.SetMaterial(icon);
+	surface.SetDrawColor(c.r,c.g,c.b,a-(255-c.a));
+	surface.DrawTexturedRect(x + (w-128)*.5 + math.cos(t)*16 ,
+							 y + (h-128)*.5 + math.sin(t)*8  ,
+							 128,128);
 end
 
 
