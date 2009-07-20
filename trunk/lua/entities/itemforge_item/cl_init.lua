@@ -8,24 +8,15 @@ include("shared.lua")
 
 language.Add("itemforge_item","Item");
 
-function ENT:AcquireItem()
-	local i=self.Entity:GetNWInt("i");
-	
-	if i==nil || i==0 then return end
-	local item=IF.Items:Get(i);
-	if item && item:IsValid() then self:SetItem(item); end
-end
-
 function ENT:Draw()
-	--If the item can't be found we'll just draw the model (no OnDrawEntity hook)
+	--If the item can't be found we'll just draw the model (no hook)
 	local item=self:GetItem();
 	if !item then
 		self.Entity:DrawModel();
 		return true;
 	end
 	
-	local s,r=pcall(item.OnEntityDraw,item,self.Entity,self,false);
-	if !s then ErrorNoHalt(r.."\n") end;
+	item:Event("OnDraw3D",nil,self.Entity,false);
 	
 	if self.IsWire then Wire_Render(self.Entity) end	--WIRE
 	
@@ -33,15 +24,14 @@ function ENT:Draw()
 end
 
 function ENT:DrawTranslucent()
-	--If the item can't be found we'll just draw the model (no OnDrawEntity hook)
+	--If the item can't be found we'll just draw the model (no hook)
 	local item=self:GetItem();
 	if !item then
 		self.Entity:DrawModel();
 		return true;
 	end
 	
-	local s,r=pcall(item.OnEntityDraw,item,self.Entity,self,true);
-	if !s then ErrorNoHalt(r.."\n") end;
+	item:Event("OnDraw3D",nil,self.Entity,false);
 	
 	if self.IsWire then Wire_Render(self.Entity) end	--WIRE
 	
@@ -60,7 +50,7 @@ function ENT:OnRemove()
 	self.Item=nil;
 	
 	--Clear the item's connection to the entity (the item "forgets" that this was it's entity)
-	if item:GetEntity()==self.Entity then item:ClearEntity() end
+	item:ToVoid(false,self.Entity,nil,false);
 	
 	return true;
 end
@@ -70,9 +60,7 @@ The item this entity is supposed to be representing may not be known or exist cl
 THIS IS SHARED but we only use it clientside
 ]]--
 function ENT:Think()
-	if !self:GetItem() then
-		self:AcquireItem();
-	end
+	if !self:GetItem() then return; end
 	
 	--WIRE
 	if self.IsWire then self["BaseWireEntity"].Think(self); end

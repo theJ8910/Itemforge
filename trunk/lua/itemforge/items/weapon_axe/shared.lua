@@ -22,6 +22,8 @@ ITEM.PrimaryDelay=0.8;
 ITEM.HitRange=75;
 ITEM.HitForce=6;
 ITEM.HitDamage=50;
+ITEM.ViewKickMin=Angle(3.0,-3.0,0);
+ITEM.ViewKickMax=Angle(4.0,-2.0,0);
 
 --Axe Weapon
 ITEM.FleshyImpactSounds={
@@ -43,7 +45,7 @@ end
 --Play a fleshy hit sound if we chopped into flesh, or the standard sound if we didn't
 function ITEM:HitSound(traceRes)
 	if traceRes.MatType==MAT_FLESH || traceRes.MatType==MAT_BLOODYFLESH || traceRes.MatType==MAT_ALIENFLESH || traceRes.MatType==MAT_ANTLION then
-		return self:EmitSound(self.FleshyImpactSounds[math.random(1,#self.FleshyImpactSounds)]);
+		return self:EmitSound(self.FleshyImpactSounds[math.random(1,#self.FleshyImpactSounds)],true);
 	end
 	return self["base_melee"].HitSound(self);
 end

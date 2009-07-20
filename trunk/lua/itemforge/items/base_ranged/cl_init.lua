@@ -66,7 +66,7 @@ pl is the player who wants to load ammo; if this isn't the same as LocalPlayer()
 ammo is the item we want to load.
 ]]--
 function ITEM:PlayerLoadAmmo(pl,ammo)
-	if !self:CanPlayerInteract(pl) then return false end
+	if !self:Event("CanPlayerInteract",false,pl) then return false end
 	for i=1,table.getn(self.Clips) do
 		if self:CanLoadClipWith(ammo,i) then return self:SendNWCommand("PlayerLoadAmmo",ammo); end
 	end

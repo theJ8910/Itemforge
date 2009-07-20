@@ -6,6 +6,7 @@ This SWEP is an 'avatar' of an item. When an item is held, this weapon represent
 ]]--
 AddCSLuaFile("cl_init.lua");
 AddCSLuaFile("shared.lua");
+AddCSLuaFile("makecopy.lua");
 
 include("shared.lua");
 
@@ -28,13 +29,7 @@ function SWEP:AcceptInput(name,activator,caller,data)
 	local item=self:GetItem();
 	if !item then return false; end
 	
-	local s,r=pcall(item.OnInput,item,true,self.Entity,name,activator,caller,data);
-	if !s then
-		ErrorNoHalt(r.."\n");
-		return false;
-	else
-		return r==true;
-	end
+	return item:Event("OnInput",false,true,self.Weapon,name,activator,caller,data)==true;
 end
 
 --Keyvalue is set on our SWEP
@@ -44,9 +39,7 @@ function SWEP:KeyValue(key,value)
 		return false;
 	end
 	
-	local s,r=pcall(item.OnKeyValue,item,true,self.Entity,key,value);
-	if !s then ErrorNoHalt(r.."\n") end
-	return true;
+	return item:Event("OnKeyValue",nil,true,self.Weapon,key,value);
 end
 
 
@@ -73,37 +66,38 @@ function SWEP:OnRemove()
 	]]--
 	if !self.ExpectRemoval then
 		--If ToVoid returns false, that probably means we failed a double-check (or in other words, this item no longer uses this weapon, if it ever did)
-		if !item:ToVoid(true,nil,self.Weapon) then return true end
-		
-		--After we send it to void successfully, we can drop it in the world. We do this because OnDrop doesn't work correctly.
+		if !item:ToVoid(true,self.Weapon) then return true end
 		
 		--DEBUG
 		Msg("Itemforge Item SWEP (Ent ID "..self.Weapon:EntIndex().."): Unexpected removal, dropping item as entity\n");
-		item:ToWorld(self.Weapon:GetPos(),Angle(0,0,0));	--In weapons we drop the item in the world
 		
-		
+		--After we send it to void successfully, we can drop it in the world. We do this because OnDrop doesn't work correctly.
+		item:ToWorld(self.Weapon:GetPos(),Angle(0,0,0));
 	end
 	
 	return true;
 end
 
---Weapon is being put away
-function SWEP:Holster(wep)
-	--DEBUG
-	Msg("Holstering weapon!\n");
-	return true
-end
-
 --Weapon is being swapped to
 function SWEP:Deploy()
-	--DEBUG
-	Msg("Deploying weapon!\n");
-	
 	--Whenever the owner swaps to this weapon, we change his viewmodel to the item's viewmodel.
 	if self.Owner then self.Owner:GetViewModel():SetModel(self.ViewModel); end
 	
-	return true;
+	local item=self:GetItem();
+	if !item then return true end
+	
+	return item:Event("OnDeploy",true);
 end
+
+--Weapon is being put away
+function SWEP:Holster(wep)
+	local item=self:GetItem();
+	if !item then return true end
+	
+	return item:Event("OnHolster",true);
+end
+
+
 
 --[[
 May allow items to take advantage of this later

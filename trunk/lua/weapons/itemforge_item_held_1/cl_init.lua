@@ -7,6 +7,8 @@ This SWEP is an 'avatar' of an item. When an item is held, this weapon represent
 include("shared.lua")
 
 language.Add("itemforge_item_held_1","Item (held)");
+--HACK
+local RegWeapons={};
 
 SWEP.PrintName			= "Itemforge Item";
 SWEP.Slot				= 0;
@@ -19,101 +21,21 @@ SWEP.SwayScale			= 1.0;
 SWEP.BobScale			= 1.0;
 SWEP.RenderGroup 		= RENDERGROUP_OPAQUE;
 
-SWEP.WM			= nil;							--World Model attachment.
-
---Panels
-SWEP.ItemPanel=nil;
-
---[[
-Can't change the SWEP's world model dynamically, so I made this function to create an imitation world model.
-If the item hasn't been acquired yet we'll keep trying to do that until we get it.
-This creates a prop_physics clientside and moves it to the player's right hand. I may change it to allow left hand too.
-]]--
-
---[[
-If an item hasn't been received clientside, 
-This is run any time acquiring an item is necessary. 
-Right now, items are acquired if they don't exist on think or on world model creation.
-The item is returned if it was acquired.
-False is returned if acquiring was not possible at the moment.
-]]--
-function SWEP:AcquireItem()
-	if !self:HasOwner() || self:IsBeingRemoved() then return false end
-	
-	local i=self.Weapon:GetNWInt("i");
-	if i==nil || i==0 then return false end
-	
-	local item=IF.Items:Get(i);
-	if item && item:IsValid() then
-		self:SetItem(item);
-		return item;
-	else
-		return false;
-	end
+--HACK
+SWEP.RegWeaponID		= nil;
+SWEP.DeployedLastFrame	= false;
+function SWEP:Initialize()
+	self.RegWeaponID=table.insert(RegWeapons,self);
 end
 
-function SWEP:ShowWorldModel()
-	if self.WM || self.WM==false then return true end
-	
-	--Assert that we have an item set. If not, try to acquire
-	local item=self:GetItem();
-	if !item then
-		item=self:AcquireItem();
-		if !item then return false end
-	end
-	
-	--What world model does our item want?
-	self.WM=IF.GearAttach:ToBone(self.Owner,item:GetWorldModel(),"ValveBiped.Bip01_R_Hand");
-	if !self.WM then
-		self.WM=IF.GearAttach:ToAP(self.Owner,item:GetWorldModel(),"anim_attachment_RH",item.WorldModelNudge,item.WorldModelRotate);
-	end
-	
-	return true;
-end
 
-function SWEP:HideWorldModel()
-	if self.WM then self.WM=nil end
-	return true;
-end
-
-function SWEP:MakePanel()
-	if !self.ItemPanel then
-		local slot=vgui.Create("ItemforgeItemSlot");
-		
-		slot:SetSize(64,64);
-		slot:SetPos(2,2);
-		slot:SetDraggable(true);
-		slot:SetDroppable(false);
-		
-		local item=self:GetItem();
-		if !item then item=self:AcquireItem(); end
-		if item then slot:SetItem(item) end
-		
-		self.ItemPanel=slot;
-	end
-end
-
-function SWEP:RemovePanel()
-	if self.ItemPanel then
-		if self.ItemPanel:IsValid() then self.ItemPanel:Remove(); end
-		self.ItemPanel=nil;
-	end
-end
 
 --The item this entity is supposed to be representing may not be known or exist clientside when the item is created. We'll search for it until we find it.
 function SWEP:Think()
 	if !self:HasOwner() then return true end
 	
 	local item=self:GetItem();
-	if !item then
-		item=self:AcquireItem()
-		if !item then return true end
-	end
-	
-	--If this player is wielding this weapon in first person, we hide the world model if it exists
-	if LocalPlayer()==GetViewEntity() && self.eWM!=nil then
-		self:HideWorldModel();
-	end 
+	if !item then return true end
 end
 
 --[[
@@ -122,13 +44,14 @@ If it does, we make sure that the item is still inside of the SWEP.
 If it is, we remove the item along with the SWEP.
 ]]--
 function SWEP:OnRemove()
-	--Don't re-acquire an item.
-	self.Weapon:SetNWInt("i",0);
 	self.BeingRemoved=true;
 	
-	--We get rid of the world model and item panel when we get rid of the weapon.
-	self:HideWorldModel();
-	self:RemovePanel();
+	--HACK
+	RegWeapons[self.RegWeaponID]=nil;
+	
+	
+	--Don't re-acquire an item.
+	self.Weapon:SetNWInt("i",0);
 	
 	--Clear the weapon's connection to the item (this weapon "forgets" this item was inside of it)
 	local item=self:GetItem();
@@ -136,90 +59,62 @@ function SWEP:OnRemove()
 	self.Item=nil;
 	
 	--Clear the item's connection to the weapon (the item "forgets" that this was it's weapon)
-	if item:GetWeapon()==self.Weapon then item:ClearWeapon() end
+	item:ToVoid(false,self.Weapon,nil,false)
 	
 	return true;
 end
 
 --Weapon is being put away
 function SWEP:Holster(wep)
-	Msg("Holstering weapon!\n");
-	
-	--Hide the world model, holstering the weapon.
-	self:HideWorldModel();
-	self:RemovePanel();
-	
-	return true;
+	local item=self:GetItem();
+	if !item then return true end
+		
+	return item:Event("OnHolster",true);
 end
 
 --Weapon is being swapped to
 function SWEP:Deploy()
-	--DEBUG
-	Msg("Deploying weapon!\n");
-	
 	--Whenever the owner swaps to this weapon, we change his viewmodel to the item's viewmodel.
 	if LocalPlayer()==self.Owner then self.Owner:GetViewModel():SetModel(self.ViewModel); end
 	
-	self:MakePanel();
+	local item=self:GetItem();
+	if !item then return true end
 	
-	return true;
+	return item:Event("OnDeploy",true);
 end
 
 --Draw weapon selection menu stuff, hooks into item's OnDrawWeaponSelection hook
-function SWEP:DrawWeaponSelection(x,y,width,height,alpha)
+function SWEP:DrawWeaponSelection(x,y,w,h,a)
 	local item=self:GetItem();
-	if !item then
-		item=self:AcquireItem();
-		if !item then return true end
-	end
+	if !item then return false end
 	
-	local s,r=pcall(item.OnSWEPDrawMenu,item,x,y,width,height,alpha);
-	if !s then ErrorNoHalt(r.."\n") end;
+	item:Event("OnSWEPDrawMenu",nil,x,y,w,h,a);
+	
 	return true;
 end
 
 --Draw view model, hooks into item's OnDrawViewmodel hook
 function SWEP:ViewModelDrawn()
 	local item=self:GetItem();
-	if !item then
-		item=self:AcquireItem();
-		if !item then return true end
-	end
+	if !item then return false end
 	
-	local s,r=pcall(item.OnSWEPDrawViewmodel,item);
-	if !s then ErrorNoHalt(r.."\n") end;
+	item:Event("OnSWEPDrawViewmodel");
 	return true;
 end
 
 --Draw world model, hooks into item's Draw3D hook
 function SWEP:DrawWorldModel()
-	if !self.WM then	self:ShowWorldModel();	end
-	if self.WM then		self.WM:Draw();			end
-	
 	local item=self:GetItem();
-	if !item then
-		item=self:AcquireItem();
-		if !item then return true end
-	end
+	if !item then return false end
 	
-	local s,r=pcall(item.OnSWEPDraw,item,self.Weapon,self,false);
-	if !s then ErrorNoHalt(r.."\n") end;
 	return true;
 end
 
 --Draw world model, hooks into item's Draw3D hook
 function SWEP:DrawWorldModelTranslucent()
-	if !self.WM then	self:ShowWorldModel();	end
-	if self.WM then		self.WM:Draw();			end
-	
 	local item=self:GetItem();
-	if !item then
-		item=self:AcquireItem();
-		if !item then return true end
-	end
+	if !item then return false end
 	
-	local s,r=pcall(item.OnSWEPDraw,item,self.Weapon,self,true);
-	if !s then ErrorNoHalt(r.."\n") end;
 	return true;
 end
 
@@ -483,3 +378,20 @@ function SWEP:DrawAngle(pos,angle)
 	surface.DrawLine(c.x,c.y,u.x,u.y);
 end
 ]]--
+
+--HACK - I hate hate HATE having to do this!
+hook.Add("Think","itemforge_deploy_think",function()
+	for k,v in pairs(RegWeapons) do
+		--Acquire ASAP
+		v:GetItem();
+		
+		--HACK until garry fixes his shit
+		if v.Owner && v.Owner!=LocalPlayer() then
+			local isDeployed=(v.Owner:GetActiveWeapon()==v.Weapon);
+			if !v.DeployedLastFrame && isDeployed then
+				v:Deploy();
+			end
+			v.DeployedLastFrame=isDeployed;
+		end
+	end
+end);

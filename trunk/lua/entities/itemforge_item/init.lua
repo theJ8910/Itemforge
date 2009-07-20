@@ -23,13 +23,7 @@ function ENT:AcceptInput(name,activator,caller,data)
 	local item=self:GetItem();
 	if !item then return false end
 	
-	local s,r=pcall(item.OnInput,item,false,self.Entity,name,activator,caller,data);
-	if !s then
-		ErrorNoHalt(r.."\n");
-		return false;
-	else
-		return r==true;
-	end
+	return item:Event("OnInput",false,false,self.Entity,name,activator,caller,data)==true;
 end
 
 --Keyvalue is set on our ent
@@ -37,8 +31,7 @@ function ENT:KeyValue(key,value)
 	local item=self:GetItem();
 	if !item then return false end
 	
-	local s,r=pcall(item.OnKeyValue,item,false,self.Entity,key,value);
-	if !s then ErrorNoHalt(r.."\n") end
+	item:Event("OnKeyValue",nil,false,self.Entity,key,value);
 	
 	return true;
 end
@@ -48,12 +41,7 @@ function ENT:StartTouch(activator)
 	local item=self:GetItem();
 	if !item then return false; end
 	
-	local touchItem=false;
-	if activator:GetClass()=="itemforge_item" then
-		touchItem=activator:GetItem();
-	end
-	if !touchItem || !touchItem:IsValid() then touchItem=nil; end
-	
+	local touchItem=IF.Items:GetEntItem(activator);
 	item:OnStartTouchSafe(self.Entity,activator,touchItem);
 	
 	return true;
@@ -63,14 +51,9 @@ function ENT:Touch(activator)
 	local item=self:GetItem();
 	if !item then return false; end
 	
-	local touchItem=false;
-	if activator:GetClass()=="itemforge_item" then
-		touchItem=activator:GetItem();
-	end
-	if !touchItem || !touchItem:IsValid() then touchItem=nil; end
+	local touchItem=IF.Items:GetEntItem(activator);
 	
-	local s,r=pcall(item.OnTouch,item,self.Entity,activator,touchItem);
-	if !s then ErrorNoHalt(r.."\n") end;
+	item:Event("OnTouch",nil,self.Entity,activator,touchItem);
 	
 	return true;
 end
@@ -79,14 +62,9 @@ function ENT:EndTouch(activator)
 	local item=self:GetItem();
 	if !item then return false; end
 	
-	local touchItem=false;
-	if activator:GetClass()=="itemforge_item" then
-		touchItem=activator:GetItem();
-	end
-	if !touchItem || !touchItem:IsValid() then touchItem=nil; end
+	local touchItem=IF.Items:GetEntItem(activator);
 	
-	local s,r=pcall(item.OnEndTouch,item,self.Entity,activator,touchItem);
-	if !s then ErrorNoHalt(r.."\n") end;
+	item:Event("OnEndTouch",nil,self.Entity,activator,touchItem);
 	
 	return true;
 end
@@ -140,21 +118,15 @@ function ENT:OnTakeDamage(dmg)
 		return false;
 	end
 	
-	local s,r=pcall(item.OnEntTakeDamage,item,self.Entity,dmg);
-	if !s then ErrorNoHalt(r.."\n") end;
-	
-	return true;
+	return item:Event("OnEntTakeDamage",nil,self.Entity,dmg);
 end
 
 --Runs when a collision occurs
 function ENT:PhysicsCollide(CollisionData,HitPhysObj)
 	local item=self:GetItem();
-	if !item then return false; end
+	if !item then return false end
 	
-	local s,r=pcall(item.OnPhysicsCollide,item,self.Entity,CollisionData,HitPhysObj);
-	if !s then ErrorNoHalt(r.."\n"); end
-	
-	return true;
+	return item:Event("OnPhysicsCollide",nil,self.Entity,CollisionData,HitPhysObj);
 end
 
 --Run when a wire input receives some data
@@ -163,8 +135,7 @@ function ENT:TriggerInput(inputName,value)
 	local item=self:GetItem();
 	if !item then return false end
 	
-	local s,r=pcall(item.OnWireInput,item,self.Entity,inputName,value);
-	if !s then ErrorNoHalt(r.."\n"); end
+	return item:Event("OnWireInput",nil,self.Entity,inputName,value);
 end
 
 --[[

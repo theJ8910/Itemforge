@@ -11,16 +11,20 @@ ITEM.BlinkMat=Material("sprites/gmdm_pickups/light");
 ITEM.BlinkColor=Color(255,0,0,255);
 ITEM.BlinkOffset=Vector(3.1624,4.3433,1.5108);
 
+ITEM.DrawAmmoNextMat=Material("sprites/yellowflare")
+ITEM.DrawAmmoCount=4;
+ITEM.DrawAmmoSize=1/ITEM.DrawAmmoCount;
+
 --This overrides base_ranged's OnDragDropHere; since we don't use clips, any item the player can interact with can be drag-dropped here.
 function ITEM:OnDragDropHere(otherItem)
-	if !self:CanPlayerInteract(LocalPlayer()) || !otherItem:CanPlayerInteract(LocalPlayer()) then return false end
+	if !self:Event("CanPlayerInteract",false,LocalPlayer()) || !otherItem:Event("CanPlayerInteract",false,LocalPlayer()) then return false end
 	return self:SendNWCommand("PlayerLoadAmmo",otherItem);
 end
 
 --[[
 Overridden from base_ranged;
 Like the base_ranged, we have everything the base weapon has.
-Ulike the base_ranged:
+Unlike the base_ranged:
 	We only one mode of fire
 	We have an option to open the rock-it's inventory,
 	If we have anything loaded it says how many items to unload (or if only one item, the option to unload it)
@@ -91,24 +95,39 @@ function ITEM:DrawUnloadBlink(ent)
 	end
 end
 
---Draw entity
-function ITEM:OnEntityDraw(eEntity,ENT,bTranslucent)
-	self["base_ranged"].OnEntityDraw(self,eEntity,ENT,bTranslucent);
+--Called when a model associated with this item needs to be drawn
+function ITEM:OnDraw3D(eEntity,bTranslucent)
+	self["base_ranged"].OnDraw3D(self,eEntity,bTranslucent);
 	self:DrawUnloadBlink(eEntity);
 end
 
---Draw SWEP world model
-function ITEM:OnSWEPDraw(eEntity,SWEP,bTranslucent)
-	self["base_ranged"].OnSWEPDraw(self,eEntity,SWEP,bTranslucent);
+--Draw icons of upcoming ammo
+function ITEM:OnDraw2D(width,height)
+	local inv=self:GetInventory();
+	if !inv then return false end
 	
-	--TODO need to GetWorldModel() or something
-	if SWEP.WM!=nil then
-		self:DrawUnloadBlink(SWEP.WM.ent);
+	local items=inv:GetItems();
+	local x=(height-4)*self.DrawAmmoSize;
+	local c=1;
+	for i=1,table.maxn(items) do
+		if items[i] then
+			if c==1 then
+				surface.SetMaterial(self.DrawAmmoNextMat);
+				surface.DrawTexturedRect(width-2-x,height-2-x,x,x);
+			end
+			
+			local icon=items[i]:Event("GetIcon");
+			if icon then
+				local color=items[i]:GetColor();
+				surface.SetMaterial(icon);
+				surface.SetDrawColor(color.r,color.g,color.b,color.a);
+				surface.DrawTexturedRect(width-2-x,height-2-(c*x),x,x);
+			end
+			
+			c=c+1;
+			if c>self.DrawAmmoCount then break end
+		end
 	end
-end
-
---Draw model in inventory
-function ITEM:OnDraw3D(eEntity,PANEL,bTranslucent)
-	self["base_ranged"].OnDraw3D(self,eEntity,PANEL,bTranslucent);
-	self:DrawUnloadBlink(eEntity);
+	
+	self["base_ranged"].OnDraw2D(self,width,height);
 end

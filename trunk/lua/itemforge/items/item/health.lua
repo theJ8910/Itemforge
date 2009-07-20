@@ -102,10 +102,10 @@ function ITEM:SetHealth(hp,who)
 			totalLoss=self:GetAmount();
 		end
 		
-		local s,r=pcall(self.OnBreak,self,totalLoss,(totalLoss==self:GetAmount()),who);
-		if !s then ErrorNoHalt(r.."\n") end
+		--TODO this old code needs to be reworked slightly
+		self:Event("OnBreak",nil,totalLoss,(totalLoss==self:GetAmount()),who);
 		
-		shouldUp=self:SetAmount(self:GetAmount()+SubtractHowMany);
+		shouldUp=self:SetAmount(math.max(0,self:GetAmount()+SubtractHowMany));
 	elseif hp>self:GetMaxHealth() then
 		hp=self:GetMaxHealth();
 	end

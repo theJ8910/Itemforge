@@ -23,7 +23,7 @@ Copy/paste this to make your own ammo-finding functions; this should go in a ser
 
 list.Add("Itemforge_BaseRanged_FindAmmo",function(self,fCallback)
 	local pOwner=self:GetWOwner();
-	if !pOwner then return false end		--We can't find any ammo if the weapon isn't being held!
+	if !pOwner then return false end		--We can't find any ammo this way if the weapon isn't being held!
 	
 	--Lets look at all the items in the player's inventory... (v is an item in his inventory)
 	for k,v in pairs(pOwner.Inventory:GetItems()) do

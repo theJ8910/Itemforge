@@ -6,6 +6,7 @@ This implements basic functionality for adding, moving, and removing models fake
 ]]--
 MODULE.Name="GearAttach";									--Our module will be stored at IF.GearAttach
 MODULE.Disabled=false;										--Our module will be loaded
+MODULE.Attachments={};										--All active attachments are stored here
 
 local Up=Vector(0,0,1);
 
@@ -14,13 +15,38 @@ local af={};
 
 --Updates the attachment's position and draws it
 function af:Draw()
-	if self.type==1 then
+	if self.type==0 then
+		return;
+	elseif self.type==1 then
+		local pos,ang=self.parent:GetBonePosition(self.PAP);
+		self.ent:SetPos(pos								+
+						ang:Forward()*self.vOffset.x	+
+						ang:Right()*self.vOffset.y		+
+						ang:Up()*self.vOffset.z);
+		
+		ang:RotateAroundAxis(ang:Forward()		,self.aOffset.r);
+		ang:RotateAroundAxis(ang:Right()		,self.aOffset.p);
+		ang:RotateAroundAxis(ang:Up()			,self.aOffset.y);
+		
+		self.ent:SetAngles(ang);
+	elseif self.type==2 then
+		local ap=self.parent:GetAttachment(self.PAP);
+		self.ent:SetPos(ap.Pos							+
+						ap.Ang:Forward()*self.vOffset.x	+
+						ap.Ang:Right()*self.vOffset.y	+
+						ap.Ang:Up()*self.vOffset.z);
+		ap.Ang:RotateAroundAxis(ap.Ang:Forward(),self.aOffset.r);
+		ap.Ang:RotateAroundAxis(ap.Ang:Right()	,self.aOffset.p);
+		ap.Ang:RotateAroundAxis(ap.Ang:Up()		,self.aOffset.y);
+		
+		self.ent:SetAngles(ap.Ang);
+	elseif self.type==3 then
 		if !self.MAPPos then
 			self.ent:SetPos(Vector(0,0,0));
 			self.ent:SetAngles(Angle(0,0,0));
 			self.MAPPos,self.MAPAng=self.ent:GetBonePosition(self.MAP);
 		end
-		local pos,a=self.pl:GetBonePosition(self.PAP);
+		local pos,a=self.parent:GetBonePosition(self.PAP);
 		local b=self.MAPAng*1;
 		
 		local c=Angle(0,0,0);
@@ -33,18 +59,167 @@ function af:Draw()
 		c:RotateAroundAxis(b:Right(),-offset.p);
 		self.ent:SetAngles(c);
 		self.ent:SetPos(pos-(self.ent:LocalToWorld(self.MAPPos)-self.ent:GetPos()));
-	elseif self.type==2 then
-		local ap=self.pl:GetAttachment(self.PAP);
-		self.ent:SetPos(ap.Pos+ap.Ang:Forward()*self.vOffset.x+ap.Ang:Right()*self.vOffset.y+ap.Ang:Up()*self.vOffset.z);
-		ap.Ang:RotateAroundAxis(ap.Ang:Up(),self.aOffset.y);
-		ap.Ang:RotateAroundAxis(ap.Ang:Right(),self.aOffset.p);
-		ap.Ang:RotateAroundAxis(ap.Ang:Forward(),self.aOffset.r);
-		self.ent:SetAngles(ap.Ang);
 	end
 	
-	self.ent:DrawModel();
+	if self.Hidden || self.parent==GetViewEntity() then return end
+	
+	if self.DrawFunc then	self.DrawFunc(self.ent);
+	else					self.ent:DrawModel();
+	end
+	
 	return true;
 end
+
+--[[
+Attaches the gear to a bone on the parent entity.
+
+bone should be the name of a bone on the parent entity (ex: for a character, "ValveBiped.Bip01_Pelvis").
+
+True is returned if the gear is successfully attached to the given bone.
+False is returned if:
+	no bone was given
+	the parent entity's model doesn't have the given bone
+]]--
+function af:ToBone(bone)
+	if !bone then ErrorNoHalt("Itemforge Gear Attach: Couldn't attach gear to bone; no bone was given.\n"); return false end
+	
+	local index=self.parent:LookupBone(bone);
+	if !index then return false end
+	
+	self.AP=bone;
+	self.PAP=index;
+	self.type=1;
+	
+	return true;
+end
+
+--[[
+Attaches the gear to an attachment point on the parent entity.
+
+attachPoint should be the name of an attachment point on the parent entity (ex: for a character: "eyes", for the jeep: "gun_ref", etc).
+
+true is returned if the gear is successfully attached to the given bone
+false is returned if:
+	no attachment point was given
+	the parent entity's model doesn't have the given attachment point
+]]--
+function af:ToAP(attachPoint)
+	if !attachPoint then ErrorNoHalt("Itemforge Gear Attach: Couldn't attach gear to attachment point; no attachment point was given.\n"); return false end
+	
+	local index=self.parent:LookupAttachment(attachPoint);
+	if index==0 then return false end	
+	
+	self.AP=attachPoint;
+	self.PAP=index;
+	self.type=2;
+	return true;
+end
+
+--[[
+Simulates a bone-merge between this gear and the parent entity.
+The given bone is expected to exist in both the parent entity's model and this gear's model (for example, "ValveBiped.Bip01_R_Hand" exists in both players and some guns).
+The gear will be positioned and oriented in such a way that the two bones (one in the parent entity and the other in the gear) fuse together.
+
+refBone should be the name of a bone in both the parent's model and the given model.
+
+true is returned if the gear is successfully attached
+false is returned if:
+	no reference bone was given
+	the parent entity's model doesn't have the given bone
+	the attachment's model doesn't have the given bone
+]]--
+function af:BoneMerge(refBone)
+	if !refBone then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; no reference bone was given.\n"); return false end
+	
+	local index1=self.parent:LookupBone(refBone);
+	if !index1 then return false end
+	
+	local index2=self.ent:LookupBone(refBone);
+	if !index2 then return false end
+	
+	self.type=3;
+	self.AP=refBone;
+	self.PAP=index1;
+	self.MAP=index2;
+	self.MAPPos=nil;
+	self.MAPAng=nil;
+	
+	return true;
+end
+
+--[[
+Sets the draw function for this attachment. This is called right before the attachment is drawn.
+fFunc should be a function(entity)
+]]--
+function af:SetDrawFunction(fFunc)
+	self.DrawFunc=fFunc;
+end
+
+--[[
+Hides the attachment.
+]]--
+function af:Hide()
+	self.Hidden=true;
+end
+
+--[[
+Shows the attachment.
+There's no need to do this unless you did :Hide() before.
+]]--
+function af:Show()
+	self.Hidden=false;
+end
+
+--[[
+Gets rid of the attachment
+]]--
+function af:Remove()
+	IF.GearAttach:Remove(self);
+end
+
+--[[
+Notes on Offset/Angular Offset:
+
+The model will be positioned and oriented on the given bone:   
+     |_
+_|_
+ |
+
+Shifted relative to the bone by offset:
+     |_   |_
+_|_
+ |
+
+And then rotated relative to the bone's rotation by angular offset:
+     |_   /
+_|_       `
+ |
+]]--
+
+--[[
+Changes the offset of gear relative to the bone/attachment point on it's parent.
+NOTE: This will have no visible effect if the attachment is :BoneMerge()'d.
+]]--
+function af:SetOffset(vPos)
+	if !vPos then ErrorNoHalt("Itemforge Gear Attach: Couldn't set offset; no angular offset given!\n"); return false end
+	
+	self.vOffset=vPos;
+	return true;
+end
+
+--[[
+Changes the rotation of the gear relative to the bone/attachment point on it's parent.
+NOTE: This will have no visible effect if the attachment is :BoneMerge()'d.
+]]--
+function af:SetOffsetAngles(aAng)
+	if !aAng then ErrorNoHalt("Itemforge Gear Attach: Couldn't set angular offset; no angular offset given!\n"); return false end
+	
+	self.aOffset=aAng;
+	return true;
+end
+
+
+
 
 --Attachment metatable. Attachments have their metatables set to this to allow them to use the functions in af above.
 local amt={};
@@ -57,37 +232,26 @@ function MODULE:Cleanup()
 end
 
 --[[
-Creates a model and attaches it to a player.
-The given bone is expected to exist in both the player and the model being attached (for example, ValveBiped.Bip01_R_Hand exists in both players and gun models).
-The model will be positioned and oriented in such a way that the two bones (one in the player and the other in the model) fuse together.
-player should be a valid player.
+Creates an attachment object with the given model, attached to the given parent entity.
+parent should be a valid entity.
 model should be a string corresponding to a model path.
-refBone should be the name of a bone in both the player's model and the given model.
-
-An attachment object is returned if the model was created successfully using the given bone.
-False is returned if:
-	no valid player was given (or if something other than a player was given).
-	no model was given
-	no reference bone was given
-	the given player's model doesn't have the given bone
-	the given model didn't have the given bone
-	the entity used to display the gear couldn't be created
 ]]--
-function MODULE:ToBone(player,model,refBone)
-	if !player then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; no player was given.\n"); return false end
-	if !player:IsValid() then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; given player was invalid.\n"); return false end
-	if !player:IsPlayer() then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; given player wasn't a player."); return false end
-	
+function MODULE:Create(parent,model)
+	if !parent then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; no parent entity was given.\n"); return false end
+	if !parent:IsValid() then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; given parent entity was invalid.\n"); return false end
 	if !model then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; no model name was given.\n"); return false end
-	if !refBone then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; no reference bone was given.\n"); return false end
-	
 	local newAttach={};
-	
-	newAttach.pl=player;
-	newAttach.type=1;
-	newAttach.AP=refBone;
-	newAttach.PAP=player:LookupBone(refBone);
-	if !newAttach.PAP then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; given player's model ("..player:GetModel()..") does not have the given bone ("..refBone..").\n"); return false end
+	newAttach.parent=parent;			--Attached to this
+	newAttach.type=0;					--0: None; 1: On Bone; 2: On Attachment Point; 3: Bone-Merge
+	newAttach.hidden=false;				--The model exists but is not drawn
+	newAttach.vOffset=Vector(0,0,0);	--Offset of model relative to bone/attachment
+	newAttach.aOffset=Angle(0,0,0);		--Rotation offset of model relative to bone/attachment
+	newAttach.DrawFunc=nil;				--This function is called prior to drawing
+	newAttach.AP="";					--Name of bone/attachment on parent/model
+	newAttach.PAP=0;					--Index of bone/attachment on parent
+	newAttach.MAP=0;					--Index of reference bone on model (for bone-merge)
+	newAttach.MAPPos=nil;				--Position/angle of reference bone relative to center of entity
+	newAttach.MAPAng=nil;
 	
 	local ent=ClientsideModel(model,RENDER_GROUP_OPAQUE_ENTITY);
 	if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; couldn't create gear model for some reason.\n"); return false end
@@ -95,65 +259,20 @@ function MODULE:ToBone(player,model,refBone)
 	ent:SetAngles(Angle(0,0,0));
 	ent:SetNoDraw(true);
 	
-	newAttach.MAP=ent:LookupBone(refBone);
-	if !newAttach.MAP then ent:Remove(); return false; end
-	
 	newAttach.ent=ent;
-	
+	newAttach.id=table.insert(self.Attachments,newAttach);
 	setmetatable(newAttach,amt);
+	
+	local effectdata=EffectData();
+	effectdata:SetEntity(parent);
+	effectdata:SetScale(newAttach.id)
+	util.Effect("Gear",effectdata);
+	
 	return newAttach;
 end
 
-
---[[
-Creates a model and attaches it to a player.
-The model is moved to the given attachment point on the player.
-	The model will be positioned and oriented on the given attachment point:   
-	     |_
-	_|_
-	 |
-	Shifted relative to the attachment point by vOffset:
-	     |_   |_
-	_|_
-	 |
-	And then rotated relative to the attachment point's rotation by aOffset:
-	     |_   /
-	_|_       `
-	 |
-player should be a valid player.
-model should be a string corresponding to a model path.
-attachPoint should be the name of an attachment point on the player.
-
-An attachment object is returned if the model was created successfully using the given attachment point.
-False is returned if:
-	no valid player was given (or if something other than a player was given).
-	no model was given
-	no attachment point was given was given
-	the given player's model doesn't have the given attachment point
-	the entity used to display the gear couldn't be created
-]]--
-function MODULE:ToAP(player,model,attachPoint,vOffset,aOffset)
-	if !player then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; no player was given.\n"); return false end
-	if !player:IsValid() then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; given player was invalid.\n"); return false end
-	if !player:IsPlayer() then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; given player wasn't a player."); return false end
-	local newAttach={};
-	
-	newAttach.pl=player;
-	newAttach.type=2;
-	newAttach.vOffset=vOffset or Vector(0,0,0);
-	newAttach.aOffset=aOffset or Angle(0,0,0);
-	newAttach.AP=attachPoint;
-	newAttach.PAP=player:LookupAttachment(attachPoint);
-	if newAttach.PAP==0 then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; given player's model ("..player:GetModel()..") does not have the given attachment point ("..attachPoint..").\n"); return false end
-	
-	local ent=ClientsideModel(model,RENDER_GROUP_OPAQUE_ENTITY);
-	if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; couldn't create gear model for some reason.\n"); return false end
-	ent:SetPos(Vector(0,0,0));
-	ent:SetAngles(Angle(0,0,0));
-	ent:SetNoDraw(true);
-	
-	newAttach.ent=ent;
-	
-	setmetatable(newAttach,amt);
-	return newAttach;
+function MODULE:Remove(attach)
+	if !attach || !attach.id then return false end
+	self.Attachments[attach.id]=nil;
+	return true;
 end

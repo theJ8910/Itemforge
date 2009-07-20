@@ -58,8 +58,8 @@ function ITEM:Unload(clip)
 	
 	if !ammo:ToSameLocationAs(self) || !ammo:IsValid() then return false end
 	
-	--TODO this needs to be the old max
-	ammo:SetMaxAmount(0);
+	ammo:SetMaxAmount(ammo.OldMaxAmount);
+	ammo.OldMaxAmount=nil;
 	
 	self.Clip[clip]=nil;
 	self:SendNWCommand("Unload",nil,clip);
@@ -71,7 +71,7 @@ end
 This function runs serverside after a player chooses "reload" from the menu.
 ]]--
 function ITEM:PlayerReload(pl)
-	if !self:CanPlayerInteract(pl) then return false end
+	if !self:Event("CanPlayerInteract",false,pl) then return false end
 	return self:OnReload();
 end
 
@@ -80,7 +80,7 @@ This function runs serverside after a player drag-drops some ammo to this gun cl
 Returns true if the ammo was loaded somewhere, false otherwise.
 ]]--
 function ITEM:PlayerLoadAmmo(pl,item)
-	if !self:CanPlayerInteract(pl) || !item:CanPlayerInteract(pl) then return false end
+	if !self:Event("CanPlayerInteract",false,pl) || !item:Event("CanPlayerInteract",false,pl) then return false end
 	return self:Load(item);
 end
 
@@ -89,7 +89,7 @@ This function runs serverside after a player chooses "Unload" from the item's ri
 Returns true if the ammo was unloaded, false otherwise.
 ]]--
 function ITEM:PlayerUnloadAmmo(pl,clip)
-	if !self:CanPlayerInteract(pl) then return false end
+	if !self:Event("CanPlayerInteract",false,pl) then return false end
 	return self:Unload(clip);
 end
 
@@ -113,11 +113,9 @@ function ITEM:OnThink()
 end
 
 --If the gun was firing on it's own it won't be any more; this only works while the item is in the world
-function ITEM:OnWorldExit(ent,forced)
-	if !self["item"].OnWorldExit(self,ent,forced) then return false end
+function ITEM:OnExitWorld(forced)
 	self.PrimaryFiring=false;
 	self.SecondaryFiring=false;
-	return true;
 end
 
 --Tells Wiremod that our gun can do these things

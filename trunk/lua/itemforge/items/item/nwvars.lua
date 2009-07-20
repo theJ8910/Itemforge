@@ -61,7 +61,7 @@ end
 --[[
 Default Networked Vars - ITEM, NameOfVar, Datatype, DefaultValue (optional), IsPredicted (optional), HoldFromUpdate (optional)
 ]]--
---Weight is how much an item weighs, in kg. This affects how much weight an item fills in an inventory with a weight cap, not the physics weight when the item is on the ground.
+--Weight is how much an item weighs, in grams. This affects how much weight an item fills in an inventory with a weight cap, not the physics weight when the item is on the ground.
 IF.Items:CreateNWVar(ITEM,"Weight","int",function(self) return self.Weight end);
 
 --Size is a measure of how much space an item takes up (think volume, not weight). Inventories can be set up to reject items that are too big.
@@ -324,9 +324,8 @@ function ITEM:SetNWVar(sName,vValue)
 	self.NWVars[sName]=vValue;
 	
 	--Our OnSetNWVar event gets called here
-	local s,r=pcall(self.OnSetNWVar,self,sName,vValue);
-	if !s then ErrorNoHalt(r.."\n") end
-	
+	self:Event("OnSetNWVar",nil,sName,vValue);
+		
 	return true;
 end
 IF.Items:ProtectKey("SetNWVar");
@@ -391,8 +390,12 @@ function ITEM:GetNWVar(sName)
 		]]--
 		if type(d)=="function" then
 			local s,r=pcall(d,self);
-			if !s then ErrorNoHalt(r.."\n")
-			else return r end
+			if !s then
+				ErrorNoHalt(r.."\n");
+				return nil;
+			else
+				return r;
+			end
 		else
 			return d;
 		end

@@ -6,7 +6,7 @@ This file contains functions related to stacks of items.
 ]]--
 
 ITEM.StartAmount=1;									--When we spawn this item, how many items will be in the stack by default? This shouldn't be larger than MaxAmount.
-ITEM.MaxAmount=1;									--How many items of this type will fit in a stack (by default - this can be changed with SetMaxAmount())? Set this to 0 to allow an unlimited amount of items of this type to be stored in a stack. Should 1000 shuriken be able to occupy a single slot in an inventory, or should 30 shuriken occupy one slot?
+ITEM.MaxAmount=1;									--How many items of this type will fit in a stack (by default - this can be changed with SetMaxAmount())? Set this to 0 to allow an unlimited amount of items of this type to be stored in a stack. EX: Should 1000 shuriken be able to occupy a single slot in an inventory, or should 30 shuriken occupy one slot?
 
 --[[
 Returns true if the item is stackable (It's MaxAmount isn't 1)
@@ -33,20 +33,64 @@ end
 IF.Items:ProtectKey("GetMaxAmount");
 
 --[[
-Adds onto the number of items in this stack.
-Returns true if the given number of items were subtracted, and false othewise.
+This function sets the number of items in the stack.
+If a new amount is set on the server, the clients are updated with the new amount as well.
+If this item is in an inventory with a weight cap, we'll check to see if the new stack weight breaks the weight cap. If it does, false is returned.
+amt is the new number of items you want this stack to have.
+	amt must be between 0 and the item's max amount (if it has one), otherwise the function will return false.
+	If amt is 0, the item is removed.
+bIgnoreWeightCap is an optional true/false. If this item's new stack weight is too much for the weight cap of the inventory it's in, and bIgnoreWeightCap is:
+	true, then we'll set the amount to whatever was given anyway. 
+	false or not given, we'll stop the amount from being changed and return false.
+bPredict is an optional true/false that defaults to false on the server and true on the client. If bPredicted is:
+	true, then we won't actually change the amount, we'll just return true if the amount can be changed to the given amount.
+	false, then we will change the amount.
+True is returned if the stack's amount was changed/is changeable to the given number.
+False is returned in four cases:
+	TODO true should be returned if :SetAmount() to 0; after all, you CAN set the amt to 0 can't you?
+	The stack has/would run out of items and has/would be removed
+	The stack can't have it's amount set below 0.
+	The stack has a max amount and can't be changed because the new amount would have exceeded the max.
+	The stack was in an inventory, and the weight cap would have/would be been exceeded if we had changed the size.
 ]]--
-function ITEM:AddAmount(amt)
-	return self:SetAmount(self:GetAmount()+amt);
+function ITEM:SetAmount(amt,bIgnoreWeightCap,bPredict)
+	if bIgnoreWeightCap==nil then bIgnoreWeightCap=false end
+	if bPredict==nil then bPredict=CLIENT end
+	
+	if self:GetAmount()==amt then return true end
+	
+	local max=self:GetMaxAmount();
+	if SERVER && amt==0 then
+		if !bPredict then self:Remove(); end
+		return false;
+	elseif amt<0 || (max!=0 && amt>max) then
+		return false;
+	end
+	
+	if !bIgnoreWeightCap && IF.Inv:DoWeightCapsBreak(self,amt) then return false end
+	
+	if !bPredict then self:SetNWInt("Amount",amt); end
+	return true;
+end
+IF.Items:ProtectKey("SetAmount");
+
+--[[
+Adds onto the number of items in this stack.
+bPredict is an optional true/false. If this is true, we won't change the amount, we'll just return true if it can be changed.
+Returns true if the given number of items were subtracted, and false otherwise.
+]]--
+function ITEM:AddAmount(amt,bIgnoreWeightCap,bPredict)
+	return self:SetAmount(self:GetAmount()+amt,bIgnoreWeightCap,bPredict);
 end
 IF.Items:ProtectKey("AddAmount");
 
 --[[
 Subtracts from the number of items in this stack.
+bPredict is an optional true/false. If this is true, we won't change the amount, we'll just return true if it can be changed.
 Returns true if the given number of items were subtracted, and false otherwise.
 ]]--
-function ITEM:SubAmount(amt)
-	return self:SetAmount(self:GetAmount()-amt)
+function ITEM:SubAmount(amt,bIgnoreWeightCap,bPredict)
+	return self:SetAmount(self:GetAmount()-amt,bIgnoreWeightCap,bPredict);
 end
 IF.Items:ProtectKey("SubAmount");
 
@@ -57,7 +101,9 @@ amt is the number of items to transfer to the stack.
 otherStack is expected to be a valid stack of items of items that are the same type as this item.
 Returns true if we transferred that many items to otherStack.
 Returns false otherwise.
-TODO get rid of split/merge and make Transfer all purpose
+
+TODO this function sucks; will improve it when repurposing it
+TODO get rid of (or repurpose) split/merge and make Transfer all purpose
 	amt given but otherStack not: Transfers amt items to a new stack and returns the stack
 	amt given and otherStack given: Transfers amt items to the given stack;
 	amt is all items and otherStack given: Merges this stack with the given stack entirely.
@@ -75,6 +121,302 @@ function ITEM:Transfer(amt,otherStack)
 end
 IF.Items:ProtectKey("Transfer");
 
+--[[
+Merge this stack of items with another/several stacks of items.
+
+The stacks given will be removed and their amounts added to this stack's amount.
+This stack or the other stack's CanMerge can stop each individual merge from happening.
+The stacks given have to have the same type of items as this stack.
+
+It's arguments are like this:
+self:Merge(stack1,stack2,...,bPartialMerge,bPredict)
+
+stack1,stack2,...
+	You can give an many stacks as you want.
+
+bPartialMerge is an optional true/false. If we can't fit all the items from a given stack, and bPartialMerge is:
+	true or not given, we'll try to move as many as possible. We'll return -1 to indicate a partial merge.
+	false, we won't move any at all. We'll return false.
+
+bPredict is an optional true/false. This defaults to false on the server, and true on the client. If bPredict is:
+	false, items will actually be merged, and we'll return whether or not a merge was successful.
+	true, a merge won't be performed; instead we'll predict what will be returned if we do merge.
+	NOTE:
+	You should NEVER set bPredict to false on the client. Clientside merges are used internally by Itemforge and are not intended to be used by scripters.
+
+This function returns a true, false, or -1 for each stack you asked it to merge.
+	true is returned if all of the items from a given stack were merged.
+	false is returned if none of the items from a given stack were merged.
+	-1 is returned if some of the items from a given stack were merged.
+
+Here are a few examples of how the function can be used:
+	On the:							Server
+	We do:					stack1:Merge(stack2)
+	This is returned:					  true
+	What this means:		stack1 received all of stack2's items.
+	
+	On the:							Server
+	We do:					stack1:Merge(stack2)
+	This is returned:					  false
+	What this means:		stack1 didn't receive any items from stack2.
+	
+	On the:							Server
+	We do:					stack1:Merge(stack2)
+	This is returned:					   -1
+	What this means:		stack1 received some items from stack2, but not all of them.
+	
+	On the:							Server
+	We do:					stack1:Merge(stack2,false)
+	This is returned:					  true
+	What this means:		We tried to move _all_ the items from stack2 to stack1, and did!
+	
+	On the:							Server
+	We do:					stack1:Merge(stack2,false)
+	This is returned:					 false
+	What this means:		We tried to move _all_ the items from stack2 to stack1, but couldn't (it may have been possible to move some, but we wanted to move them all)
+	
+	On the:							Server
+	We do:					stack1:Merge(stack2,stack3,stack4);
+	This is returned:					  true,  true,  true
+	What this means:		stack1 received all the items from stack2, stack3, and stack4.
+	
+	On the:							Server
+	We do:					stack1:Merge(stack2,stack3,stack4);
+	This function returns:				  true,   -1,   false
+	What this means:		stack1 received all of stack2's items, some of stack3's items, and none of stack4's items.
+	
+	On the:							Server
+	We do:					stack1:Merge(stack2,stack3,false);
+	This function returns:				  true, false
+	What this means:		We tried to move _all_ the items from stack2 and stack3 to stack1. stack1 received all of stack2's items and none of stack3's.
+
+	On the:							Client
+	We do:					stack1:Merge(stack2)
+	This function returns:				  true
+	What this means:		Since this is called on the client, we're predicting instead of actually merging. If a merge is performed, stack1 should receive all of stack2's items.
+	
+	On the:							Client
+	We do:					stack1:Merge(stack2)
+	This function returns:				  false
+	What this means:		Since this is called on the client, we're predicting instead of actually merging. If a merge is performed, stack1 shouldn't receive any of stack2's items.
+	
+	On the:							Client
+	We do:					stack1:Merge(stack2)
+	This function returns:				   -1
+	What this means:		Since this is called on the client, we're predicting instead of actually merging. If a merge is performed, stack1 should receive some, but not all, of stack2's items.
+	
+	On the:							Client
+	We do:					stack1:Merge(stack2,false)
+	This function returns:				 false
+	What this means:		Since this is called on the client, we're predicting instead of actually merging. If we try to move all of stack2's items to stack1, it shouldn't work.
+	
+	On the:							Server
+	We do:					stack1:Merge(stack2,false,true)
+	This function returns:					false
+	What this means:		For some reason we want to predict if we can merge _all_ of stack2's items into stack1 on the server. If we try to move all of stack2's items to stack 1, it shouldn't work.
+	
+If you are merging several stacks, you can store the values :Merge() returns like this:
+	local merged2,merged3,merged4=stack1:Merge(stack2,stack3,stack4);
+Hope this is an adequate explanation of how this works.
+]]--
+function ITEM:Merge(...)
+	if type(arg[1])!="table" then ErrorNoHalt("Itemforge Items: Couldn't merge "..tostring(self).." with another item. No item was given!\n"); return false end
+	
+	local bPartialMerge=true;
+	local bPredict=CLIENT;
+	
+	local args=#arg;
+	local last=arg[args];
+	if type(last)=="boolean" then
+		local sec2last=arg[args-1];
+		
+		--A second bool was given
+		if sec2last==nil || type(sec2last)=="boolean" then
+			if sec2last!=nil then bPartialMerge=sec2last end
+			bPredict=last;
+		
+		--Only one bool was given
+		else
+			bPartialMerge=last;
+		end
+	end
+	
+	local SuccessTable={};
+	local total=self:GetAmount();
+	local i=1;
+	while type(arg[i])=="table" do
+		SuccessTable[i]=false;
+		
+		--[[
+		Can't merge with self, invalid items, different item types, or if CanMerge events on either item deny it
+		Additionally, a stack must have enough free space (determined by the stack's MaxAmount, if there is one) to take all items (or some, if partial merges are allowed) from another stack.
+		Lastly, if either stack is in a container, weight caps in these inventories must not be broken as a result of the merge.
+		]]--
+		if self!=arg[i] && arg[i]:IsValid() && self:GetType()==arg[i]:GetType() && self:Event("CanMerge",false,arg[i],true) && arg[i]:Event("CanMerge",false,self,false) then
+			local newAmt=total+arg[i]:GetAmount();
+			
+			if self:SetAmount(newAmt,true,true) && !IF.Inv:DoWeightCapsBreak(self,newAmt,arg[i],0) then
+				
+				if !bPredict then
+					arg[i]:Remove();
+				
+					self:Event("OnMerge",nil,nil,false);
+				end
+				
+				total=newAmt;
+				SuccessTable[i]=true;
+			
+			elseif bPartialMerge then
+				local fit=self:GetMaxAmount()-self:GetAmount();
+				
+				newAmt=total+fit;
+				local newAmt2=arg[i]:GetAmount()-fit;
+				
+				if fit > 0 && self:SetAmount(newAmt,true,true) && !IF.Inv:DoWeightCapsBreak(self,newAmt,arg[i],newAmt2) then
+					
+					if !bPredict then
+						arg[i]:SetAmount(newAmt2,true,false);
+						self:Event("OnMerge",nil,arg[i],true);
+					end
+					
+					total=newAmt;
+					SuccessTable[i]=-1;
+				end
+			end
+		end
+		i=i+1;
+	end
+	
+	if !bPredict then self:SetAmount(total,true,false) end
+	return unpack(SuccessTable);
+end
+IF.Items:ProtectKey("Merge");
+
+--[[
+Split this pile of items into two or more piles.
+
+The arguments for this function are like so:
+self:Split(split1,split2,...,bSameLocation,bPredict)
+
+split1,split2,...
+	For each split# you give, this will transfer the given number of items to a new stack.
+	You can split the item into as many stacks as you want.
+
+bSameLocation is an optional true/false. If bSameLocation is:
+	true or not given, the new stacks are created at the same location as this stack.
+	false, the new stacks are created in the void
+	See the ToSameLocation function for more details on where an item is placed when sent to the "Same Location" as another item.
+
+bPredict is an optional true/false. This defaults to false on the server and true on the client. If bPredict is:
+	false, a split will actually be performed, and [NEW ITEM]/nil will be returned if the split was/wasn't successful.
+	true, we'll predict if splits are possible. [TEMP ITEM]/nil will be returned if the split should work/shouldn't be successful.
+
+Here are a few examples of how the function can be used.
+	On the:					Server
+	We do:					stack1:Split(5);
+	This is returned:		[NEW ITEM]
+	What this means:		5 items from stack1 were split off into a new stack. The new stack has been returned.
+	
+	On the:					Server
+	We do:					stack1:Split(10);
+	This is returned:		nil
+	What this means:		We tried to split off 10 items from stack1 but couldn't.
+	
+	On the:					Server
+	We do:					stack1:Split(10,20,30);
+	This is returned:		[NEW ITEM],[NEW ITEM],nil
+	What this means:		We tried to split off 60 total items into stacks of 10, 20, and 30 from stack1. The stack of 10 and the stack of 20 were split off successfully, but the stack of 30 couldn't be split.
+	
+	On the:					Client
+	We do:					stack1:Split(7);
+	This is returned:		[TEMP ITEM]
+	What this means:		Since this is called on the client, we're predicting what will be returned if we split. We got a [TEMP ITEM], which can be used to carry out further predictions. The fact that we got a temp item means that a split should work.
+
+	On the:					Client
+	We do:					stack1:Split(24);
+	This is returned:		nil
+	What this means:		Since this is called on the client, we're predicting what will be returned if we split. We got nil, meaning we shouldn't be able to split off 24 items from stack1.
+	
+	On the:					Client
+	We do:					stack1:Split(1,5,7);
+	This is returned:		nil,[TEMP ITEM],nil
+	What this means:		Since this is called on the client, we're predicting what will be returned if we split. We predict that the stack of 1 won't split, the stack of 5 will split, and the stack of 7 won't.
+
+If you are splitting several stacks, you can store the values :Split() returns like this:
+	local stack2,stack3,stack4=stack1:Split(4,12,8);
+
+TODO return false if a stack can't be broken
+]]--
+function ITEM:Split(...)
+	--Forgot to tell us how many items to split
+	if type(arg[1])!="number" then ErrorNoHalt("Itemforge Items: Couldn't split "..tostring(self).." - number of items to transfer to a new stack into wasn't given!\n"); return false end
+	
+	local bSameLocation=true;
+	local bPredict=CLIENT;
+	
+	local args=#arg;
+	local last=arg[args];
+	if type(last)=="boolean" then
+		local sec2last=arg[args-1];
+		
+		--A second bool was given
+		if sec2last==nil || type(sec2last)=="boolean" then
+			if sec2last!=nil then bSameLocation=sec2last end
+			bPredict=last;
+		
+		--Only one bool was given
+		else
+			bSameLocation=last;
+		end
+	end
+	
+	local newStacks={};
+	local total=0;
+	local i=1;
+	while type(arg[i])=="number" do
+		arg[i]=math.floor(arg[i]);
+		newStacks[i]=nil;
+		
+		--[[
+		Can we split off the given number of items? We need to have at least 1 and need to be able to subtract that much from the stack.
+		The CanSplit event will have the final say in wheter a split can happen
+		]]--
+		if arg[i]>0 && self:SubAmount(total+arg[i],nil,true) && self:Event("CanSplit",true,howMany) then
+			
+			--Split the item. We'll create in same location as this stack if told to, or in the void if not told to.
+			if bSameLocation then	newStacks[i]=IF.Items:CreateSameLocation(self:GetType(),self,nil,bPredict);
+			else					newStacks[i]=IF.Items:Create(self:GetType(),nil,false,nil,bPredict);
+			end
+			
+			if newStacks[i] then
+				--TODO this method of dealing with failed SetAmounts sucks, redo it
+				if !newStacks[i]:SetAmount(arg[i],nil,bPredict) && !bPredict then
+					newStacks[i]:Remove();
+				else
+					--Update the total amount of items to subtract
+					total=total+arg[i];
+					
+					if !bPredict then
+						--New stack created, call our hook to indicate it was successful.
+						self:Event("OnSplit",nil,newStacks[i],howMany);
+						
+						--New stack created, call it's hook so it can decide what to do next.
+						newStacks[i]:Event("OnSplitFromStack",nil,self,howMany);
+					end
+				end
+			end
+		end
+		
+		i=i+1;
+	end
+	
+	--Subtract the total number of items moved from the master stack (doing it here rather than for each thing saves bandwidth)
+	self:SubAmount(total,nil,bPredict);
+	
+	return unpack(newStacks);
+end
+IF.Items:ProtectKey("Split");
+
 
 
 
@@ -82,40 +424,6 @@ if SERVER then
 
 
 
-
---[[
-This function Sets the number of items in the stack.
-If happening on the server, the clients are updated with the amount as well.
-If the amount is set to 0 or below, the item is removed.
-True is returned if the stack's amount was successfully changed to the given number.
-False is returned in three cases:
-	The stack has run out of items and has been removed (amt was 0 or less)
-	The stack has a max amount and couldn't be changed because the new amount would have exceeded the max.
-	The stack was in an inventory, and the weight cap would have been exceeded if we had changed the size.
-]]--
-function ITEM:SetAmount(amt)
-	local cur=self:GetAmount();
-	if cur==amt then return true end
-	
-	local max=self:GetMaxAmount();
-	if amt<=0 then
-		self:Remove();
-		return false;
-	elseif max!=0 && amt>max then
-		return false;
-	end
-	
-	local container=self:GetContainer();
-	if container then
-		local weightCap=container:GetWeightCapacity();
-		if weightCap>0 && container:GetWeightStored()-self:GetStackWeight()+(self:GetWeight()*amt)>weightCap then
-			return false;
-		end
-	end
-	
-	return self:SetNWInt("Amount",amt);
-end
-IF.Items:ProtectKey("SetAmount");
 
 --[[
 Set max number of items in the stack.
@@ -126,218 +434,6 @@ function ITEM:SetMaxAmount(maxamount)
 	return self:SetNWInt("MaxAmount",maxamount);
 end
 IF.Items:ProtectKey("SetMaxAmount");
-
---[[
-Merge this pile of items with another pile of items.
-
-bPartialMerge can be used to allow or disallow partial merges.
-	A partial merge is where some, but not all, of the items in a stack given to this function were moved.
-	If bPartialMerge is:
-		true, partial merges will be allowed. If a partial merge occurs, whatever is left of the stack will not removed. -1 will be returned instead of true or false. False will only be returned if none of the items were merged at all.
-		false, partial merges will NOT be allowed. It will return true if it merged all of the items in the stack given to it and then removed the stack, or false if this did not happen.
-
-You can give as many items as you want to this function. Ex:
-	myItem:Merge(true,otherItem);								--Merge otherStack with this stack
-	myItem:Merge(true,otherItem,anotherItem);					--Merge otherStack and anotherStack with this stack
-	myItem:Merge(true,otherItem,anotherItem,yetAnotherItem);	--Merge otherStack, anotherStack, and yetAnotherStack with this stack
-	myItem:Merge(false,otherItem);								--Merge otherStack with this stack; fails if it doesn't move EVERY item in that stack to this one
-The items given will be removed and their amounts added to this item's amount.
-This item's OnMerge or the other item's OnMerge can stop each individual merge.
-Items have to be the same type as this item.
-
-This function returns a series of trues and falses, based on the success of merges asked. Ex:
-	Lets say we want to merge this item with three items:
-		myItem:Merge(true,otherItem,anotherItem,yetAnotherItem);
-	If this function returns:
-						    true,      true,         true
-	It means, otherItem's whole stack merged, anotherItem's whole stack merged, and yetAnotherItem's whole stack merged. They all merged successfully.
-	
-	Another example...
-	Lets say we want to merge this item with three items:
-		myItem:Merge(true,otherItem,anotherItem,yetAnotherItem);
-	If this function returns:
-						    true,      -1,          false
-	It means, otherItem's whole stack merged, anotherItem PARTIALLY merged, and yetAnotherItem DIDN'T merge.
-	
-	Another example...
-	Lets say we want to merge this item with a complete stack:
-		myItem:Merge(false,otherItem,anotherItem);
-	If this function returns:
-							  true      false
-	It means, the whole stack of otherItem merged, but anotherItem's whole stack couldn't merge unfortunately.
-So, how do you put these values in vars?
-	local first,second,third=item:Merge(true,firstItem,secondItem,thirdItem);
-Hope this is an adequate explanation of how this works.
-]]--
-function ITEM:Merge(bPartialMerge,...)
-	
-	if !arg[1] then ErrorNoHalt("Itemforge Items: Couldn't merge "..tostring(self).." with another item. No item was given!\n"); return false end
-	
-	local SuccessTable={};
-	local max=self:GetMaxAmount();
-	local i=1;
-	while arg[i]!=nil do
-		if arg[i]:IsValid() then
-			if self!=arg[i] then
-				if self:GetType()==arg[i]:GetType() then
-					--Give merge events on both items a chance to stop the merge
-					local s,r1=pcall(self.OnMerge,self,arg[i]);
-					if !s then ErrorNoHalt(r1.."\n"); r1=false end
-					local s,r2=pcall(arg[i].OnMerge,arg[i],self);
-					if !s then ErrorNoHalt(r2.."\n"); r2=false end
-					
-					if r1 && r2 then
-						local fit=self:GetMaxAmount()-self:GetAmount();
-						
-						if self:SetAmount(self:GetAmount()+arg[i]:GetAmount()) then
-							arg[i]:Remove();
-							SuccessTable[i]=true;
-						elseif bPartialMerge && fit > 0 && arg[i]:GetAmount()>fit then
-							if self:SetAmount(self:GetMaxAmount()) then
-								arg[i]:SetAmount(arg[i]:GetAmount()-fit);
-								SuccessTable[i]=-1;
-							else
-								SuccessTable[i]=false;
-							end
-						else
-							SuccessTable[i]=false;
-						end
-					else
-						SuccessTable[i]=false;
-					end
-				else
-					ErrorNoHalt("Itemforge Items: Couldn't merge "..tostring(self).." with "..tostring(arg[i])..". These items are not the same type.\n");
-					SuccessTable[i]=false;
-				end
-			else
-				ErrorNoHalt("Itemforge Items: Couldn't merge "..tostring(self).." with "..tostring(arg[i]).." - can't merge an item with itself!\n");
-				SuccessTable[i]=false;
-			end
-		else
-			ErrorNoHalt("Itemforge Items: Couldn't merge "..tostring(self).." with an item. Item given was invalid!\n");
-			SuccessTable[i]=false;
-		end
-		
-		i=i+1;
-	end
-	return unpack(SuccessTable);
-end
-IF.Items:ProtectKey("Merge");
-
---[[
-Split this pile of items into two or more piles.
-
-This function can be used to split an item into:
-	Two stacks:		self:Split(true,5);			(make a new stack with 5 items from this stack)
-	Three stacks:	self:Split(true,5,7);		(make two new stacks: one with 5 items, another with 7)
-	Four stacks:	self:Split(true,5,7,12);	(make three new stacks: one with 5 items, another with 7, and another with 12)
-
-Really, however many stacks you want!
-The numbers in the examples above are how many items to transfer to new stacks.
-Each number you give this function tells it to split the stack into a new stack with that many items from the original stack.
-
-bSameLocation is an argument that determines where the item is placed.
-	If this is false, the new stack will be created in the void.
-	If this is true, the new stack will be created in:
-		the same container that this stack is in, if in a container.
-		the new stack will be created nearby this stack, if in the world.
-		dropped from where the player is looking.
-
-TODO return false if a stack can't be broken
-]]--
-function ITEM:Split(bSameLocation,...)
-	--Forgot to tell us how many items to split
-	if !arg[1] then ErrorNoHalt("Itemforge Items: Couldn't split "..tostring(self).." - number of items to transfer to a new stack into wasn't given!\n"); return false end
-	bSameLocation=bSameLocation or false;
-	
-	--Count how many items are trying to be taken out of the stack and sent to new stacks
-	local i=1;
-	local totalCount=0;
-	while type(arg[i])=="number" do
-		local howMany=math.floor(arg[i]);
-		
-		--And make sure we're not asking to split something impossible
-		if howMany<=0 then ErrorNoHalt("Itemforge Items: Couldn't split "..tostring(self).." - was trying to transfer 0 or less items to a new stack...\n"); return false end
-		
-		totalCount=totalCount+howMany;
-		i=i+1;
-	end
-	
-	--Total numbers of items possibly being transferred in range?
-	if totalCount<=0 then ErrorNoHalt("Itemforge Items: Couldn't split "..tostring(self).." - was trying to transfer 0 or less items to the new stack...\n"); return false end
-	local amt=self:GetAmount();
-	if totalCount>=amt then ErrorNoHalt("Itemforge Items: Couldn't split "..tostring(self).." - was trying to transfer all or too many ("..totalCount..") items total to new stacks. This stack only has "..amt.." items.\n"); return false end
-	
-	local i=1;
-	local newStacks={};
-	local totalAmountTransferred=0;
-	
-	while type(arg[i])=="number" do
-		local howMany=math.floor(arg[i]);
-		
-		--Will the event let the split happen (we run the event for each split)
-		local s,r=pcall(self.OnSplit,self,howMany);
-		if !s then ErrorNoHalt(r.."\n")
-		elseif r then
-			--Split the item. We'll create in same location as this stack if told to, or in the void if not told to.
-			local newStack=0;
-			if bSameLocation then
-				newStack=IF.Items:CreateSameLocation(self:GetType(),self);
-			else
-				newStack=IF.Items:Create(self:GetType());
-			end
-			
-			if newStack && newStack:IsValid() then
-				
-				--Adjust amounts
-				totalAmountTransferred=totalAmountTransferred+howMany;
-				newStack:SetAmount(howMany);
-				
-				--New stack created, call it's hook so it can decide what to do next.
-				local s,r=pcall(newStack.OnSplitFromStack,newStack,self,howMany);
-				if !s then ErrorNoHalt(r.."\n") end
-				
-				table.insert(newStacks,newStack);
-			end
-		end
-		
-		i=i+1;
-	end
-	
-	self:SetAmount(amt-totalAmountTransferred);
-	return unpack(newStacks);
-end
-IF.Items:ProtectKey("Split");
-
-
-
-
-else
-
-
-
-
---[[
-Sets the number of items in this stack.
-Clientside, this is only good for predicition purposes.
-NOTE: It's important to realize an item's amount could be 0 clientside!
-	Serverside, if the item amount is set to 0, the item is immediately removed.
-	Clientside, however, we can't immediately remove the item. As a compromise, the amount can be set to 0.
-amt is how many items you want this stack to have.
-	If amt is less than 0, amt will be changed to 0.
-	If this item has a max amount set, and amt is greater than that, amt will be set to the max amount.
-Returns true if the amount was changed successfully, or false otherwise.
-]]--
-function ITEM:SetAmount(amt)
-	local max=self:GetMaxAmount();
-	
-	if amt<0 then					amt=0;
-	elseif max!=0 && amt>max then	amt=max;
-	end
-	
-	return self:SetNWInt("Amount",amt);
-end
-IF.Items:ProtectKey("SetAmount");
 
 
 

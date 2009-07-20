@@ -366,6 +366,66 @@ function MODULE:GetAll()
 	return t;
 end
 
+--[[
+This function is used to determine if changing the amount of one or two stacks will break the weight capacity of an inventory.
+The reason this function exists is because if the "will weight cap break" calculations are done seperately, this situation can arise:
+	There is an inventory with a weight cap of 3000 grams.
+	In this inventory, there are two seperate stacks of rocks; each rock in the stack weighs 100 grams.
+	One stack has 20 rocks, another has 10 rocks.
+	Or to put it another way, one stack weighs 2000 grams, another stack weighs 1000 grams.
+	The total weight of these two stacks if 3000 grams (the weight cap of the inventory is maxed out)
+	Lets say we want to merge these two piles into a single stack of 30 rocks.
+	To do this, we add the second stack's items onto the first stack's items and remove the second stack.
+	The merge would fail because we added 10 items onto the first stack before removing the second stack.
+	Because the "will weight cap break" calculations were done seperately, it didn't know we were planning to remove the second stack.
+	All it sees is that we wanted to have a stack of 30 rocks and a stack of 10 rocks, which would break the weight cap.
+	This function solves this situation.
+
+i1 is the first item.
+a1 is the new amount of the first item.
+i2 is the second item.
+a2 is the new amount of the second item.
+
+Returns false if no weight caps will break by changing the amounts of the items.
+Returns true if any weight cap will break by changing the amounts of the items.
+]]--
+function MODULE:DoWeightCapsBreak(i1,a1,i2,a2)
+	local c1=i1 && i1:IsValid() && i1:GetContainer();
+	local c2=i2 && i2:IsValid() && i2:GetContainer();
+	
+	--Neither item given is in an inventory (or no valid items were given)
+	if !c1 && !c2 then
+		return false;
+	
+	--Both items given are in the same inventory
+	elseif c1==c2 then	
+		local cap=c1:GetWeightCapacity();
+		if cap==0 then return false end
+		
+		return (c1:GetWeightStored() + i1:GetWeight()*(a1-i1:GetAmount()) + i2:GetWeight()*(a2-i2:GetAmount()) > cap);
+	--Both items are in inventories but not the same inventory
+	elseif c1 && c2 then
+		local cap1=c1:GetWeightCapacity();
+		local cap2=c2:GetWeightCapacity();
+		
+		return (cap1!=0 && c1:GetWeightStored() + i1:GetWeight()*(a1-i1:GetAmount()) > cap1) || (cap2!=0 && c2:GetWeightStored() + i2:GetWeight()*(a2-i2:GetAmount()) > cap2);
+	--Only one item given was in an inventory
+	else
+		--The item we want to deal with is the one that was in an inventory
+		local i,c,a;
+		if c1 then		i,c,a=i1,c1,a1;
+		elseif c2 then	i,c,a=i2,c2,a2;
+		end
+		
+		local cap=c:GetWeightCapacity();
+		if cap==0 then return false end
+		
+		return (c:GetWeightStored() + i:GetWeight()*(a-i:GetAmount()) > cap);
+	end
+	
+	return false;
+end
+
 
 --TEMPORARY
 function MODULE:DumpInventories()
@@ -801,8 +861,8 @@ TODO need to check all network data to make sure it's respecting inventory owner
 ]]--
 function _INV:SetOwner(pl)
 	if pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Cannot set owner on inventory "..self:GetID()..". Given player was invalid.\n"); return false
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Cannot set owner on inventory "..self:GetID()..". Given player wasn't a player!\n"); return false end
+		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Cannot set owner on "..tostring(self)..". Given player was invalid.\n"); return false
+		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Cannot set owner on "..tostring(self)..". Given player wasn't a player!\n"); return false end
 	end
 	
 	local oldOwner=self:GetOwner();
@@ -1108,11 +1168,11 @@ end
 
 --[[
 Returns an item with the given type in this inventory.
-If there's no item with this type in the inventory, nil is returned.
+If there's no item with this type in the inventory (or there are errors), nil is returned.
 If there are several items of this type in the inventory, then the first item found with this type is returned.
 ]]--
 function _INV:GetItemByType(sItemtype)
-	if !sItemtype then ErrorNoHalt("Itemforge Inventories: Can't find a specific item-type in inventory "..self:GetID().." - the type of item to find wasn't given!\n"); return false end
+	if !sItemtype then ErrorNoHalt("Itemforge Inventories: Can't find a specific item-type in inventory "..self:GetID().." - the type of item to find wasn't given!\n"); return nil end
 	sItemtype=string.lower(sItemtype);
 	
 	for k,v in pairs(self.Items) do
@@ -1128,20 +1188,20 @@ end
 
 --[[
 Returns a table of items with the given type in this inventory.
+Returns nil if there are errors.
 ]]--
 function _INV:GetItemsByType(sItemtype)
-	if !sItemtype then ErrorNoHalt("Itemforge Inventories: Can't find a specific item-type in inventory "..self:GetID().." - the type of item to find wasn't given!\n"); return false end
+	if !sItemtype then ErrorNoHalt("Itemforge Inventories: Can't find items of a specific item-type in inventory "..self:GetID().." - the type of item to find wasn't given!\n"); return nil end
 	local sItemtype=string.lower(sItemtype);
 	
 	local items={};
-	for k,v in pairs(self.ItemsByID) do
-		local item=self.Items[v];
-		if item:IsValid() then
-			if item:GetType()==sItemtype then table.insert(items,item) end
+	for k,v in pairs(self.Items) do
+		if v:IsValid() then
+			if v:GetType()==sItemtype then table.insert(items,v) end
 		else
 			--INVALID - Item was removed but not taken out of inventory for some reason
-			self:RemoveItem(k,true);
-			ErrorNoHalt("Itemforge Inventories: Found an item in inventory "..self:GetID().." (slot "..v..", item ID "..k..") that no longer exists but is still listed as being in this inventory\n");
+			self:RemoveItem(k,true,false);
+			ErrorNoHalt("Itemforge Inventories: Found an item in inventory "..self:GetID().." (slot "..k..") that no longer exists but is still listed as being in this inventory\n");
 		end
 	end
 	
@@ -1494,7 +1554,7 @@ Returns the title of the inventory.
 This is displayed on the GUI when the inventory is opened on-screen.
 By default, the inventory title is the name of the first connected object found.
 You can override this to return whatever you like (as long as it's a string).
-The advantage of doing this is when you have two or more inventories on a single item (for example, an ATM), you can give each inventory a different title (deposits and withdrawls, for example).
+The advantage of doing this is when you have two or more inventories on a single item (for example, a vending machine), you can give each inventory a different title ("Products" and "Profits", for example).
 ]]--
 function _INV:GetTitle()
 	for k,v in pairs(self.ConnectedObjects) do
@@ -1505,15 +1565,67 @@ function _INV:GetTitle()
 	return "Inventory";
 end
 
+--[[
+Called when moving an item in this inventory from one slot to another.
+item is the item being moved.
+oldslot is the slot the item is currently in.
+newslot is the slot the item wants to move to.
+Return false to stop the item from moving, or return true to allow it to move.
+]]--
+function _INV:CanMoveItem(item,oldslot,newslot)
+	return true;
+end
 
+--[[
+Called after an item in this inventory has been moved from one slot to another.
+item is the item being moved.
+oldslot was the slot the item was occupying before.
+newslot is the slot the item is now occupying.
+]]--
+function _INV:OnMoveItem(item,oldslot,newslot)
 
+end
 
-if SERVER then
+--[[
+Called when inserting an item into the inventory.
+This can be used to stop an item from entering this inventory.
+item is the item being inserted.
+slot is the slot in the inventory that the item will be placed in.
+Return false to stop the item from being inserted, or true to allow it to be inserted.
+]]--
+function _INV:CanInsertItem(item,slot)
+end
 
+--[[
+Called after an item has been inserted.
+item is the item being inserted.
+slot is the slot in the inventory that the item was placed in.
+]]--
+function _INV:OnInsertItem(item,slot)
+end
 
+--[[
+Called when taking an item out of the inventory.
+item is the item that wants to be taken out.
+slot is the slot this item is occupying in this inventory.
+Return true to allow the item to be taken out, or false to stop the item from being taken out.
+]]--
+function _INV:CanRemoveItem(item,slot)
+	return true;
+end
 
+--[[
+Called after an item has been taken out of the inventory.
+item is the item that was taken out.
+slot is the slot this item was in.
+forced will be true or false.
+	If forced is true, then the item HAD to come out (this inventory was removed, the item was removed, etc).
+	If forced is false, this was a normal removal (we just moved the item somewhere else)
+]]--
+function _INV:OnRemoveItem(item,slot,forced)
+end
 
---Called prior to the inventory being removed serverside
+--Called prior to the inventory being removed
 function _INV:OnRemove(lastConnection)
 	--Deal with items in this inventory at the time of removal
 	--Items will be taken care of serverside AND clientside (rather than just removing them serverside and individually removing each one clientside, we roll it all into one function here to save bandwidth/reduce lag)
@@ -1552,51 +1664,29 @@ function _INV:OnRemove(lastConnection)
 			end
 		elseif self.RemovalAction==IFINV_RMVACT_VOIDITEMS then
 			for k,v in pairs(self.Items) do
-				v:ToVoid(true,true,self);
+				v:ToVoid(true,self,true);
 			end
 		end
 	else
 		if self.RemovalAction==IFINV_RMVACT_VOIDITEMS then
 			for k,v in pairs(self.Items) do
-				v:ToVoid(true,self);
+				v:ToVoid(true,self,nil,false);
 			end
 		end
 	end
 end
 
---[[
-Called when inserting an item into the inventory. Serverside, returning false will prevent an item from being inserted.
-This can be used to stop items of certain types from being placed in an inventory.
-item is the item being inserted.
-slot is the slot in the inventory that the item is being placed in.
-]]--
-function _INV:OnInsertItem(item,slot)
-	return true;
-end
 
---[[
-Called when moving an item in this inventory from one slot to another. Serverside, returning false will prevent the move.
-item is the item being moved.
-oldslot is the slot the item is currently in.
-newslot is the slot the item wants to move to.
-]]--
-function _INV:OnMoveItem(item,oldslot,newslot)
-	return true;
-end
 
---[[
-Called when taking an item out of the inventory.
-item is the item being taken out.
-If forced is true, it doesn't matter if you return true or false, the item will be taken out anyway.
-If forced is false, then returning false in this event will prevent the item from being taken out of the inventory. Returning true allows the item to be taken out.
-]]--
-function _INV:OnRemoveItem(item,forced)
-	return true;
-end
+
+if SERVER then
+
+
+
 
 --[[
 Called when a full update is being sent. You can put some stuff here to send along with it if you like.
-pl is the player who the full update is being sent to. pl can be nil (for everybody)
+pl is the player who the full update is being sent to.
 ]]--
 function _INV:OnSendFullUpdate(pl)
 	
@@ -1624,41 +1714,6 @@ function _INV:GetIcon()
 		end
 	end
 	return nil;
-end
-
---[[
-Called when inserting an item into the inventory. Clientside, insertion cannot be prevented by returning false here.
-This can be used to stop items of certain types from being placed in an inventory.
-item is the item being inserted.
-slot is the slot in the inventory that the item is being placed in.
-]]--
-function _INV:OnInsertItem(item,slot)
-	return true;
-end
-
---[[
-Called when moving an item in this inventory from one slot to another. Clientside, movement cannot be prevented by returning false here.
-item is the item being moved.
-oldslot is the slot the item is currently in.
-newslot is the slot the item wants to move to.
-]]--
-function _INV:OnMoveItem(item,oldslot,newslot)
-	return true;
-end
-
---[[
-Called when taking an item from the inventory.
-item is the item being removed.
-forced will be true if the item was removed by force (that is, serverside the OnRemoveItem event couldn't stop the removal of the item - it /has/ to come out).
-Clientside, this event cannot stop the removal of the item from the inventory.
-]]--
-function _INV:OnRemoveItem(item,forced)
-	return true;
-end
-
---Called prior to the inventory being removed clientside
-function _INV:OnRemove()
-	
 end
 
 
@@ -1726,31 +1781,64 @@ function _INV:SendFullUpdate(pl)
 end
 
 --[[
+Calls an event on the inventory.
+If there is an error calling the event, a non-halting error message is generated and a default value is returned.
+
+sEventName is a string which should be the name of the event to call (EX: "CanRemoveItem", "OnInsertItem", etc)
+vDefaultReturn is what will be returned in case of errors calling the hook.
+... - You can pass arguments to the hook here
+
+This function returns two values: vReturn,bSuccess
+	vReturn will be what the event returned, or if there were errors, then it will be vDefaultReturn.
+	bSuccess will be true if the event was called successfully or false if there were errors.
+]]--
+function _INV:Event(sEventName,vDefaultReturn,...)
+	local f=self[sEventName];
+	if !f then ErrorNoHalt("Itemforge Inventories: "..sEventName.." ("..tostring(self)..") failed: This event does not exist.\n"); return vDefaultReturn,false end
+		
+	local s,r=pcall(f,self,...);
+	if !s then ErrorNoHalt("Itemforge Inventories: "..sEventName.." ("..tostring(self)..") failed: "..r.."\n"); return vDefaultReturn,false end
+	
+	return r,true;
+end
+
+--[[
 Adds an item into this inventory.
 DO NOT CALL DIRECTLY - this is called automatically by other functions.
 
 When this function is run, it triggers the OnInsertItem event, both clientside and serverside.
 Serverside, the OnInsertItem event can stop the item from being inserted.
+
+item is the item/stack of items to insert.
+
 slotnum's use varies by what side it's on:
 	Serverside, If a specific slot is requested, we'll try to add it there. If it doesn't work for some reason, we'll fail. This can be nil to accept any slot.
 	Clientside, It's necessary to provide slotnum to prevent netsync errors.
-bNoSplit is an optional argument. In the case that a stack of items is being inserted but weighs too much to be inserted...
-	If bNoSplit is false or not given, we'll determine how many items in the stack can fit in the inventory, and then split off that many items into a seperate stack.
-	If bNoSplit is true, we'll return false (because we're basically saying we want the whole stack or no stack in there).
+bNoSplit is an optional true/false. If item is a stack that weighs too much to fit the all the items in this inventory, and bNoSplit is:
+	false or not given, we'll determine how many items in the stack can fit in the inventory, and then split off that many items into a seperate stack.
+	true, we'll return false (because we're basically saying we want the whole stack or no stack in there).
+bPredict is an optional true/false that defaults to false on the server and true on the client. If bPredict is:
+	false, we are actually inserting the item into this inventory.
+	true, we are returning true/false if it is possible to insert the item into the inventory.
+
 The clients are instructed to add the item automatically by the Item's ToInventory function.
 Use the item's ToInventory() function and pass this inventory's ID.
 False is returned if the item could not be inserted for any reason, otherwise the slot for the item to use in the inventory is returned.
 ]]--
-function _INV:InsertItem(item,slotnum,bNoSplit)
+function _INV:InsertItem(item,slotnum,bNoSplit,bPredict)
 	if !item || !item:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't add item to inventory "..self:GetID().."... item given was invalid.\n"); return false end
 	
+	if bPredict==nil then bPredict=CLIENT end
+	
+	local itemid=item:GetID();
+	
 	--If the item is in this inventory already, we'll just return the slot it's in
-	local s=self:GetItemSlotByID(item:GetID());
+	local s=self:GetItemSlotByID(itemid);
 	if s!=nil then return s end
 			
 	--Lets insert this item to a slot in this inventory.
 	local i=1;
-	if SERVER then
+	if SERVER || bPredict then
 		--Do we have a given slot?
 		if slotnum then
 			--Is the given slot open? If it is, we can insert/move the item to that slot.
@@ -1771,7 +1859,7 @@ function _INV:InsertItem(item,slotnum,bNoSplit)
 		
 		--We're not trying to pull a loophole by putting an item into itself are we?
 		--Also, is the item being inserted small enough to fit inside this inventory?
-		if self:IsBeneath(item) || (self:GetSizeLimit()!=0 && item:GetSize()>self:GetSizeLimit()) then return false end
+		if self:IsBeneath(item) || (self:GetSizeLimit()!=0 && item:GetSize()>self:GetSizeLimit()) || !self:Event("CanInsertItem",true,item,i) then return false end
 
 		--Can this inventory support the weight of all the items being inserted?
 		--TODO Hard Weight Caps and Soft Weight Caps
@@ -1787,43 +1875,31 @@ function _INV:InsertItem(item,slotnum,bNoSplit)
 				
 			--The stack being moved to our inventory is 'item', so we'll create a stack with everything that _isn't_ moving to that inventory in the same location.
 			--TODO I don't like this approach; it should split off a stack and move the new one instead
-			local newStack=item:Split(true,item:GetAmount()-howMany);
+			local newStack=item:Split(item:GetAmount()-howMany,nil,bPredict);
 			
 			--If the new stack couldn't be created, we fail because it's been established that we can't fit the whole stack
 			if !newStack then return false end
 		end
-		
-		
-		
-		--We'll run the OnInsertItem event to give the inventory a chance to deny entry (we check a lot of things here like size limit, weight, etc)
-		local s,r=pcall(self.OnInsertItem,self,item,i);
-		if !s then ErrorNoHalt(r.."\n");
-		elseif !r then return false end
 	else
 		if slotnum==nil then ErrorNoHalt("Itemforge Inventories: Tried to add "..tostring(item).." clientside, but slotnum was nil!\n"); return false end
 		i=slotnum;
-		
-		--We'll run the OnInsertItem event clientside too (this can't stop it from being inserted clientside, but the inventory can do something when this happens I guess)
-		local s,r=pcall(self.OnInsertItem,self,item,i);
-		if !s then ErrorNoHalt(r.."\n") end
 	end
 	
 	
 	--Send to void. False is returned in case of errors or if events stop the removal of the item from it's current medium.
-	if SERVER then
-		if !item:ToVoid(false,true) then return false end
-	else
-		local inv=item:GetContainer();
-		item:ToVoid(false,inv);
+	if !item:ToVoid(false,nil,true,bPredict) then return false end
+	
+	if !bPredict then
+		--Register the item in the inventory
+		self.Items[i]=item;
+		self.ItemsByID[itemid]=i;
+		
+		--OnInsertItem is called when an item enters the inventory
+		self:Event("OnInsertItem",nil,item,i);
+		
+		--Refresh any UI displaying this inventory
+		if CLIENT then self:Update(); end
 	end
-	
-	--Register the item in the inventory
-	self.Items[i]=item;
-	self.ItemsByID[item:GetID()]=i;
-	
-	--Refresh any UI displaying this inventory
-	if CLIENT then self:Update(); end
-	
 	--Return slot item placed in
 	return i;
 end
@@ -1832,44 +1908,55 @@ end
 Moves an item in this inventory from one slot to another.
 DO NOT CALL DIRECTLY - this is called automatically by other functions.
 
-When this function is run, it triggers the OnMoveItem event, both clientside and serverside.
-Serverside, the OnMoveItem event can stop the item from moving from slot to slot.
+The Inventory's CanMoveItem event can stop the item from moving from one slot to another slot.
+When an item is moved, the inventory's OnMoveItem event is triggered.
+
 item is the item in this inventory to move. If the item is not in this inventory then an error message is generated.
-oldslot is only required clientside. Clientside, both the item and the slot it's expected to be in are required to detect netsync errors.
+oldslot is only required when moving items clientside. Clientside, both the item and the slot it's expected to be in are required to detect netsync errors.
 newslot is the slot to move the item to. If this slot is occupied, false is returned and if occuring clientside an error message is generated.
+bPredict is an optional true/false that defaults to false on the server and true on the client. If bPredict is:
+	false, then we are actually moving item from oldslot to newslot.
+	true, then we are simply predicting whether or not we can move the item.
 ]]--
-function _INV:MoveItem(item,oldslot,newslot)
-	if !item || !item:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't move item in inventory "..self:GetID().." from one slot to another - Item given was invalid!\n"); return false end
-	if !newslot then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." in inventory "..self:GetID().." from one slot to another - new slot wasn't given!\n"); return false end
-	local s=self:GetItemSlotByID(item:GetID());
-	if CLIENT then
-		if !oldslot then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." in inventory "..self:GetID().." from one slot to another - old slot wasn't given!\n"); return false end
-		if s!=oldslot then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." in inventory "..self:GetID().." from one slot to another - given item wasn't in old slot!\n"); return false end
+function _INV:MoveItem(item,oldslot,newslot,bPredict)
+	if !item || !item:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't move item in "..tostring(self).." from one slot to another - Item given was invalid!\n"); return false end
+	if !newslot then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." in "..tostring(self).." from one slot to another - new slot wasn't given!\n"); return false end
+	
+	if bPredict==nil then bPredict=CLIENT end
+	
+	local itemid=item:GetID();
+	
+	--Make sure that the given item is occupying a slot in this inventory (and that clientside this matches the old slot given)
+	local s=self:GetItemSlotByID(itemid);
+	if SERVER || bPredict then
+		if !s then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." from one slot to another - Wasn't in "..tostring(self).."!\n"); return false end
 	else
-		if !s then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." from one slot to another - Wasn't in inventory "..self:GetID().."!\n"); return false end
-		oldslot=s;
+		if !oldslot then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." in "..tostring(self).." from one slot to another - old slot wasn't given!\n"); return false end
+		if s!=oldslot then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." in "..tostring(self).." from one slot to another - given item wasn't in given old slot! Netsync error?\n"); return false end
 	end
 	
 	--Can't move to anything but an empty slot
 	if self:GetItemBySlot(newslot)!=nil then
-		if CLIENT then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." in inventory "..self:GetID().." from one slot to another - new slot has an item in it! Netsync error?\n") end
+		if CLIENT && !bPredict then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." in "..tostring(self).." from one slot to another - new slot has an item in it! Netsync error?\n") end
 		return false;
 	end
 	
-	--We'll run the OnMoveItem event (this can't stop it from being inserted clientside, but the inventory can do something when this happens I guess)
-	local s,r=pcall(self.OnMoveItem,self,item,oldslot,newslot);
-	if !s then ErrorNoHalt(r.."\n")
-	elseif SERVER && !r then return false end
+	--The CanMoveItem event gets to decide whether or not an item is allowed to move
+	if (SERVER || bPredict) && !self:Event("CanMoveItem",true,item,oldslot,newslot) then return false end
 	
-	--Clear old slot
-	self.Items[oldslot]=nil;
-	
-	--Register at new slot
-	self.Items[newslot]=item;
-	self.ItemsByID[item:GetID()]=newslot;
-	
-	--Refresh any UI displaying this inventory
-	if CLIENT then self:Update(); end
+	if !bPredict then
+		--Clear old slot
+		self.Items[oldslot]=nil;
+		
+		--Register at new slot
+		self.Items[newslot]=item;
+		self.ItemsByID[itemid]=newslot;
+		
+		self:Event("OnMoveItem",nil,item,oldslot,newslot);
+		
+		--Refresh any UI displaying this inventory
+		if CLIENT then self:Update(); end
+	end
 	
 	return true;
 end
@@ -1877,57 +1964,70 @@ end
 --[[
 Finds a free slot in this inventory, starting from the first slot.
 ]]--
+
 function _INV:GetFreeSlot()
+	--Finds the highest consecutive occupied index and returns the empty slot following it
+	local n=table.getn(self.Items);
 	local max=self:GetMaxSlots();
-	if max!=0 then
-		for i=1,max do
-			if self.Items[i]==nil then return i end
-		end
-		return nil;
-	else
-		local i=1;
-		while self.Items[i]!=nil do
-			i=i+1;
-		end
-		return i;
+	
+	--[[
+	for i=1,max do
+		if self.Items[i]==nil then return i end
 	end
+	return nil;
+
+	local i=1;
+	while self.Items[i]!=nil do
+		i=i+1;
+	end
+	return i;
+	]]--
+	
+	if max==0 || n!=max then
+		--Returns the empty slot following it
+		return n+1;
+	end
+	return nil;
 end
 
 --[[
 Takes an item out of the inventory. DO NOT CALL DIRECTLY - this is called automatically by other functions.
 This function triggers the OnRemoveItem event. The item can be prevented from being taken out serverside.
+
 itemid is the ID of an item. We use the ID because it's possible the item no longer exists, and is being cleaned up.
 If forced is true, the OnRemoveItem event cannot stop the removal (forced is usually set to true whenever the inventory's connected object is being removed, and items HAVE to be taken out)
+bPredict is an optional true/false that defaults to false on the server and true on the client. If bPredict is:
+	false, we are actually removing the item from this inventory.
+	true, instead we are predicting whether or not we can remove the item from the inventory.
+
+True is returned if the item was/can be removed successfully.
 False is returned if the item cannot be removed (either due to an event or it can't be found in the inventory)
 ]]--
-function _INV:RemoveItem(itemid,forced)
-	local forced=forced or false;
-	if !itemid then ErrorNoHalt("Itemforge Inventories: Cannot remove item from inventory "..self:GetID().."... itemid wasn't given!\n"); return false end
+function _INV:RemoveItem(itemid,forced,bPredict)
+	if !itemid then ErrorNoHalt("Itemforge Inventories: Cannot remove item from "..tostring(self).."... itemid wasn't given!\n"); return false end
+	if forced==nil then forced=false end
+	if bPredict==nil then bPredict=CLIENT end
 	
 	--[[
 	This part is kind of tricky. This function can be used to take out an item, or clear the record of an item in this inventory.
 	If it's the former, our OnRemoveItem event is called.
 	OnRemoveItem exists on both the client and server. It's called on both, but the event can only stop it on the server, given that it wasn't forced.
-	]]--
+	]]--	
+	local slot=self:GetItemSlotByID(itemid);
+	if slot==nil then ErrorNoHalt("Itemforge Inventories: Tried to remove item "..itemid.." from "..tostring(self)..", but it's not listed there.\n"); return false end
 	
 	local item=IF.Items:Get(itemid);
-	if item && item:IsValid() then
-		local s,r=pcall(self.OnRemoveItem,self,item,forced);
-		if !s then
-			ErrorNoHalt(r.."\n");
-		elseif SERVER && !r && !forced then
-			return false;
-		end
+	if !forced && (SERVER || bPredict) && item && item:IsValid() && !self:Event("CanRemoveItem",true,item,slot) then return false end
+	
+	if !bPredict then
+		self.Items[slot]=nil;
+		self.ItemsByID[itemid]=nil;
+		
+		self:Event("OnRemoveItem",nil,item,slot,forced)
+		
+		--Update the inventory to tell the UI to refresh
+		if CLIENT then self:Update(); end
 	end
-	
-	local slot=self:GetItemSlotByID(itemid);
-	if slot==nil then ErrorNoHalt("Itemforge Inventories: Tried to remove item "..itemid.." from inventory "..self:GetID()..", but it's not listed there.\n"); return false end
-	
-	self.Items[slot]=nil;
-	self.ItemsByID[itemid]=nil;
-	
-	--Update the inventory to tell the UI to refresh
-	if CLIENT then self:Update(); end
 	
 	return true;
 end

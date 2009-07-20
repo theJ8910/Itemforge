@@ -47,39 +47,18 @@ function ITEM:DrawBack(ent)
 	cam.PopModelMatrix();
 end
 
---Draw entity
-function ITEM:OnEntityDraw(eEntity,ENT,bTranslucent)
-	self["base_lock"].OnEntityDraw(self,eEntity,ENT,bTranslucent);
-	
-	--We only draw the back if the keypad isn't attached to something
-	if !self:GetAttachedEnt() then self:DrawBack(eEntity); end
-end
-
---Draw SWEP world model
-function ITEM:OnSWEPDraw(eEntity,SWEP,bTranslucent)
-	self["item"].OnSWEPDraw(self,eEntity,SWEP,bTranslucent);
-	
-	--TODO need to GetWorldModel() or something
-	if SWEP.WM!=nil then
-		self:DrawBack(SWEP.WM.ent);
-	end
-end
-
---Pose model in inventory. I want it posed a certain way (standing upright)
+--Pose model in item slot. I want it posed a certain way (standing upright)
 function ITEM:OnPose3D(eEntity,PANEL)
-	if !self.Rand then self.Rand=math.random()*100 end
-	local r=(RealTime()+self.Rand)*20;
-	
 	local min,max=eEntity:GetRenderBounds();
 	local center=max-((max-min)*.5);			--Center, used to position 
-	eEntity:SetAngles(Angle(0,r,0));
+	eEntity:SetAngles(Angle(0,(RealTime()+self:GetRand())*20,0));
 	eEntity:SetPos(Vector(0,0,0)-(eEntity:LocalToWorld(center)-eEntity:GetPos()));
 end
 
---Draw model in inventory
-function ITEM:OnDraw3D(eEntity,PANEL,bTranslucent)
-	self["item"].OnDraw3D(self,eEntity,PANEL,bTranslucent);
-	self:DrawBack(eEntity);
+--Called when a model associated with this item needs to be drawn
+function ITEM:OnDraw3D(eEntity,bTranslucent)
+	self["base_lock"].OnDraw3D(self,eEntity,bTranslucent);
+	if !self:GetAttachedEnt() then self:DrawBack(eEntity); end
 end
 
 --[[

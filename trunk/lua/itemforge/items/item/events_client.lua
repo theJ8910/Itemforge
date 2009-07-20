@@ -19,28 +19,14 @@ This function runs when the entity sets it's item to us clientside.
 NOTE: It is impossible for me to run this event when the entity is initialized clientside.
 	Serverside, a networked int with this Item's ID is set on the entity.
 	This function runs when the entity "acquires" this item's ID clientside and sets it's item to this item.
-	It may take a short period of time (maybe a few seconds) after the entity arrives clientside for the ID of the item it's supposed to use to arrive and be set.
+	It may take a short period of time (usually a fraction of a second) after the entity is created serverside and then arrives clientside for the item it is supposed to use to be set.
+	However, this is assuming the player can see this entity. Due to PVS optimization, the entity may not exist until the player sees it clientside.
 	When that occurs, this function will run; keep this in mind.
 ENT is the SENT table - it's "ENT".
 eEntity is the SENT that is created to hold the object. It's "ENT.Entity".
 ]]--
 function ITEM:OnEntityInit(ENT,eEntity)
 	return true;
-end
-
---[[
-This function runs when it comes time to draw the model of an item in the world.
-eEntity is the entity that needs to draw a model. This would be the itemforge_item entity. This is basically the same thing as self.Entity in an entity.
-ENT is ENT table. It's the same thing as eEntity:GetTable().
-if bTranslucent is true, then the entity called DrawWorldModelTranslucent instead of DrawWorldModel.
-	DrawTranslucent deals with transparent entities, so if bTranslucent is true, the entity is somewhat see-through.
-]]--
-function ITEM:OnEntityDraw(eEntity,ENT,bTranslucent)
-	local c=self:GetNWColor("Color");
-	render.SetColorModulation(c.r/255,c.g/255,c.b/255);
-	render.SetBlend(c.a/255);
-	
-	eEntity:DrawModel();
 end
 
 --[[
@@ -60,42 +46,32 @@ function ITEM:OnSWEPInit(SWEP,eWeapon)
 	--TODO use hooks
 	SWEP.Primary.Automatic=self.PrimaryAuto;
 	SWEP.Secondary.Automatic=self.SecondaryAuto;
-	
-	--Grab the item's name; if it can't be grabbed the SWEP's name is Itemforge Item by default
-	local s,r=pcall(self.GetName,self)
-	if !s then	ErrorNoHalt(r.."\n")
-	elseif type(r)=="string" then SWEP.PrintName=r
-	end
+	SWEP.PrintName=self:Event("GetName","Itemforge Item");
 	
 	return true;
 end
 
 --[[
-Whenever the item is being held as a weapon, it will appear in the weapons menu.
-The weapons menu will want to draw an icon for the weapon. The weapon icon will be drawn
-inside of a black box whose top-left corner is at x,y and who is "width" pixels wide and "height" pixels high.
-Alpha is how opaque the icon should be drawn (because the menu will fade out if it's left open for too long)
-]]--
-function ITEM:OnSWEPDrawMenu(x,y,width,height,alpha)
-	local s,r=pcall(self.GetIcon,self);
-	if !s then ErrorNoHalt(r.."\n") end
-	
-	local c=self:GetNWColor("Color");
-	surface.SetMaterial(r);
-	surface.SetDrawColor(c.r,c.g,c.b,alpha-(255-c.a));
-	surface.DrawTexturedRect(x+((width-64)*.5),y+((height-64)*.5)+(math.sin(CurTime()*5)*16),64,64);
-end
+This hook is called when this item needs it's weapon menu graphics drawn.
 
---[[
-This function runs when drawing the world model of a held item.
-eEntity is the weapon entity. This would be the itemforge_item_held entity. This is basically the same thing as self.Weapon in an SWEP.
-SWEP is SWEP table. It's the same thing as eEntity:GetTable().
-if bTranslucent is true, then the entity called DrawWorldModelTranslucent instead of DrawWorldModel.
-	DrawTranslucent deals with transparent entities, so if bTranslucent is true, the entity is somewhat see-through.
-TODO item color
+The weapon menu graphics are drawn inside of a black box.
+x and y describe where the top-left corner of the black box is.
+w and h describe how wide and tall (respectively) the black box is.
+a is a number between 0 and 255 that describes how opaque the weapon menu graphics should be.
+	This is 255 when the menu is open.
+	The weapons menu slowly fades out if it is left open for too long;
+	While this is happening, "a" will slowly change from 255 to 0.
 ]]--
-function ITEM:OnSWEPDraw(eEntity,SWEP,bTranslucent)
+function ITEM:OnSWEPDrawMenu(x,y,w,h,a)
+	local icon,s=self:Event("GetIcon");
+	if !s then return false end
 	
+	local c=self:GetColor();
+	surface.SetMaterial(icon);
+	surface.SetDrawColor(c.r,c.g,c.b,a-(255-c.a));
+	surface.DrawTexturedRect(x + (w-64)*.5,
+							 y + (h-64)*.5 + math.sin(CurTime()*5)*16
+							 ,64,64);
 end
 
 --This function is run when it comes time to draw a viewmodel. This will only happen while a player is holding an item
@@ -103,21 +79,47 @@ function ITEM:OnSWEPDrawViewmodel()
 end
 
 --[[
-This is run when a player is holding the item as an SWEP and presses the left mouse button (primary attack).
+This is run when a player is holding the item as a weapon and presses the left mouse button (primary attack).
 ]]--
 function ITEM:OnPrimaryAttack()
 end
 
 --[[
-This is run when a player is holding the item as an SWEP and presses the right mouse button (secondary attack).
+This is run when a player is holding the item as a weapon and presses the right mouse button (secondary attack).
 ]]--
 function ITEM:OnSecondaryAttack()
 end
 
 --[[
-This is run when a player is holding the item as an SWEP and presses the reload button (usually the "R" key).
+This is run when a player is holding the item as a weapon and presses the reload button (usually the "R" key).
 ]]--
 function ITEM:OnReload()
+end
+
+--[[
+This is run when a player is holding the item as a weapon and swaps from a different weapon to this weapon.
+]]--
+function ITEM:OnDeploy()
+	--DEBUG
+	Msg("Itemforge Items: Deploying "..tostring(self).."!\n");
+	
+	if self.WMAttach then self.WMAttach:Show(); end
+	if self.ItemSlot then self.ItemSlot:SetVisible(true); end
+	
+	return true;
+end
+
+--[[
+This is run when a player is holding the item as a weapon and swaps from this weapon to a different weapon.
+]]--
+function ITEM:OnHolster()
+	--DEBUG
+	Msg("Itemforge Items: Holstering "..tostring(self).."!\n");
+	
+	if self.WMAttach then self.WMAttach:Hide(); end
+	if self.ItemSlot then self.ItemSlot:SetVisible(false); end
+	
+	return true;
 end
 
 
@@ -163,10 +165,10 @@ These methods might be of some use:
 function ITEM:OnPopulateMenu(pMenu)
 	--Add basic "Use" and "Hold" options
 	pMenu:AddOption("Use",function(panel) self:Use(LocalPlayer()) end);
-	pMenu:AddOption("Hold",function(panel) self:Hold(LocalPlayer()) end);
+	if !self:IsHeld() then pMenu:AddOption("Hold",function(panel) self:PlayerHold(LocalPlayer()) end); end
 	
-	--Add "Split" option; as long as there are enough items to split (at least 2)
-	if self:GetMaxAmount()!=1 && self:GetAmount()>1 then
+	--Add "Split" option; as long as there are enough items to split (at least 2); also, the CanPlayerSplit event must indicate it's possible
+	if self:IsStack() && self:GetAmount()>1 && self:Event("CanPlayerSplit",true,LocalPlayer()) then
 		pMenu:AddOption("Split",function(panel) self:PlayerSplit(LocalPlayer()); end);
 	end
 end
@@ -176,6 +178,7 @@ While an inventory is opened, this item can be dragged somewhere on screen.
 If this item is drag-dropped to an empty slot in an inventory this function runs.
 ]]--
 function ITEM:OnDragDropToInventory(inv,invSlot)
+	if !self:Event("CanPlayerInteract",false,LocalPlayer()) then return false end
 	self:SendNWCommand("PlayerSendToInventory",inv,invSlot);
 end
 
@@ -196,8 +199,12 @@ A few examples of what this could be used for... You could:
 	Load a gun with ammo
 
 Return true if you want otherItem's OnDragDropToItem to run.
+TODO if client determines merge is impossible return false
 ]]--
 function ITEM:OnDragDropHere(otherItem)
+	--Don't even bother telling the server to merge if we know we can't interact with the two
+	if !self:Event("CanPlayerInteract",false,LocalPlayer()) || !otherItem:Event("CanPlayerInteract",false,pl) then return false end
+	
 	self:SendNWCommand("PlayerMerge",otherItem);
 	return true;
 end
@@ -209,6 +216,13 @@ traceRes is a full trace results table.
 ]]--
 function ITEM:OnDragDropToWorld(traceRes)
 	self:SendNWCommand("PlayerSendToWorld",traceRes.HitPos);
+end
+
+--[[
+This function is run periodically (when the client ticks).
+]]--
+function ITEM:OnTick()
+
 end
 
 --[[
@@ -240,33 +254,36 @@ eEntity is a ClientsideModel() belonging to the model panel using this item's wo
 PANEL is the DModelPanel on the slot displaying eEntity.
 ]]--
 function ITEM:OnPose3D(eEntity,PANEL)
-	if !self.Rand then self.Rand=math.random()*100 end
-	local r=(RealTime()+self.Rand)*20;
-	
 	local min,max=eEntity:GetRenderBounds();
 	local v=max-min;					--relative position, where min is at 0,0,0 and max is v
-	local m=math.min(v.x,v.y,v.z);		--mINOR axe, or the axe of the bounding box that's smallest, used to determine side with most surface area
 	local center=max-(v*.5);			--Center, used to position 
 	
 	--Orientation depends on which side of the bounding box has the most surface area
+	local m=math.min(v.x,v.y,v.z);		--mINOR axe, or the axe of the bounding box that's smallest, used to determine side with most surface area
 	if m==v.z then
-		eEntity:SetAngles(Angle(0,r,0));
+		eEntity:SetAngles(Angle(0,(RealTime()+self:GetRand())*20,0));
 	elseif m==v.y then
-		eEntity:SetAngles(Angle(0,r,90));
+		eEntity:SetAngles(Angle(0,(RealTime()+self:GetRand())*20,90));
 	elseif m==v.x then
-		eEntity:SetAngles(Angle(90,r,0));
+		eEntity:SetAngles(Angle(90,(RealTime()+self:GetRand())*20,0));
 	end
+	
 	eEntity:SetPos(     Vector(0,0,0)-(   eEntity:LocalToWorld(center)-eEntity:GetPos()   )        );
 end
 
 --[[
-This function is run when an item slot (most likely the ItemforgeItemSlot VGUI control) is displaying this item and needs to draw this item's model.
-eEntity is the ClientsideModel() belonging to the model panel using this item's world model.
-PANEL is the DModelPanel on the slot displaying eEntity.
-If bTranslucent is true, the entity is partially see-through (it has an alpha of less than 255).
+This function is called when a model associated with this item needs to be drawn. This usually happens in three cases:
+	The item is in the world and it's world entity needs to draw.
+	The item is being held as a weapon and it's world model attachment needs to draw
+	An item slot (most likely the ItemforgeItemSlot VGUI control) is displaying this item and needs to draw this item's model.
+eEntity is the entity that needs to draw.
+	If this item is in the world, eEntity will be an itemforge_item entity (a SENT).
+	If this item is held or is drawing in an item slot, eEntity will be a ClientsideModel().
+If bTranslucent is true, this means that the entity is in the Translucent rendergroup.
+	Or in other words, the entity is most likely partially see-through (has an alpha of less than 255).
 ]]--
-function ITEM:OnDraw3D(eEntity,PANEL,bTranslucent)
-	local c=self:GetNWColor("Color");
+function ITEM:OnDraw3D(eEntity,bTranslucent)
+	local c=self:GetColor();
 	render.SetColorModulation(c.r/255,c.g/255,c.b/255);
 	render.SetBlend(c.a/255);
 	
@@ -284,37 +301,22 @@ function ITEM:OnDraw2D(width,height)
 	--Here's the code to draw the item's icon in 2D
 	
 	--[[
-	local s,r=pcall(self.GetIcon,self);
-	if !s then ErrorNoHalt(r.."\n") end
-	local c=self:GetNWColor("Color");
-	surface.SetMaterial(r);
+	local icon,s=self:Event("GetIcon");
+	if !s then return false end
+	
+	local c=self:GetColor();
+	surface.SetMaterial(icon);
 	surface.SetDrawColor(c.r,c.g,c.b,c.a);
 	surface.DrawTexturedRect(0,0,width,height);
 	]]--
 	
 	--Stackable items have amount drawn
-	if self:GetMaxAmount()!=1 then
+	if self:IsStack() then
 		surface.SetFont("ItemforgeInventoryFontBold");
 		surface.SetTextColor(255,255,0,255);			--255,255,0 is bright yellow
 		surface.SetTextPos(2,height-16);
 		surface.DrawText(tostring(self:GetAmount()));
 	end
-end
-
---[[
-This function is called when the item leaves the world (when it's world entity is being removed clientside).
-ent is the item's world entity. It should be the same as self:GetEntity().
-Clientside, we don't have any real way to know if a removal was forced or not.
-Additionally, clientside returning true or false cannot stop the item from leaving the world.
-]]--
-function ITEM:OnWorldExit(ent)
-end
-
-function ITEM:OnRelease(pl,forced)
-	return true;
-end
-
-function ITEM:OnMove(OldInv,OldSlot,NewInv,NewSlot,forced)
 end
 
 --This function is run prior to an item being removed. It cannot cancel the item from being removed.

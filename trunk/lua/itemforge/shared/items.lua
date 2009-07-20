@@ -5,10 +5,23 @@ SHARED
 This module implements items. The purpose of this module is to load item types, keep track of created items and item types,
 handle inheritence between item types, handle networking of items between client and server, and much, much more.
 
+theJ89's BUG list
+BUG  Shotgun reload loop is failing when trying to reload from a stack of 1 items
+BUG  net_fakelag 500 produces noticable problems with weapons. *sigh*
+BUG  Players are complaining about missing weapon icons, investigate
+BUG  Weapons should have networked, predicted ammo counters instead of using :GetAmount() from the current ammo. This should fix the "dry fire on last shot clientside" bug with ranged weapons.
+BUG  sometimes the view model does not change; this has been noticed when picking up one item, dropping it, and picking up a separate item
+BUG  when a weapon is picked up clientside, the weapon will not automatically acquire the item clientside. This causes the weapon menu and pickup notify to report the weapon as "Itemforge Item" until it is swapped to for the first time. This happens when picking up an item while holding a "no-switch from" weapon such as the gravity gun.
+BUG  Item icons do not automatically appear in the upper-left hand corner
+BUG  SWEP pickup issues; waiting on garry for this
+BUG	 Odd bug noticed; may be related to entity owner, entity collision group, or damage. Sometimes while in the world an item loses its collision, player can walk through it, can't use it, etc.
+BUG  fix bug with SetNetOwner; is complaining about non-existent inventories table 
+BUG  the new reusable IDs may interfere with full-update checks - If an old item 5 (lets pretend it's a crowbar) exists clientside and a new item 5 (lets say it's a base_ranged) is created, then it needs to override. This may be troublesome.
+
 theJ89's Giant TODO list
 This is why the system hasn't been released yet:
 
-TODO code maintainence... make sure that multi-line comments are used for function descriptions, check arguments, do cleanup code (for items listed in an inventory for example), for collections check to see if something being inserted still exists, check events to make sure they are all being pcalled, consider putting "item"'s events into their own lua file.
+TODO code maintainence... make sure that multi-line comments are used for function descriptions, check arguments, do cleanup code (for items listed in an inventory for example), for collections check to see if something being inserted still exists, check events to make sure they are all being pcalled, consider putting base item's events into their own lua file.
 TODO remember to divide default files into sections: Methods, events, internal methods (things scripters won't be calling)
 TODO Have it so item types can be reloaded without needing a full map change/restart
 TODO redux of itemforge_item and itemforge_item_held, need to reduce complexity and homogenize
@@ -16,16 +29,12 @@ TODO consider renaming default item "item" to "base" or "base_item"
 TODO eliminate redundancy; ex: IF.Items:CreateItem becomes IF.Items:Create
 TODO pay attention to function return values; false should be returned for failures, true most of the other times
 TODO wire outputs are forgotten when the item is taken out of the world and put back in; make an item wrapper that remembers them, restore when entity enters world
-TODO change inventory functions from MoveSlot to SwapSlot
+TODO looping sounds should resume when possible
+TODO change inventory functions from MoveSlot to SwapSlot (functionality and name)
 TODO SetWorldModel and SetViewModel need to work clientside too
-TODO Inventory merge is causing splits to fail with "ToSameLocation" errors; ToSameLocation needs to Ignore Inventory Merge??
-TODO Shotgun reload loop is failing when trying to reload from a stack of 1 items
-TODO Unloading ammo into a container that already has that ammo causes SetMaxAmount errors in the gun; need better handling of removal actions
-TODO net_fakelag 500 produces noticable problems with weapons. *sigh*
-TODO Rock-It launcher reload sound isn't playing clientside, attack sound is always "fwoosh" sound (no dry fire)
-TODO Players are complaining about missing weapon icons, investigate
-TODO ranged weapons use ammo clientside, base_ammo should be given predictable amount
-TODO multiple items held by players
+TODO MaxHealth=0 means item is invincible
+TODO migrate .ReloadsSingly related things from the shotgun to the base_ranged
+TODO base_ranged needs to have "Load" renamed to "FillClip"; StartReload needs to be called OnReload - if the weapon .ReloadsSingly this starts the reload loop, otherwise this immediately fills the clip; items that use :Load() must be configured this way
 
 Item Ideas
 TODO awesome idea! Been thinking about implementing "inventory locking" that prevents any player interaction for a while now, but what if we used the lock items for this? Password locked briefcase? Hell yeah!
@@ -40,6 +49,7 @@ TODO OnNewWorldModel
 TODO OnNewViewModel
 TODO OnPopulateMenu is stupid, rename it to OnMakeMenu or OnRightClick
 TODO OnLeftClick/OnRightClick event for world entity & item icon??
+TODO If OnInit returns false, remove the item
 
 UI related
 TODO when item model changes it doesn't update on the "hold" icon.
@@ -53,27 +63,17 @@ Entity related
 TODO Spawning and Dragdropping to world often stick the items in the world... ideally we don't want this to happen
 TODO Need to have SetSkin function that takes appropriate action (NOTE: may have to engineer ItemSlot displaying item to check for changes in skin)
 TODO entities need to glow while the cursor is dragging something overhead (or perhaps have a hook on the item like OnDragDropHover/OnDragDropHoverWorld)
-TODO Odd bug noticed; may be related to entity owner, entity collision group, or damage. Sometimes while in the world an item loses its collision, player can walk through it, can't use it, etc.
-
-SWEP related
-TODO sometimes the view model does not change; this has been noticed when picking up one item, dropping it, and picking up a separate item
-TODO when a weapon is picked up clientside, the weapon will not automatically acquire the item clientside. This causes the weapon menu and pickup notify to report the weapon as "Itemforge Item" until it is swapped to for the first time. This happens when picking up an item while holding a "no-switch from" weapon such as the gravity gun.
-TODO Item icons do not automatically appear in the upper-left hand corner
-TODO SWEP pickup issues; waiting on garry for this
 
 Networking related
-TODO For NWVars, I need to have two flags: "HoldFromUpdate" which stops the NWVar from being sent in a full update, and "Predicted", which sends it on the next tick rather than ASAP.
 TODO okay let me set this straight once and for all: An update is when an item syncs everything related to that item with a client. A full update is an update of all items sent to a client. I need to rename these things as such.
 TODO check that when a full update is performed everything is intact...
 TODO Default network commands, consider putting in IFI instead?
-TODO rename "Owner" to "NetOwner" or something to that effect, I can see this being accidentally overridden; "Owner" isn't a good name for the concept anyway
-TODO fix bug with SetNetOwner; is complaining about non-existent inventories table
-TODO Ownership has been neglected; needs to be looked at in a serious manner
-TODO Merge and split's networking can be macro'ed to save bandwidth 
-TODO Additionally I could rewrite the ownership to allow items clientside to be public, private, group-owned or hidden (where group-owned is like private with multiple players, and hidden is on no clients [server only])
-TODO the new reusable IDs may interfere with full-update checks - If an old item 5 (lets pretend it's a crowbar) exists clientside and a new item 5 (lets say it's a base_ranged) is created, then it needs to override. This may be troublesome.
+TODO Merge and split's networking can be macro'ed to save bandwidth
 TODO Josh suggested doing something like Item-Types but with groups of items - creating macros and passing IDs: IFI_MSG_CREATEMACRO "macro_healthkit" 2 3 6 8 10 creates 5 items with IDs 2, 3, 6, 8, and 10
 TODO Josh also suggested prioritizing full updates of items, sending items in the order most important. Items held would be first, in world second, in inventories third, and in void fourth (or maybe not at all?).
+TODO rename "Owner" to "NetOwner" or something to that effect, I can see this being accidentally overridden; "Owner" isn't a good name for the concept anyway
+TODO Ownership has been neglected; needs to be looked at in a serious manner
+TODO Additionally I could rewrite the ownership to allow items clientside to be public, private, group-owned or hidden (where group-owned is like private with multiple players, and hidden is on no clients [server only])
 
 Item creation/removal related
 TODO Duplicator support
@@ -794,9 +794,7 @@ end
 
 --[[
 Creates an item of this type. This should only be called on the server by a scripter. Clientside, this is called to sync creation.
-id is only required clientside. This is the item id to create.
-fullUpd is only used on the client. This will be true only if creating the item is part of a full update.
-owner is an optional player given serverside. If this player is given, only this player will be told to create the item (usually the only reason this is given is because the item is being created in a private inventory)
+
 Once the item has been created, it will be floating around in the void (not in the world or in an inventory).
 You'll have to place it in the world, in a player's hands, an inventory, or simply leave it in the void.
 I personally suggest doing one of the first three, so you don't lose track of items in the void.
@@ -807,15 +805,23 @@ If you want a more convenient solution, try:
 	IF.Items:CreateInInventory(type,inventory);
 	IF.Items:CreateInInv(type,inventory);
 	IF.Items:CreateSameLocation(type,otherItem);
-	
-This function returns the new item if successful, or nil if unsuccessful for any reason.
+
+id is only required when creating items clientside. This is the item id to give the created item.
+fullUpd is only used on the client. This will be true only if creating the item is part of a full update.
+owner is an optional player given serverside.
+	If this player is given, only this player will be told to create the item (usually the only reason this is given is because the item is being created in a private inventory)
+bPredict is an optional true/false that defaults to false on the server and true on the client. If bPredict is:
+	false, then if successful we'll register and return a new item. nil will be returned if unsuccessful for any reason.
+	true, then if we determine the item can be created, a temporary item that can be used for further prediction tests will be returned. nil will be returned otherwise.
 ]]--
-function MODULE:Create(type,id,fullUpd,owner)
-	if type==nil then ErrorNoHalt("Itemforge Items: Could not create item. No type provided.\n"); return nil end
-	local type=string.lower(type);
+function MODULE:Create(type,id,fullUpd,owner,bPredict)
+	if type==nil then ErrorNoHalt("Itemforge Items: Could not create item. No type was provided.\n"); return nil end
+	type=string.lower(type);
+	
+	if bPredict==nil then bPredict=CLIENT end
 	
 	--[[
-	Make sure the type of item requested to be created is valid (loaded succesfully)
+	Make sure the itemtype we want is valid (has loaded succesfully)
 	If it's not, a few things could be causing this.
 	    Parsing errors serverside or clientside may be at work (meaning there's probably a typo in your script)
 	    If the item can be created serverside with no trouble, but can't be created clientside...
@@ -823,37 +829,35 @@ function MODULE:Create(type,id,fullUpd,owner)
 	        Check the server console. Apparantly, lua files are compiled before they are sent to the clients. If there are parsing errors dealing with clientside files, this may be to blame.
 	]]--
 	if ItemTypes[type]==nil then
-		if SERVER then
-			ErrorNoHalt("Itemforge Items: Could not create item, \""..type.."\" is not a valid item-type. Check for parsing errors in console or mis-spelled item-type.\n"); 
-		else
-			ErrorNoHalt("Itemforge Items: Could not create item, \""..type.."\" is not a valid item-type. Check for item scripts not being sent!\n");
+		if SERVER then	ErrorNoHalt("Itemforge Items: Could not create item, \""..type.."\" is not a valid item-type. Check for parsing errors in console or mis-spelled item-type.\n"); 
+		else			ErrorNoHalt("Itemforge Items: Could not create item, \""..type.."\" is not a valid item-type. Check for item scripts not being sent!\n");
 		end
 		return nil;
 	end
 	
-	--We need to give an ID to the newly created item - we'll either use an ID that is not in use at the moment, (usually influenced by the number of items created so far) or the ID sent from the server
-	local n=0;
-	if SERVER then
+	--[[
+	We need to find an ID for the soon-to-be created item.
+	We'll either use an ID that is not in use at the moment, which is usually influenced by the number of items created so far
+	or a requested ID likely sent from the server
+	]]--
+	local n;
+	if SERVER || (bPredict && !id) then
 		n=NextItem;
-		if n>self.MaxItems then n=1 end
-		
 		if Items[n]!=nil then
 			n=self:FindEmptySlot(n+1);
 			
-			if n==nil then
-				ErrorNoHalt("Itemforge Items: Couldn't create item - no free slots (all "..self.MaxItems.." slots occupied)!\n");
-				return nil;
-			end
+			if n==nil then ErrorNoHalt("Itemforge Items: Couldn't create item - no free slots (all "..self.MaxItems.." slots occupied)!\n"); return nil; end
 		end
 		
 		NextItem=n+1;
+		if NextItem>self.MaxItems then NextItem=1 end
 	else
 		if id==nil then ErrorNoHalt("Itemforge Items: Could not create \""..type.."\" clientside, the ID of the item to be created wasn't given!\n"); return nil end
 		n=id;
 	end
 	
 	--When an item is updated, Create is called before updating it. That way if the item doesn't exist it's created in time for the update.
-	if CLIENT && fullUpd==true && self.FullUpInProgress==true then
+	if CLIENT && fullUpd==true && self.FullUpInProgress==true && !bPredict then
 		self.FullUpCount=self.FullUpCount+1;
 		self.FullUpItemsUpdated[n]=true;
 	end
@@ -862,39 +866,147 @@ function MODULE:Create(type,id,fullUpd,owner)
 	--TODO possible bug here; what if a dead item clientside blocks new items with the same ID from being created?
 	if Items[n] then
 		--We only need to bitch about this on the server. Full updates of an item clientside will tell the item to be created regardless of whether it exists or not. If it exists clientside we'll just ignore it.
-		if SERVER then
+		if SERVER && !bPredict then
 			ErrorNoHalt("Itemforge Items: Could not create \""..type.."\", with id "..n..". An item with this ID already exists!\n");
 		end
+		
 		return nil;
 	end
+	
+	if bPredict then n=0 end
 	
 	local newitem={};					--Create a new item
 	newitem.Class=ItemTypes[type];		--Set the item type to the type provided
 	newitem.ID=n;						--Set item ID (the item ID is stored in both the reference and the item itself)
 	setmetatable(newitem,imt);			--Setting the meta table makes the item able to use everything the item-type has. It searches the item-type for functions and default values.
 	
-	--Register the item in array
-	Items[n]=newitem;
+	local newref={};					--Create a new item reference
+	BindReference(newref,newitem,n);	--We tell the new reference to refer to the new item and store the ID it uses
 	
-	
-	
-	--Create an item reference and register it
-	local newref={};
-	BindReference(newref,newitem,n);
-	
-	ItemRefs[n]=newref;
-	
-	--Register in "items by type" array
-	ItemsByType[type][n]=newref;
-	
-	--We'll tell the clients to create and initialize the item as well
-	if SERVER then self:CreateClientside(newref,owner); end
-	
-	--Items will be initialized right after being created
-	newref:Initialize(owner);
+	if !bPredict then
+		Items[n]=newitem;					--Register the item in array
+		ItemRefs[n]=newref;
+		ItemsByType[type][n]=newref;		--Register in "items by type" array
+		
+		--We'll tell the clients to create and initialize the item as well
+		if SERVER then self:CreateClientside(newref,owner); end
+		
+		--Items will be initialized right after being created
+		--TODO predicted items need to initialize too but not do any networking shit
+		newref:Initialize(owner);
+	end
 	
 	--Return a reference to the newly created item
 	return newref;
+end
+
+--[[
+Creates an item and then places it in the given inventory
+If the creation succeeds, the item created is returned. Otherwise, nil is returned.
+]]--
+function MODULE:CreateInInventory(type,inv,bPredict)
+	if type==nil then ErrorNoHalt("Itemforge Items: Tried to create item in inventory, but type of item to create was not given!\n"); return nil end
+	if !inv or !inv:IsValid() then ErrorNoHalt("Itemforge Items: Tried to create item in inventory, but given inventory was not valid!\n"); return nil end
+	
+	if bPredict==nil then bPredict=CLIENT end
+	
+	--Get the owner of the inventory. The item will be networked to this player only.
+	local owner=inv:GetOwner();
+	
+	local item=self:Create(type,nil,false,owner,bPredict);
+	if !item then return nil end
+	
+	--TODO PREDICT
+	if !bPredict && !item:ToInventory(inv,nil,owner) then
+		item:Remove(true);
+		return nil;
+	end
+	
+	return item;
+end
+MODULE.CreateInInv=MODULE.CreateInInventory;
+
+--[[
+Creates an item and then places it in the world at the given position and angles.
+type is the type of item you want to create.
+vWhere is an optional position you want to create the item at in the world. This defaults to Vector(0,0,0).
+aAngles is an optional Angle() you want to rotate the item to. This defaults to Angle(0,0,0).
+bPredict is an
+
+If the creation succeeds, the item created is returned. Otherwise, nil is returned.
+]]--
+function MODULE:CreateInWorld(type,vWhere,aAngles,bPredict)
+	if type==nil then ErrorNoHalt("Itemforge Items: Tried to create item in world but type of item to create was not given!\n"); return nil end
+	
+	vWhere=vWhere or Vector(0,0,0);
+	if bPredict==nil then bPredict=CLIENT end
+	
+	--Create the item.
+	local item=self:Create(type,nil,nil,nil,bPredict);
+	if !item then return nil end
+	
+	--TODO PREDICT
+	if !bPredict && !item:ToWorld(vWhere,aAngles) then
+		item:Remove(true);
+		return nil;
+	end
+	
+	return item;
+end
+
+--[[
+Creates an item and then places it in the hands of a player as a weapon.
+If the creation succeeds, the item created is returned. Otherwise, nil is returned.
+]]--
+function MODULE:CreateHeld(type,pPlayer,bPredict)
+	if type==nil then ErrorNoHalt("Itemforge Items: Tried to create item as weapon but type of item was not given!\n"); return nil end
+	if pPlayer==nil then ErrorNoHalt("Itemforge Items: Tried to create item as weapon but player to give the item to wasn't given!\n"); return nil end
+	
+	if bPredict==nil then bPredict=CLIENT end
+	
+	local item=self:Create(type,nil,nil,nil,bPredict);
+	if !item then return nil end
+	
+	--TODO PREDICT
+	if !bPredict && !item:Hold(pPlayer) then
+		item:Remove(true);
+		return nil;
+	end
+	
+	return item;
+end
+
+--[[
+Creates an item and places it in the same location as an existing item.
+This function is probably best for things that are breaking apart (such as a pickaxe breaking into a pickaxe head and a stick)
+extItem is an existing item. The new item will be created in the same location as it.
+
+The new item will be created in...
+	the same container that this item is in, if 'extItem' is in a container.
+	nearby this item, if 'extItem' in the world.
+	where the player is looking, if 'extItem' is held by a player (because a player can only hold one item at a time).
+	
+The newly created item will be returned if all goes well, or nil will be returned in case of errors.
+TODO this sucks, fix it
+]]--
+function MODULE:CreateSameLocation(type,extItem,bPredict)
+	if type==nil then ErrorNoHalt("Itemforge Items: Tried to create item in same location as other item, but type of item to create was not given!\n"); return nil end
+	if !extItem or !extItem:IsValid() then ErrorNoHalt("Itemforge Items: Tried to create \""..type.."\" in same location as other item, but other item wasn't given!\n"); return nil end
+	
+	if bPredict==nil then bPredict=CLIENT end
+	
+	local item=self:Create(type,nil,nil,nil,bPredict);
+	if !item then return nil end
+	
+	--TODO predict
+	if !bPredict && !item:ToSameLocationAs(extItem,nil,true) then
+		--DEBUG
+		Msg("Couldn't create in same location, removing.\n");
+		item:Remove();
+		return nil;
+	end
+	
+	return item;
 end
 
 --[[
@@ -909,10 +1021,9 @@ function MODULE:Remove(item)
 		item.BeingRemoved=true;
 	end
 	
-	local s,r=pcall(item.OnRemove,item);
-	if !s then ErrorNoHalt(r.."\n") end
+	item:Event("OnRemove");
 	
-	--Stop thinking if we're thinking, stop all looping sounds and timers
+	--Stop thinking if we're thinking, stop all looping sounds and active timers
 	item:StopThink();
 	item:StopAllLoopingSounds();
 	item:RemoveAllTimers();
@@ -935,10 +1046,9 @@ function MODULE:Remove(item)
 	
 	--Remove entity, swep, or remove from inventory.
 	if SERVER then
-		item:ToVoid(true,true);
+		item:ToVoid(true,nil,true);
 	else
-		local inv=item:GetContainer();
-		item:ToVoid(true,inv);
+		item:ToVoid(true,nil,nil,false);
 	end
 	
 	local type=item:GetType();
@@ -946,7 +1056,7 @@ function MODULE:Remove(item)
 	
 	--Tell clients to remove too
 	if SERVER then
-		self:RemoveClientside(id,nil);
+		self:RemoveClientside(id);
 	end
 	
 	--Clear item from collection, invalidate item reference (disconnect it from the actual item), remove reference from collection, remove from ItemsByType collection
@@ -1129,7 +1239,7 @@ end
 --[[
 Asks the client to remove an item clientside.
 itemid is the ID of an item that needs to be removed. We use itemid here instead of item because the item has probably already been removed serverside, and we would need to run :GetID() on a non-existent item in that case
-If pl isn't nil, this function will only tell that player to remove the item. Otherwise, all players are instructed to remove this item clientside.
+If pl is given/isn't nil, this function will only tell that player to remove the item. Otherwise, all players are instructed to remove this item clientside.
 ]]--
 function MODULE:RemoveClientside(itemid,pl)
 	if itemid==nil then ErrorNoHalt("Itemforge Items: Couldn't RemoveClientside - No itemid was given!\n"); return false end
@@ -1152,8 +1262,10 @@ function MODULE:RemoveClientside(itemid,pl)
 	return true;
 end
 
---Remove an item clientside on all players except for the given player.
+--[[
+Remove an item clientside on all players except for the given player.
 --TODO rename to RemoveClientsideToAllBut
+]]--
 function MODULE:RemoveClientsideOnAllBut(itemid,pl)
 	if itemid==nil then ErrorNoHalt("Itemforge Items: Couldn't RemoveClientsideOnAllBut - No itemid was given!\n"); return false end
 	
@@ -1168,98 +1280,6 @@ function MODULE:RemoveClientsideOnAllBut(itemid,pl)
 	end
 	
 	return true;
-end
-
---[[
-Creates an item and then places it in the given inventory
-If the creation succeeds, the item created is returned. Otherwise, nil is returned.
-]]--
-function MODULE:CreateInInventory(type,inv)
-	if type==nil then ErrorNoHalt("Itemforge Items: Tried to create item in inventory, but type of item to create was not given!\n"); return nil end
-	if !inv or !inv:IsValid() then ErrorNoHalt("Itemforge Items: Tried to create item in inventory, but given inventory was not valid!\n"); return nil end
-	
-	//Get the owner of the inventory. The item will be networked to this player only.
-	local owner=inv:GetOwner();
-	
-	local item=self:Create(type,nil,false,owner);
-	if !item || !item:IsValid() then return nil end
-	
-	if !item:ToInventory(inv,nil,owner) then
-		item:Remove(true);
-	end
-	
-	return item;
-end
-MODULE.CreateInInv=MODULE.CreateInInventory;
-
---[[
-Creates an item and then places it in the world at the given position and angles.
-If the creation succeeds, the item created is returned. Otherwise, nil is returned.
-]]--
-function MODULE:CreateInWorld(type,vWhere,aAngles)
-	if type==nil then ErrorNoHalt("Itemforge Items: Tried to create item in world but type of item to create was not given!\n"); return nil end
-	
-	local vWhere=vWhere or Vector(0,0,0);
-	
-	--Create the item. We opt to manually tell the clients to create the item, just in case there's a problem sending the item to the world once it's created.
-	local item=self:Create(type,nil);
-	if !item || !item:IsValid() then return nil end
-	if !item:ToWorld(vWhere,aAngles) then
-		item:Remove(true);
-		return nil;
-	end
-	
-	return item;
-end
-
---[[
-Creates an item and then places it in the hands of a player as a weapon.
-If the creation succeeds, the item created is returned. Otherwise, nil is returned.
-]]--
-function MODULE:CreateHeld(type,pPlayer)
-	if type==nil then ErrorNoHalt("Itemforge Items: Tried to create item as weapon but type of item was not given!\n"); return nil end
-	if pPlayer==nil then ErrorNoHalt("Itemforge Items: Tried to create item as weapon but player to give the item to wasn't given!\n"); return nil end
-	
-	--Create the item. We opt to manually tell the clients to create the item, just in case there's a problem holding the item once it's created.
-	local item=self:Create(type,nil);
-	if !item || !item:IsValid() then return nil end
-	if !item:Hold(pPlayer) then
-		item:Remove(true);
-		return nil;
-	end
-	
-	return item;
-end
-
---[[
-Creates an item and places it in the same location as an existing item.
-This function is probably best for things that are breaking apart (such as a pickaxe breaking into a pickaxe head and a stick)
-extItem is an existing item. The new item will be created in the same location as it.
-
-The new item will be created in...
-	the same container that this item is in, if 'extItem' is in a container.
-	nearby this item, if 'extItem' in the world.
-	where the player is looking, if 'extItem' is held by a player (because a player can only hold one item at a time).
-	
-The newly created item will be returned if all goes well, or nil will be returned in case of errors.
-TODO this sucks, fix it
-]]--
-function MODULE:CreateSameLocation(type,extItem)
-	if type==nil then ErrorNoHalt("Itemforge Items: Tried to create item in same location as other item, but type of item to create was not given!\n"); return nil end
-	if !extItem or !extItem:IsValid() then ErrorNoHalt("Itemforge Items: Tried to create \""..type.."\" in same location as other item, but other item wasn't given!\n"); return nil end
-	
-	--Create the item. We opt to manually tell the clients to create the item, just in case there's a problem placing the item where it needs to be once it's created.
-	local item=self:Create(type,nil);
-	if !item || !item:IsValid() then return nil end
-	
-	if !item:ToSameLocationAs(extItem,nil,true) then
-		--DEBUG
-		Msg("Couldn't create in same location, removing.\n");
-		item:Remove();
-		return nil;
-	end
-	
-	return item;
 end
 
 --[[
@@ -1530,6 +1550,9 @@ concommand.Add("ifi",function(pl,command,args) return IF.Items:HandleIFIMessages
 --Client only
 else
 
+
+
+
 --Called when a full update has started - We're expecting a certain number of items from the server
 function MODULE:OnStartFullUpdateAll(count)
 	self.FullUpInProgress=true;
@@ -1570,23 +1593,25 @@ function MODULE:HandleIFIMessages(msg)
 		local fullUpRelated=msg:ReadBool();
 		
 		--Create the item clientside too. Use the ID provided by the server.
-		self:Create(type,id,fullUpRelated);
+		self:Create(type,id,fullUpRelated,nil,false);
 	elseif msgType==IFI_MSG_REMOVE then
 		local item=self:Get(id);
-		if !item || !item:IsValid() then return false end
+		if !item then return false end
 		
 		--Remove the item clientside since it has been removed serverside.
 		self:Remove(item);
 	elseif msgType==IFI_MSG_CREATETYPE then
 		local type=msg:ReadString();
 		for i=1,id do
-			self:Create(type,msg:ReadShort()+32768,true);
+			self:Create(type,msg:ReadShort()+32768,true,nil,false);
 		end
 	elseif msgType==IFI_MSG_CREATEININV then
 		--TODO Macro
 		--self:
 	elseif msgType==IFI_MSG_MERGE then
+		--TODO Macro
 		local item=self:Get(id);
+		if !item then return false end
 		
 		local newAmt=msg:ReadLong();
 		local otherItem=msg:ReadShort()+32768;
@@ -1594,17 +1619,19 @@ function MODULE:HandleIFIMessages(msg)
 		item:SetAmount(newAmt);
 		self:Remove(otherItem);
 	elseif msgType==IFI_MSG_PARTIALMERGE then
+		--TODO Macro
 	elseif msgType==IFI_MSG_SPLIT then
+		--TODO Macro
 	elseif msgType==IFI_MSG_SV2CLCOMMAND then
 		local item=self:Get(id);
-		if !item || !item:IsValid() then ErrorNoHalt("Itemforge Items: Tried to run a networked command on non-existent item with ID "..id..".\n"); return false; end
+		if !item then return false end
 		
 		item:ReceiveNWCommand(msg);
 	elseif msgType>=IFI_MSG_SETANGLE && msgType<=IFI_MSG_SETNIL then
 		local item=self:Get(id);
 		local VarID=msg:ReadChar()+128;
 		
-		if !item || !item:IsValid() then ErrorNoHalt("Itemforge Items: Tried to set a networked var by ID "..VarID.." on non-existent item with ID "..id..".\n"); return false end
+		if !item then return false end
 		
 		if item.NWVarsByID[VarID]==nil then ErrorNoHalt("Itemforge Items: Couldn't find a networked var by ID "..VarID.." on "..tostring(item).."\n"); return false end
 		local sName=item.NWVarsByID[VarID].Name;
@@ -1653,14 +1680,14 @@ function MODULE:HandleIFIMessages(msg)
 			local vVal=msg:ReadShort()+32768;
 			iItem=IF.Items:Get(vVal);
 			
-			if !iItem || !iItem:IsValid() then ErrorNoHalt("Itemforge Items: Tried to set a networked item (var ID "..VarID..") on "..tostring(item).." to non-existent item with ID "..vVal..".\n"); return false end
+			if !iItem then ErrorNoHalt("Itemforge Items: Tried to set a networked item (var ID "..VarID..") on "..tostring(item).." to non-existent item with ID "..vVal..".\n"); return false end
 			
 			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETINV then
 			local vVal=msg:ReadShort()+32768;
 			iInv=IF.Inv:Get(vVal);
 			
-			if !iInv || !iInv:IsValid() then ErrorNoHalt("Itemforge Items: Tried to set a networked inventory (var ID "..VarID..") on "..tostring(item).." to non-existent inventory with ID "..vVal..".\n"); return false end
+			if !iInv then ErrorNoHalt("Itemforge Items: Tried to set a networked inventory (var ID "..VarID..") on "..tostring(item).." to non-existent inventory with ID "..vVal..".\n"); return false end
 			
 			item:ReceiveNWVar(sName,vVal);
 		elseif msgType==IFI_MSG_SETUCHAR then

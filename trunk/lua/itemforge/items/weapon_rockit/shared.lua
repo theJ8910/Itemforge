@@ -81,7 +81,8 @@ When this function is called we load items into the gun's inventory instead of t
 function ITEM:Load(item,clip,amt)
 	if !self:CanReload() then return false end
 	
-	if !item || !item:IsValid() then return false end
+	--TODO when clientside prediction comes the item==self check won't be necessary since the inv will deny it
+	if !item || !item:IsValid() || item==self then return false end
 	
 	--Can't load items into a non-existent inventory
 	local inv=self:GetInventory();
@@ -144,7 +145,7 @@ function ITEM:Chuck(speed)
 		local phys=ent:GetPhysicsObject();
 		if phys && phys:IsValid() then
 			phys:SetVelocity(fwd*speed);
-			phys:AddAngleVelocity(Angle(math.Rand(-100,100),math.Rand(-100,100),math.Rand(-100,100)));
+			phys:AddAngleVelocity(Angle(math.Rand(-200,200),math.Rand(-200,200),math.Rand(-200,200)));
 		end
 		ent:SetPhysicsAttacker(pOwner);
 		

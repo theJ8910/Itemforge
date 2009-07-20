@@ -90,6 +90,14 @@ function ITEM:OnWireInput(entity,inputName,value)
 	end
 end
 
+function ITEM:PlayerSetStrength(pl,to)
+	if !self:Event("CanPlayerInteract",false,pl) then return false end
+	self.Strength=math.Clamp(to,0,1000);
+end
+
+
+IF.Items:CreateNWCommand(ITEM,"PlayerSetStrength",function(self,...) self:PlayerSetStrength(...) end,{"int"});
+
 
 
 
@@ -114,12 +122,6 @@ function ITEM:DrawGlow(ent)
 	end
 end
 
---Draw entity
-function ITEM:OnEntityDraw(eEntity,ENT,bTranslucent)
-	self["item"].OnEntityDraw(self,eEntity,ENT,bTranslucent);
-	self:DrawGlow(eEntity);
-end
-
 --Draw SWEP world model
 function ITEM:OnSWEPDraw(eEntity,SWEP,bTranslucent)
 	self["item"].OnSWEPDraw(self,eEntity,SWEP,bTranslucent);
@@ -130,11 +132,29 @@ function ITEM:OnSWEPDraw(eEntity,SWEP,bTranslucent)
 	end
 end
 
---Draw model in inventory
-function ITEM:OnDraw3D(eEntity,PANEL,bTranslucent)
-	self["item"].OnDraw3D(self,eEntity,PANEL,bTranslucent);
+--Called when a model associated with this item needs to be drawn
+function ITEM:OnDraw3D(eEntity,bTranslucent)
+	self["item"].OnDraw3D(self,eEntity,bTranslucent);
 	self:DrawGlow(eEntity);
 end
+
+function ITEM:OnPopulateMenu(pMenu)
+	local Slider = vgui.Create("DSlider");
+		Slider:SetTrapInside(true);
+		Slider:SetImage("vgui/slider");
+		Slider:SetLockY(0.5);
+		Slider:SetSize(100,13);
+		Slider:SetSlideX(self.Strength*.001);
+		Derma_Hook(Slider,"Paint","Paint","NumSlider");
+		Slider.TranslateValues=function(p,x,y)
+			self:SendNWCommand("PlayerSetStrength",x*1000);
+			return x,y;
+		end
+	pMenu:AddPanel(Slider);
+	self["item"].OnPopulateMenu(self,pMenu);
+end
+
+IF.Items:CreateNWCommand(ITEM,"PlayerSetStrength",nil,{"int"});
 
 
 
@@ -142,3 +162,4 @@ end
 end
 
 IF.Items:CreateNWVar(ITEM,"On","bool",false);
+

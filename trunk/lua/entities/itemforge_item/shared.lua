@@ -27,52 +27,28 @@ function ENT:Initialize()
 end
 
 function ENT:SetItem(item)
-	if self:IsBeingRemoved() then return false end	--It may try to call this function while the item is being removed
-	if !item || !item:IsValid() then ErrorNoHalt("Itemforge Item Entity (Ent ID "..self.Entity:EntIndex().."): Tried to set item, but the item doesn't exist!\n"); return false end
+	if self:IsBeingRemoved() || !item then return false end
 	
-	local itemid=item:GetID();
 	self.Item=item;
-	
-	item:SetEntity(self.Entity);
-	self:SetNWInt("i",itemid);
-	
-	local s,r=pcall(item.OnEntityInit,item,self.Entity);
-	if !s then ErrorNoHalt(r.."\n") end;
+	item:Event("OnEntityInit",nil,self.Entity);
 	
 	self:GiveWire();	--WIRE
 	
 	if SERVER then
 		--WIRE
 		if self.IsWire then
-			--Set Debug Name
-			local s,r=pcall(item.GetWireDebugName,item);
-			if !s then
-				ErrorNoHalt(r.."\n");
-				self.WireDebugName="Itemforge Item";
-			else
-				self.WireDebugName=r;
-			end
-			
-			--Declare inputs
-			local s,r=pcall(item.GetWireInputs,item,self.Entity);
-			if !s then
-				ErrorNoHalt(r.."\n");
-				self.Inputs=nil;
-			else
-				self.Inputs=r;
-			end
-			
-			--Declare outputs
-			local s,r=pcall(item.GetWireOutputs,item,self.Entity);
-			if !s then
-				ErrorNoHalt(r.."\n");
-				self.Outputs=nil;
-			else
-				self.Outputs=r;
-			end
+			--Set Debug Name, declare inputs and outputs
+			self.WireDebugName=item:Event("GetWireDebugName","Itemforge Item");
+			self.Inputs=item:Event("GetWireInputs",nil,self.Entity);
+			self.Outputs=item:Event("GetWireOutputs",nil,self.Entity);	
 		end
 		
+		--Tell clients what item we use
+		self:SetNWInt("i",item:GetID());
+		
 		self:Spawn();
+	else
+		item:ToWorld(self.Entity:GetPos(),self.Entity:GetAngles(),self.Entity,false);
 	end
 end
 
@@ -81,7 +57,11 @@ Returns the item that is piloting this entity.
 If the item has been removed, then nil is returned and self.Item is set to nil.
 ]]--
 function ENT:GetItem()
-	if self.Item && !self.Item:IsValid() then
+	if !self.Item then
+		if CLIENT && !self:SetItem(IF.Items:Get(self.Entity:GetNWInt("i"))) then 
+			return nil;
+		end
+	elseif !self.Item:IsValid() then
 		self.Item=nil;
 	end
 	return self.Item;

@@ -32,10 +32,12 @@ function ITEM:OnInit()
 	 
 	inv:ConnectItem(self);
 	self.Inventory=inv;
+	
+	return true;
 end
 
 --Containers can't be held like weapons.
-function ITEM:OnHold(pl)
+function ITEM:CanHold(pl)
 	return false;
 end
 
