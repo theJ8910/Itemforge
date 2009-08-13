@@ -1594,6 +1594,7 @@ slot is the slot in the inventory that the item will be placed in.
 Return false to stop the item from being inserted, or true to allow it to be inserted.
 ]]--
 function _INV:CanInsertItem(item,slot)
+	return true;
 end
 
 --[[

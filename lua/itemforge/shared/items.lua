@@ -1181,6 +1181,11 @@ function MODULE:GetType(sName)
 end
 
 --TEMPORARY/DEBUG
+function MODULE:GetRaw(id)
+	return Items[id];
+end
+
+--TEMPORARY/DEBUG
 function MODULE:DumpItems()
 	dumpTable(Items);
 end
