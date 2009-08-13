@@ -29,7 +29,7 @@ function ITEM:TransInventory(old,new,newSlot)
 	if newSlot==nil then ErrorNoHalt("Itemforge Items: Could not transfer "..tostring(self).." from inventory "..old:GetID().." to inventory "..newInv:GetID().." clientside! newSlot was not given!\n"); return false end
 	
 	if old!=new && !self:ToVoid(false,old,nil,false) then end
-	if !self:ToInventory(new,newSlot) then return false end
+	if !self:ToInventory(new,newSlot,nil,nil,false) then return false end
 end
 IF.Items:ProtectKey("TransInventory");
 
@@ -40,7 +40,7 @@ True is returned if the move was successful. False is returned otherwise.
 ]]--
 function ITEM:TransSlot(inv,oldslot,newslot)
 	if !inv || !inv:IsValid() then ErrorNoHalt("Itemforge Items: Could not transfer "..tostring(self).." from one slot to another clientside, inventory given is not valid.\n"); return false end
-	if !inv:MoveItem(self,oldslot,newslot) then return false end
+	if !inv:MoveItem(self,oldslot,newslot,false) then return false end
 end
 IF.Items:ProtectKey("TransSlot");
 
@@ -396,10 +396,10 @@ IF.Items:ProtectKey("ReceiveNWCommand");
 
 
 --Place networked commands here in the same order as in init.lua.
-IF.Items:CreateNWCommand(ITEM,"ToInventory",ITEM.ToInventory,{"inventory","short"});
+IF.Items:CreateNWCommand(ITEM,"ToInventory",function(self,inv,slot) self:ToInventory(inv,slot,nil,nil,false) end,{"inventory","short"});
 IF.Items:CreateNWCommand(ITEM,"RemoveFromInventory",function(self,forced,inv) self:ToVoid(forced,inv,nil,false) end,{"bool","inventory"});
-IF.Items:CreateNWCommand(ITEM,"TransferInventory",ITEM.TransInventory,{"inventory","inventory","short"});
-IF.Items:CreateNWCommand(ITEM,"TransferSlot",ITEM.TransSlot,{"inventory","short","short"});
+IF.Items:CreateNWCommand(ITEM,"TransferInventory",function(self,oldinv,newinv,newslot) self:TransInventory(oldinv,newinv,newslot) end,{"inventory","inventory","short"});
+IF.Items:CreateNWCommand(ITEM,"TransferSlot",function(self,oldinv,oldslot,newslot) self:TransSlot(oldinv,oldslot,newslot) end,{"inventory","short","short"});
 IF.Items:CreateNWCommand(ITEM,"PlayerUse");
 IF.Items:CreateNWCommand(ITEM,"PlayerHold");
 IF.Items:CreateNWCommand(ITEM,"PlayerSendToInventory",nil,{"inventory","short"});
