@@ -23,6 +23,29 @@ ITEM.AdminSpawnable=false;
 --Base Container
 ITEM.Inventory=nil;
 
+--[[
+If this function is used clientside, this creates an inventory window for the player.
+If this function is used serverside, this tells the given player's client to show him the inventory.
+]]--
+function ITEM:ShowInventory(pl)
+	if SERVER then
+		self:SendNWCommand("ShowInventory",pl);
+	else
+		--If this item doesn't know what it's inventory is clientside, we return false
+		if self.Inventory==nil then return false end
+		
+		--If this item is already showing us it's inventory then don't show another one
+		if self.InventoryPanel && self.InventoryPanel:IsValid() then return false end
+		
+		--Create an inventory panel...
+		self.InventoryPanel=vgui.Create("ItemforgeInventory");
+		
+		--And then display our inventory on it
+		self.InventoryPanel:SetInventory(self.Inventory);
+	end
+	return true;
+end
+
 if SERVER then
 
 --Whenever this item is created we need to make an inventory for it and connect it.
@@ -49,9 +72,10 @@ end
 
 --Show the container's inventory to whoever used it
 function ITEM:OnUse(pl)
-	self:SendNWCommand("ShowInventory",pl);
-	return true;
+	return self:ShowInventory(pl);
 end
+
+IF.Items:CreateNWCommand(ITEM,"ShowInventory");
 
 
 
@@ -65,21 +89,6 @@ else
 function ITEM:OnUse(pl)
 	self:ShowInventory();
 	return false;
-end
-
---When the item is used serverside, this function is called clientside
-function ITEM:ShowInventory()
-	--If this item doesn't know what it's inventory is clientside, we return false
-	if self.Inventory==nil then return false end
-	
-	--If this item is already showing us it's inventory then don't show another one
-	if self.InventoryPanel && self.InventoryPanel:IsValid() then return false end
-	
-	--Create an inventory panel...
-	self.InventoryPanel=vgui.Create("ItemforgeInventory");
-	
-	--And then display our inventory on it
-	self.InventoryPanel:SetInventory(self.Inventory);
 end
 
 function ITEM:HideInventory()
@@ -104,9 +113,9 @@ function ITEM:OnSeverInventory(inv)
 	return false;
 end
 
+IF.Items:CreateNWCommand(ITEM,"ShowInventory",function(self,...) self:ShowInventory(...) end);
+
 
 
 
 end
-
-IF.Items:CreateNWCommand(ITEM,"ShowInventory",ITEM.ShowInventory);
