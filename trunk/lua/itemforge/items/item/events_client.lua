@@ -188,6 +188,7 @@ If this item is drag-dropped onto another item, this function runs.
 This function will not run if the other item's OnDragDropHere function returns false.
 ]]--
 function ITEM:OnDragDropToItem(item)
+	if !self:Event("CanPlayerInteract",false,LocalPlayer()) then return false end
 end
 
 --[[
@@ -215,6 +216,7 @@ If an item is drag-dropped to somewhere in the world, this function will run.
 traceRes is a full trace results table.
 ]]--
 function ITEM:OnDragDropToWorld(traceRes)
+	if !self:Event("CanPlayerInteract",false,LocalPlayer()) then return false end
 	self:SendNWCommand("PlayerSendToWorld",traceRes.HitPos);
 end
 

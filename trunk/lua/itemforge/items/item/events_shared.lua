@@ -48,6 +48,10 @@ function ITEM:CanPlayerInteract(pl)
 	else			if pl!=LocalPlayer() then return false end
 	end
 	
+	--If the item is in an inventory, will the inventory let the players interact with it?
+	local c=self:GetContainer();
+	if c && !c:Event("CanPlayerInteract",false,pl,self) then return false end
+	
 	--If the item is held, only the player holding it can interact with it.
 	if self:IsHeld() && self:GetWOwner()==pl then
 		return true;

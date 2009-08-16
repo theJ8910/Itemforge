@@ -106,9 +106,12 @@ This function is called when the panel being dragged is dropped.
 function MODULE:Drop()
 	local p=self:GetDropzone();
 	
+	--Panel was dropped onto another panel (dropzone)
 	if p && p:IsValid() && p.OnDrop then
 		local s,r=pcall(p.OnDrop,p,self.DragPanel);
 		if !s then ErrorNoHalt(r.."\n") end
+	
+	--Panel was dropped while hovering the game world
 	elseif vgui.IsHoveringWorld() then
 		--We dropped in world
 		--TODO this is hardcoded; it needs to be adapted
