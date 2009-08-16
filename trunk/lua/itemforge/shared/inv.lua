@@ -1705,6 +1705,10 @@ Return true to allow the player to interact with items in this inventory,
 or false to stop players from interacting with items in this inventory.
 ]]--
 function _INV:CanPlayerInteract(player,item)
+	--Can't interact with this inventory if we can't interact with the inventory's connected objects
+	for k,v in pairs(self:GetConnectedItems()) do
+		if !v:Event("CanPlayerInteract",false,player) then return false end
+	end
 	return !self.Locked;
 end
 
