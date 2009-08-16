@@ -43,6 +43,8 @@ IFINV_MSG_CONNECTITEM		=	-118;	--(Server > Client) The inventory has connected i
 IFINV_MSG_CONNECTENTITY		=	-117;	--(Server > Client) The inventory has connected itself with an entity. Have client connect too.
 IFINV_MSG_SEVERITEM			=	-116;	--(Server > Client) The inventory is severing itself from an item. Have client sever as well.
 IFINV_MSG_SEVERENTITY		=	-115;	--(Server > Client) The inventory is severing itself from an entity. Have client sever too.
+IFINV_MSG_LOCK				=	-114;	--(Server > Client) The inventory has been locked serverside. Have client lock too.
+IFINV_MSG_UNLOCK			=	-113;	--(Server > Client) The inventory has been unlocked serverside. Have client unlock too.
 
 --Itemforge Inventory (IFINV) Connection Type.
 IFINV_CONTYPE_ITEM			=1;			--Inventory connected to an item.
@@ -783,6 +785,16 @@ function MODULE:HandleIFINVMessages(msg)
 		
 		local slot=msg:ReadShort()+32768;
 		inv:SeverEntity(slot);
+	elseif msgType==IFINV_MSG_LOCK then
+		local inv=self:Get(id);
+		if !inv:IsValid() then return false end
+		
+		inv:Lock();
+	elseif msgType==IFINV_MSG_UNLOCK then
+		local inv=self:Get(id);
+		if !inv:IsValid() then return false end
+		
+		inv:Unlock();
 	else
 		ErrorNoHalt("Itemforge Inventories: Unhandled IFINV message \""..msgType.."\"\n");
 	end
@@ -1069,6 +1081,62 @@ function _INV:GetPos()
 		end
 	end
 	return nil;
+end
+
+--[[
+Locks the inventory.
+If pl is given only locks for that player
+]]--
+function _INV:Lock(pl)
+	
+	if SERVER && pl!=nil then
+		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Cannot lock "..tostring(self)..". Given player was invalid.\n"); return false
+		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Cannot lock "..tostring(self)..". Given player wasn't a player!\n"); return false
+		elseif !self:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Inventories: Cannot lock "..tostring(self)..". Given player wasn't the owner of the inventory!\n"); return false end
+	end
+	
+	self.Locked=true;
+	if SERVER then
+		--DEBUG
+		Msg("OUT: Message Type: "..IFINV_MSG_LOCK.." - Inventory: "..self:GetID().." - Player: "..tostring(pl).."\n");
+		
+		umsg.Start("ifinv",pl or self:GetOwner());
+		umsg.Char(IFINV_MSG_LOCK);
+		umsg.Short(self:GetID()-32768);
+		umsg.End();
+	end
+end
+
+--[[
+Unlocks the inventory.
+If pl is given only unlocks for that player
+]]--
+function _INV:Unlock(pl)
+	
+	if SERVER && pl!=nil then
+		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Cannot unlock "..tostring(self)..". Given player was invalid.\n"); return false
+		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Cannot unlock "..tostring(self)..". Given player wasn't a player!\n"); return false
+		elseif !self:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Inventories: Cannot unlock "..tostring(self)..". Given player wasn't the owner of the inventory!\n"); return false end
+	end
+	
+	self.Locked=false;
+	if SERVER then
+		--DEBUG
+		Msg("OUT: Message Type: "..IFINV_MSG_UNLOCK.." - Inventory: "..self:GetID().." - Player: "..tostring(pl).."\n");
+		
+		umsg.Start("ifinv",pl or self:GetOwner());
+		umsg.Char(IFINV_MSG_UNLOCK);
+		umsg.Short(self:GetID()-32768);
+		umsg.End();
+	end
+end
+
+--[[
+Returns true if the inventory is locked.
+Returns false otherwise.
+]]--
+function _INV:IsLocked()
+	return self.Locked;
 end
 
 --[[
@@ -1594,7 +1662,7 @@ slot is the slot in the inventory that the item will be placed in.
 Return false to stop the item from being inserted, or true to allow it to be inserted.
 ]]--
 function _INV:CanInsertItem(item,slot)
-	return true;
+	return !self.Locked;
 end
 
 --[[
@@ -1612,7 +1680,7 @@ slot is the slot this item is occupying in this inventory.
 Return true to allow the item to be taken out, or false to stop the item from being taken out.
 ]]--
 function _INV:CanRemoveItem(item,slot)
-	return true;
+	return !self.Locked;
 end
 
 --[[
@@ -1626,12 +1694,26 @@ forced will be true or false.
 function _INV:OnRemoveItem(item,slot,forced)
 end
 
+--[[
+Can a player interact with an item in this inventory?
+When an item's CanPlayerInteract event is called, this function lets it's container have a say in whether or not we can interact with it.
+
+player is the player who wants to interact with an item in this inventory.
+item is the item being interacted with.
+
+Return true to allow the player to interact with items in this inventory,
+or false to stop players from interacting with items in this inventory.
+]]--
+function _INV:CanPlayerInteract(player,item)
+	return !self.Locked;
+end
+
 --Called prior to the inventory being removed
 function _INV:OnRemove(lastConnection)
 	--Deal with items in this inventory at the time of removal
 	--Items will be taken care of serverside AND clientside (rather than just removing them serverside and individually removing each one clientside, we roll it all into one function here to save bandwidth/reduce lag)
 	if SERVER then
-		if self.RemovalAction==IFINV_RMVACT_REMOVEITEMS then
+		if self.RemovalAction==IFINV_RMVACT_REMOVEITEMS || !lastConnection then
 			for k,v in pairs(self.Items) do
 				--Assert that items are still valid and still consider themselves part of this inventory
 				if v:IsValid() && v:InInventory(self) then
@@ -1639,27 +1721,20 @@ function _INV:OnRemove(lastConnection)
 				end
 			end
 		elseif self.RemovalAction==IFINV_RMVACT_SAMELOCATION then
-			if lastConnection then
-				if lastConnection.Type==IFINV_CONTYPE_ITEM then
-					for k,v in pairs(self.Items) do
-						--Assert that items are still valid and still consider themselves part of this inventory
-						if v:IsValid() && v:InInventory(self) then
-							v:ToSameLocationAs(lastConnection.Obj,true);
-						end
-					end
-				elseif lastConnection.Type==IFINV_CONTYPE_ENT then
-					for k,v in pairs(self.Items) do
-						--Assert that items are still valid and still consider themselves part of this inventory
-						if v:IsValid() && v:InInventory(self) then
-							--TODO inventory's last connection was an entity
-						end
-					end
-				end
-			else
+			--TODO THIS SUCKS, it should force removal of the items instead of unlocking it here
+			self.Locked=false;
+			if lastConnection.Type==IFINV_CONTYPE_ITEM then
 				for k,v in pairs(self.Items) do
 					--Assert that items are still valid and still consider themselves part of this inventory
 					if v:IsValid() && v:InInventory(self) then
-						v:Remove();
+						v:ToSameLocationAs(lastConnection.Obj,true);
+					end
+				end
+			elseif lastConnection.Type==IFINV_CONTYPE_ENT then
+				for k,v in pairs(self.Items) do
+					--Assert that items are still valid and still consider themselves part of this inventory
+					if v:IsValid() && v:InInventory(self) then
+						--TODO inventory's last connection was an entity
 					end
 				end
 			end
@@ -1775,6 +1850,13 @@ function _INV:SendFullUpdate(pl)
 		elseif v.Type==IFINV_CONTYPE_ENT then
 			self:ConnectEntity(v.Obj,pl);
 		end
+	end
+	
+	--If we're locked tell that player
+	if self.Locked then
+		self:Lock(pl);
+	else
+		self:Unlock(pl);
 	end
 	
 	local s,r=pcall(self.OnSendFullUpdate,self,pl);

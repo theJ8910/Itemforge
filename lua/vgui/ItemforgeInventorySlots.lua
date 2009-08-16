@@ -340,17 +340,21 @@ function PANEL:DisplaySelectedItems()
 	end
 end
 
---Checks all of the panel's selected items to make sure they can still be selected
---This is necessary because... lets say a selected item was taken out of the inventory this panel displays, for example)
+--[[
+Checks all of the panel's selected items to make sure they can still be selected
+This is necessary because... lets say a selected item was taken out of the inventory this panel displays, for example)
+]]--
 function PANEL:ValidateSelectedItems()
 	for k,v in pairs(self.SelectedItems) do
 		if !self:CanSelectItem(v) then self:DeselectItem(k); end
 	end
 end
 
---Returns the first selected item or nil if nothing is selected
---What does "first selected item" mean? Our selected item list is sorted by Item ID. So, the first selected item will be the item with the lowest ID.
---Example: If Item 40, Item 3, and Item 8 are selected, then Item 3 will be returned.
+--[[
+Returns the first selected item or nil if nothing is selected
+What does "first selected item" mean? Our selected item list is sorted by Item ID. So, the first selected item will be the item with the lowest ID.
+Example: If Item 40, Item 3, and Item 8 are selected, then Item 3 will be returned.
+]]--
 function PANEL:GetSelectedItem()
 	for i=1,table.maxn(self.SelectedItems) do
 		if self.SelectedItems[i] then
