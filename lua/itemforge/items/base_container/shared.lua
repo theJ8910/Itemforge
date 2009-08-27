@@ -21,7 +21,8 @@ ITEM.Spawnable=false;
 ITEM.AdminSpawnable=false;
 
 --Base Container
-ITEM.Inventory=nil;
+ITEM.InvTemplate=nil;			--This can be the name of an inventory template your containers use
+ITEM.Inventory=nil;				--This is the inventory attached to this item
 
 --[[
 If this function is used clientside, this creates an inventory window for the player.
@@ -50,7 +51,7 @@ if SERVER then
 
 --Whenever this item is created we need to make an inventory for it and connect it.
 function ITEM:OnInit()
-	local inv=IF.Inv:Create();
+	local inv=IF.Inv:Create(self.InvTemplate);
 	if !inv || !inv:IsValid() then return false end
 	 
 	inv:ConnectItem(self);
@@ -72,7 +73,9 @@ end
 
 --Show the container's inventory to whoever used it
 function ITEM:OnUse(pl)
-	return self:ShowInventory(pl);
+	self:ShowInventory(pl);
+	
+	return true;
 end
 
 IF.Items:CreateNWCommand(ITEM,"ShowInventory");
@@ -111,6 +114,11 @@ end
 function ITEM:OnSeverInventory(inv)
 	if self.Inventory==inv then self.Inventory=nil; return true end
 	return false;
+end
+
+function ITEM:OnPopulateMenu(pMenu)
+	self["item"].OnPopulateMenu(self,pMenu);
+	pMenu:AddOption("Check Inventory",function(panel) self:ShowInventory(LocalPlayer()) end);
 end
 
 IF.Items:CreateNWCommand(ITEM,"ShowInventory",function(self,...) self:ShowInventory(...) end);

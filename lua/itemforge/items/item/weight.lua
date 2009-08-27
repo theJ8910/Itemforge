@@ -5,7 +5,7 @@ SHARED
 This file contains functions related to item weight.
 ]]--
 
-ITEM.Weight=1;										--Default weight of one item in this stack, in kg. By default, I mean that the weight can be changed after the item is created. Note: this doesn't affect the physics weight when the item is on the ground, just the weight of the item in an inventory.
+ITEM.Weight=1;										--Default weight of one item in this stack, in grams. By default, I mean that the weight can be changed after the item is created. Note: this doesn't affect the physics weight when the item is on the ground, just the weight of the item in an inventory.
 
 --[[
 This sets the weight of each individual item in the stack.

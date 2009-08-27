@@ -32,7 +32,7 @@ function ITEM:EmitSound(sound,bPredicted,amp,pitch)
 		
 		w:EmitSound(sound,amp,pitch);
 		return true;
-	elseif self:InInventory() then
+	else
 		local pos=self:GetPos();
 		local postype=type(pos);
 		if postype=="Vector" then
@@ -41,6 +41,8 @@ function ITEM:EmitSound(sound,bPredicted,amp,pitch)
 			for k,v in pairs(pos) do
 				WorldSound(sound,pos,amp,pitch);
 			end
+		else
+			return false;
 		end
 		return true;
 	end

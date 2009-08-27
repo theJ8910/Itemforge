@@ -1088,15 +1088,20 @@ Locks the inventory.
 If pl is given only locks for that player
 ]]--
 function _INV:Lock(pl)
-	
 	if SERVER && pl!=nil then
 		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Cannot lock "..tostring(self)..". Given player was invalid.\n"); return false
 		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Cannot lock "..tostring(self)..". Given player wasn't a player!\n"); return false
 		elseif !self:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Inventories: Cannot lock "..tostring(self)..". Given player wasn't the owner of the inventory!\n"); return false end
 	end
 	
-	self.Locked=true;
-	if SERVER then
+	local bWasLocked=false;
+	if !self.Locked then
+		self.Locked=true;
+		self:Event("OnLock");
+		bWasLocked=true;
+	end
+	
+	if SERVER && (bWasLocked || pl) then
 		--DEBUG
 		Msg("OUT: Message Type: "..IFINV_MSG_LOCK.." - Inventory: "..self:GetID().." - Player: "..tostring(pl).."\n");
 		
@@ -1119,8 +1124,14 @@ function _INV:Unlock(pl)
 		elseif !self:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Inventories: Cannot unlock "..tostring(self)..". Given player wasn't the owner of the inventory!\n"); return false end
 	end
 	
-	self.Locked=false;
-	if SERVER then
+	local bWasUnlocked=false;
+	if self.Locked then
+		self.Locked=false;
+		self:Event("OnUnlock");
+		bWasUnlocked=true;
+	end
+	
+	if SERVER && (bWasUnlocked || pl) then
 		--DEBUG
 		Msg("OUT: Message Type: "..IFINV_MSG_UNLOCK.." - Inventory: "..self:GetID().." - Player: "..tostring(pl).."\n");
 		
@@ -1572,7 +1583,7 @@ function _INV:BindPanel(panel)
 	table.insert(self.BoundPanels,panel);
 end
 
---Unbind a panel bound to this inventory.
+--Unbind a panel bound from this inventory.
 function _INV:UnbindPanel(panel)
 	--Find this panel first in our collection..
 	for k,v in pairs(self.BoundPanels) do
@@ -1695,6 +1706,18 @@ function _INV:OnRemoveItem(item,slot,forced)
 end
 
 --[[
+Called after the inventory has been locked.
+]]--
+function _INV:OnLock()
+end
+
+--[[
+Called after the inventory has been unlocked.
+]]--
+function _INV:OnUnlock()
+end
+
+--[[
 Can a player interact with an item in this inventory?
 When an item's CanPlayerInteract event is called, this function lets it's container have a say in whether or not we can interact with it.
 
@@ -1705,6 +1728,9 @@ Return true to allow the player to interact with items in this inventory,
 or false to stop players from interacting with items in this inventory.
 ]]--
 function _INV:CanPlayerInteract(player,item)
+	--Can't interact with this inventory if the player doesn't own it
+	if SERVER && !self:CanSendInventoryData(player) then return false end
+	
 	--Can't interact with this inventory if we can't interact with the inventory's connected objects
 	for k,v in pairs(self:GetConnectedItems()) do
 		if !v:Event("CanPlayerInteract",false,player) then return false end

@@ -26,19 +26,16 @@ end
 When we use the password lock, something happens depending on the state the password lock is in.
 ]]--
 function ITEM:OnUse(pl)
-	if self:InWorld() then
-		local att=self:GetAttachedEnt();
-
-		if att then
-			if self.Password=="" then	self:SetPassword(pl);
-			else						self:RequestPassword(pl,"Enter Password:",self.OpenAttachedEnt)
-			end
+	if self:GetAttachedEnt() || self:GetAttachedItem() then
+		if self.Password=="" then
+			self:SetPassword(pl);
+		elseif self:IsAttachmentLocked() then
+			self:RequestPassword(pl,"Enter password to unlock:",self.UnlockAttachment);
 		else
-			self:WorldAttach();
+			self:RequestPassword(pl,"Enter password to lock:",self.LockAttachment);
 		end
-	else
-		--Bzzzt! Nothing really happens unless we're in the world
-		self:EmitSound(self.DenySound);
+	elseif self:InWorld() then	self:WorldAttach();
+	else						self:EmitSound(self.DenySound);
 	end
 	return true;
 end
@@ -68,11 +65,29 @@ function ITEM:PasswordFail()
 end
 
 --[[
-Opens the attached entity if the password given matches this password.
+Unlocks the attached entity if the password given matches this password.
 ]]--
-function ITEM:OpenAttachedEnt(pl,password)
+function ITEM:LockAttachment(pl,password)
+	if !pl then return self["base_lock"].LockAttachment(self); end
+	
 	if password==self.Password then
-		if !self["base_lock"].OpenAttachedEnt(self) then return false end
+		self["base_lock"].LockAttachment(self);
+		self:PasswordSuccess();
+		return true;
+	else
+		self:PasswordFail();
+		return false;
+	end
+end
+
+--[[
+Unlocks the attached entity if the password given matches this password.
+]]--
+function ITEM:UnlockAttachment(pl,password)
+	if !pl then return self["base_lock"].UnlockAttachment(self); end
+	
+	if password==self.Password then
+		self["base_lock"].UnlockAttachment(self);
 		self:PasswordSuccess();
 		return true;
 	else

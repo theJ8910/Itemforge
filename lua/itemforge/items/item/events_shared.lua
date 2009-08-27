@@ -27,6 +27,13 @@ function ITEM:GetDescription()
 end
 
 --[[
+If an item is in the void, this hook can be used to return it's position in the world.
+This hook can return nil, a vector, or a table of vectors.
+]]--
+function ITEM:GetVoidPos()
+end
+
+--[[
 This hook is called whenever a player tries to do something with an item (use it, hold it, drag it to world, merge it with something, etc).
 Itemforge uses this in some places, but you can use this hook to check if a player can interact with something youself. EX:
 	if !self:Event("CanPlayerInteract",false,PLAYER) then return false end
@@ -42,18 +49,15 @@ function ITEM:CanPlayerInteract(pl)
 	--The player has to be alive to interact with anything
 	if !pl:Alive() then return false end
 	
-	--Serverside, we make sure the player can't interact with private items he doesn't own (IE, Player 1 can't use items in Player 2's private inventory)
-	--Clientside, we make sure the local player is interacting with items and not some other palyer (IE, if this client is controlling Player 1, only Player 1 can interact with an item on this client)
-	if SERVER then	if !self:CanSendItemData(pl) then return false end
-	else			if pl!=LocalPlayer() then return false end
-	end
+	--Clientside, we make sure the local player is interacting with items and not some other player (IE, if this client is controlling Player 1, only Player 1 can interact with an item on this client)
+	if CLIENT && pl!=LocalPlayer() then	return false end
 	
 	--If the item is in an inventory, will the inventory let the players interact with it?
 	local c=self:GetContainer();
 	if c && !c:Event("CanPlayerInteract",false,pl,self) then return false end
 	
 	--If the item is held, only the player holding it can interact with it.
-	if self:IsHeld() && self:GetWOwner()==pl then
+	if self:IsHeld() && self:GetWOwner()!=pl then
 		return true;
 	--Otherwise, the player must be nearby the item in order to interact with it
 	else
@@ -62,15 +66,15 @@ function ITEM:CanPlayerInteract(pl)
 		if postype=="Vector" then
 			if pos:Distance(pl:GetPos())<=256 then return true end
 			
-		--If we're in several locations we have to be nearby at least one.
+		--If we're in several locations we have to be nearby at least one (this happens when an item is in an inventory connected to several objects)
 		elseif postype=="table" then
 			for k,v in pairs(pos) do
 				if v:Distance(pl:GetPos())<=256 then return true end
 			end
+		else
+			return false;
 		end
 	end
-	
-	return false;
 end
 
 --[[

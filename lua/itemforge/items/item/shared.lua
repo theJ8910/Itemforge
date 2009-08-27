@@ -790,7 +790,7 @@ function ITEM:GetPos()
 		return container:GetPos();
 	end
 	
-	return nil;
+	return self:Event("GetVoidPos",nil);
 end
 IF.Items:ProtectKey("GetPos");
 
