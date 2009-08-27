@@ -1687,7 +1687,7 @@ function MODULE:HandleIFIMessages(msg)
 			
 			if !iItem then ErrorNoHalt("Itemforge Items: Tried to set a networked item (var ID "..VarID..") on "..tostring(item).." to non-existent item with ID "..vVal..".\n"); return false end
 			
-			item:ReceiveNWVar(sName,vVal);
+			item:ReceiveNWVar(sName,iItem);
 		elseif msgType==IFI_MSG_SETINV then
 			local vVal=msg:ReadShort()+32768;
 			iInv=IF.Inv:Get(vVal);

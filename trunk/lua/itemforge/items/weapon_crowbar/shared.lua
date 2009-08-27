@@ -10,6 +10,9 @@ if SERVER then AddCSLuaFile("shared.lua") end
 ITEM.Name="Crowbar";
 ITEM.Description="A long, fairly heavy iron rod with teeth.\nGood for prying open doors or pulverising skulls.";
 ITEM.Base="base_melee";
+ITEM.Size=19;
+ITEM.Weight=1500;
+
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 
