@@ -12,6 +12,8 @@ ITEM.Description="This is a Heckler & Koch MP7, a German-manufactured submachine
 ITEM.Base="base_firearm";
 ITEM.WorldModel="models/weapons/w_smg1.mdl";
 ITEM.ViewModel="models/weapons/v_smg1.mdl";
+ITEM.Weight=1900;		--1.9kg according to http://en.wikipedia.org/wiki/Heckler_&_Koch_MP7
+ITEM.Size=13;
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 
@@ -80,7 +82,7 @@ function ITEM:FireGrenade(fVel)
 		return true;
 	elseif self:InWorld() then
 		local eEnt=self:GetEntity();
-		local posang=self:GetMuzzle();
+		local posang=self:GetMuzzle(self:GetEntity());
 		
 		local pos = posang.Pos;
 		local ang = posang.Ang:Forward();

@@ -10,7 +10,8 @@ if SERVER then AddCSLuaFile("shared.lua") end
 
 ITEM.Name="Lantern";
 ITEM.Description="An electric lantern.";
-ITEM.Base="item";
+ITEM.Weight=7000;
+ITEM.Size=14;
 ITEM.WorldModel="models/props/cs_italy/it_lantern1.mdl";
 ITEM.Sounds={
 	Sound("buttons/button1.wav"),
@@ -168,14 +169,33 @@ function ITEM:DrawGlow(ent)
 	end
 end
 
---[[
-Deploying the lantern moves the world model attachment to the player's hand
-]]--
-function ITEM:OnDeploy()
+function ITEM:SwapToHand()
 	if self.WMAttach && self.WMAttach:ToAP("anim_attachment_RH") then
 		self.WMAttach:SetOffset(self.WorldModelNudge);
 		self.WMAttach:SetOffsetAngles(self.WorldModelRotate);		
 	end
+end
+
+function ITEM:SwapToHip()
+	if self.WMAttach && self.WMAttach:ToBone("ValveBiped.Bip01_Pelvis") then
+		self.WMAttach:SetOffset(Vector(-10,0,0));
+		self.WMAttach:SetOffsetAngles(Angle(0,0,-45));
+	end
+end
+
+function ITEM:OnHold(pl,weapon)	
+	self["item"].OnHold(self,pl,weapon);
+	
+	if pl:GetActiveWeapon()==weapon then	self:SwapToHand();
+	else									self:SwapToHip();
+	end
+end
+
+--[[
+Deploying the lantern moves the world model attachment to the player's hand
+]]--
+function ITEM:OnDeploy()
+	self:SwapToHand();
 	
 	if self.ItemSlot then self.ItemSlot:SetVisible(true); end
 end
@@ -184,10 +204,7 @@ end
 Holstering the lantern moves the world model attachment to the player's hip (Legend of Zelda: Twilight Princess anyone?)
 ]]--
 function ITEM:OnHolster()
-	if self.WMAttach && self.WMAttach:ToBone("ValveBiped.Bip01_Pelvis") then
-		self.WMAttach:SetOffset(Vector(-10,0,0));
-		self.WMAttach:SetOffsetAngles(Angle(0,0,-45));
-	end
+	self:SwapToHip();
 	
 	if self.ItemSlot then self.ItemSlot:SetVisible(false); end
 end

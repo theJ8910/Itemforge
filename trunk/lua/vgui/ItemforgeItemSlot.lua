@@ -19,9 +19,9 @@ PANEL.Item=nil;														--This is the item that the slot is set to display.
 PANEL.SlotOpen=true;												--Is this slot open? If it is, it will draw a background, then the set item (if there is one), then the border. If it isn't, it draws a closed slot. This mostly applies to inventory slots.
 PANEL.Draggable=false;												--Can this panel be dragged?
 PANEL.Droppable=false;												--Can this panel have things dropped onto it?
-PANEL.DrawBorder=false;												--If this is true, a border with the color given below will be drawn around the box (it's selected).
-PANEL.MouseDown=false;
-PANEL.ClickX=0;
+PANEL.ShouldDrawBorder=false;										--If this is true, a border with the color given below will be drawn around the box (it's selected).
+PANEL.DragExpected=false;											--If this is true, whenever the user moves his mouse outside the panel a drag is started. This becomes true when the user presses the mouse down, and false whenever a drag is started OR whenever the user releases his mouse.
+PANEL.ClickX=0;														--This is the X and Y position on the panel that the user pressed his mouse down at.
 PANEL.ClickY=0;
 PANEL.ModelPanel=nil;												--If the item opts to use a model, a model panel will be created for it.
 
@@ -32,10 +32,10 @@ local SlotClosed=		Material("itemforge/inventory/closedslot");	--This is a close
 local BorderColor=Color(49,209,255,255);							--Color of the border, if a border is being drawn
 local BorderColorDrop=Color(255,175,0,255);							--Color of the border, if a drag-drop is occuring and we're being moused over
 
-local ModelPanelX=2;		--At this location on the panel...
-local ModelPanelY=2;
-local ModelPanelW=60;		--...at this size.
-local ModelPanelH=60;
+local ModelPanelX=0.03125;		--The model panel is at this location on the panel (in the terms of 0-1)... 2/64 = 0.03125
+local ModelPanelY=0.03125;
+local ModelPanelW=0.9375;		--...at this size (in terms of 0-1).	60/64 = 0.9375
+local ModelPanelH=0.9375;
 
 --This is garry's Model Panel paint pretty much, but with comments and slight modifications
 local SlotPaint=function(self,item)
@@ -83,60 +83,20 @@ end
 
 
 --Panel methods
+
+--Opens the slot.
 function PANEL:Open()
 	self.SlotOpen=true;
 end
 
+--Closes the slot. Clears any items, borders, pending drags, etc.
 function PANEL:Close()
 	self:SetItem(nil);
-	self:SetDrawBorder(false);
-	self:MouseCapture(false);
-	self:CancelDrag();
-	self.MouseDown=false;
+	IF.UI:ClearDropzone(self);
 	self.MouseOver=false;
-	self.ClickX=0;
-	self.ClickY=0;
 	
 	self.SlotOpen=false;
-	
 end
-
-function PANEL:RemoveModelPanel()
-	if self.ModelPanel && self.ModelPanel:IsValid() then self.ModelPanel:Remove(); self.ModelPanel=nil; end
-end
-
---Asks itemforge to start a drag/drop operation involving this panel
-function PANEL:StartDrag()
-	if !self.Draggable then return false end
-	self.MouseDown=false;
-	
-	if IF.UI:Drag(self,self.ClickX,self.ClickY) then
-		return true;
-	end
-	return false;
-end
-
---Asks itemforge to stop the current drag/drop operation if this panel is involved
-function PANEL:CancelDrag()
-	IF.UI:CancelDrag(self);
-end
-
---[[
-This function creates a panel used while dragging this panel from one place to another.
-While being dragged, this is the "drag image" displayed under the cursor.
-]]--
-function PANEL:MakeDragPanel()
-	local panel=vgui.Create("ItemforgeItemSlot");
-	panel:MakePopup();
-	panel:SetSize(self:GetWide(),self:GetTall());
-	panel:SetMouseInputEnabled(false);
-	panel:SetItem(self:GetItem());
-	return panel;
-end
-
-
-
---Set/get stuff
 
 --[[
 Set the item this panel should render. You can set this to nil to make it render nothing.
@@ -145,6 +105,8 @@ Returns true if the panel's item was set successfully. Returns false otherwise.
 ]]--
 function PANEL:SetItem(item)
 	if !self.SlotOpen then return false end
+	
+	self:ForgetDrag();
 	if !item then
 		self:RemoveModelPanel();
 		self.Item=nil;
@@ -156,51 +118,10 @@ function PANEL:SetItem(item)
 	self.Item=item;
 	
 	if item:Event("ShouldUseModelFor2D",true) then
-		self:RemoveModelPanel();
-		
-		self.ModelPanel=vgui.Create("DModelPanel",self);
-		self.ModelPanel:SetPos(ModelPanelX,ModelPanelY);
-		self.ModelPanel:SetSize(ModelPanelW,ModelPanelH);
-		self.ModelPanel:SetModel(self.Item:GetWorldModel());
-		
-		if self.ModelPanel:GetEntity() then
-			--We use the bounding box and some trig to determine what distance the camera needs to be at to see the entire model.
-			local min,max=self.ModelPanel:GetEntity():GetRenderBounds();
-			--local d=(min:Distance(max)*.5);
-			local d=math.max(max.x-min.x,max.y-min.y,max.z-min.z);
-			local f=math.Deg2Rad(self.ModelPanel:GetFOV()*.5);
-			local x=0.8*d*(1/math.tan(f));
-			
-			--Position the camera at an interesting angle, at the calculated distance
-			self.ModelPanel:SetCamPos(Angle(-45,-45,0):Forward() * x);
-			
-			--Look at the center of the bounding box
-			self.ModelPanel:SetLookAt(Vector(0,0,0));
-		end
-		self.ModelPanel.Paint=SlotPaint;
-		self.ModelPanel:SetPaintedManually(true);
-		
-		--I don't particularly understand why this wasn't done in the DModelPanel file... it's not like the panel does anything if clicked, but it's blocking my slots regardless.
-		self.ModelPanel:SetMouseInputEnabled(false);
-		self.ModelPanel:SetKeyboardInputEnabled(false);
+		self:CreateModelPanel(self.Item:GetWorldModel());
 	end
 	
 	return true;
-end
-
-function PANEL:SetDraggable(b)
-	self.Draggable=b;
-	if b==false then
-		self:CancelDrag();
-	end
-end
-
-function PANEL:SetDroppable(b)
-	self.Droppable=b;
-end
-
-function PANEL:SetDrawBorder(b)
-	self.DrawBorder=b;
 end
 
 --[[
@@ -209,31 +130,165 @@ If no items is set, nil is returned.
 If the item set is invalid, nil is returned and the panel's item is set to nil.
 ]]--
 function PANEL:GetItem()
-	if self.Item then
-		if !self.Item:IsValid() then
-			self:SetItem(nil);
-			return nil;
-		end
-		return self.Item;
+	if self.Item && !self.Item:IsValid() then
+		self:SetItem(nil);
 	end
-	return nil;
+	return self.Item;
 end
 
+--Creates a model panel.
+function PANEL:CreateModelPanel(sModel)
+	--Remove the model panel if we already have one
+	self:RemoveModelPanel();
+	
+	self.ModelPanel=vgui.Create("DModelPanel",self);
+	
+	--We use custom painting
+	self.ModelPanel.Paint=SlotPaint;
+	self.ModelPanel:SetPaintedManually(true);
+	
+	--The position and size of the model panel depends on the size of the Item Slot
+	local w,h=self:GetSize();
+	self.ModelPanel:SetPos(math.floor(ModelPanelX*w),math.floor(ModelPanelY*h));
+	self.ModelPanel:SetSize(math.floor(ModelPanelW*w),math.floor(ModelPanelH*h));
+	
+	--I don't particularly understand why this wasn't done in the DModelPanel file... it's not like the panel does anything if clicked, but it's blocking my slots regardless.
+	self.ModelPanel:SetMouseInputEnabled(false);
+	self.ModelPanel:SetKeyboardInputEnabled(false);
+	
+	--Lastly we'll set the model to the requested model.
+	self.ModelPanel:SetModel(sModel);
+	
+	--If for some reason this didn't work we just end it here
+	local ent=self.ModelPanel:GetEntity();
+	if !ent then return false end
+	
+	--We use the bounding box and some trig to determine what distance the camera needs to be at to see the entire model.
+	local min,max=ent:GetRenderBounds();
+	
+	--[[
+	y = mx;
+	
+	d = [the largest side of the model's bounding box]
+	f = [half of the Model Panel Camera's FOV in radians]
+	
+	y = 0.8*d;
+	m = sin(f)/cos(f) = tan(f);
+	
+	0.8*d = tan(f)*x;
+	0.8*d/tan(f) = x;
+	]]--
+	
+	--Position the camera at an interesting angle, at the calculated distance
+	self.ModelPanel:SetCamPos(Angle(-45,-45,0):Forward() * ( 0.8*(math.max(max.x-min.x,max.y-min.y,max.z-min.z))/math.tan(math.Deg2Rad(self.ModelPanel:GetFOV()*.5))));
+	
+	--Look at the center of the bounding box (The model will be moved when posed so the center of the bounding box is at 0,0,0)
+	self.ModelPanel:SetLookAt(Vector(0,0,0));
+	
+	return true;
+end
+
+--[[
+Removes the model panel if we have one
+]]--
+function PANEL:RemoveModelPanel()
+	if self.ModelPanel && self.ModelPanel:IsValid() then self.ModelPanel:Remove(); self.ModelPanel=nil; end
+end
+
+--[[
+Sets whether or not the panel should be draggable or not.
+]]--
+function PANEL:SetDraggable(b)
+	self.Draggable=b;
+	if b==false then self:ForgetDrag(); end
+end
+
+--[[
+Sets whether or not you should be able to drop other panels on this panel.
+If there is a drag-drop occuring
+]]--
+function PANEL:SetDroppable(b)
+	self.Droppable=b;
+	if b==false then
+		IF.UI:ClearDropzone(self);
+	end
+end
+
+--This function is run if a drag is expected
+function PANEL:ExpectDrag(x,y)
+	if !self.Draggable then return false end
+	
+	self.DragExpected=true;
+	self.ClickX,self.ClickY=x,y;
+end
+
+--If a drag is pending, cancel it.
+function PANEL:ForgetDrag()
+	self.DragExpected=false;
+end
+
+--[[
+Run this function to start a drag/drop operation.
+This function should be called some time after an ExpectDrag() and before a ForgetDrag().
+Rather than dragging _this_ panel, we create a floating panel which is basically the same as this panel, and drag IT.
+That way, even if the contents of this panel change, or the window that contained this panel is closed, etc, we can still drag the item somewhere.
+]]--
+function PANEL:Drag()
+	self:ForgetDrag();
+	
+	if IF.UI:IsDragging() then return false end
+	
+	local panel=vgui.Create("ItemforgeItemSlot");
+	panel:MakePopup();
+	panel:SetSize(self:GetWide(),self:GetTall());
+	panel:SetItem(self:GetItem());
+	panel:SetMouseInputEnabled(false);
+	
+	if IF.UI:Drag(panel,self.ClickX,self.ClickY) then
+		return true;
+	end
+	return false;
+end
+
+function PANEL:SetDrawBorder(b)
+	self.ShouldDrawBorder=b;
+end
+
+function PANEL:DrawBorder(color)
+	surface.SetDrawColor(color.r,color.g,color.b,191.25+(math.sin(CurTime()*5)*63.75));
+	
+	--Vertical lines
+	surface.DrawRect(0,0,2,self:GetTall());
+	surface.DrawRect(self:GetWide()-2,0,2,self:GetTall());
+	
+	--Horizontal lines
+	surface.DrawRect(2,0,self:GetWide()-4,2);
+	surface.DrawRect(2,self:GetTall()-2,self:GetWide()-4,2);
+end
 
 
 
 --Events
 
---Occurs if a panel is dropped here (override this)
-function PANEL:OnDrop(panel)
+--Occurs if a panel is dropped here (override this if you want it to do something different)
+function PANEL:OnDragDropHere(panel)
+	
+end
+
+--Occurs if a panel is dropped in the world (override this if you want it to do something different)
+function PANEL:OnDragDropToWorld(traceRes)
+	local droppedItem=self:GetItem();
+	if !droppedItem then return false end
+	
+	droppedItem:Event("OnDragDropToWorld",nil,traceRes);
 end
 
 --Override this to set a click action
 function PANEL:DoClick()
 end
 
---When itemforge stops a drag-drop with this panel, this event runs
 function PANEL:OnCancelDrag()
+	self:Remove();
 end
 
 function PANEL:Init()
@@ -245,7 +300,10 @@ function PANEL:OnCursorEntered()
 	if !self.SlotOpen then return false end
 	
 	self.MouseOver=true;
-	IF.UI:SetDropzone(self);
+	
+	if self.Droppable then
+		IF.UI:SetDropzone(self);
+	end
 end
 
 function PANEL:OnCursorExited()
@@ -254,17 +312,15 @@ function PANEL:OnCursorExited()
 	self.MouseOver=false;
 	IF.UI:ClearDropzone(self);
 	
-	if self.MouseDown==true then
-		self:StartDrag();
+	if self.DragExpected==true then
+		self:Drag();
 	end
 end
 
 function PANEL:OnMousePressed(mc)
 	if !self.SlotOpen || mc==MOUSE_RIGHT then return false end
 	
-	--Record that the mouse has been pressed and where it has been pressed (used in drag code)
-	self.MouseDown=true;
-	self.ClickX,self.ClickY=self:ScreenToLocal(gui.MousePos());
+	self:ExpectDrag(self:ScreenToLocal(gui.MousePos()));
 end
 
 function PANEL:OnMouseReleased(mc)
@@ -275,8 +331,9 @@ function PANEL:OnMouseReleased(mc)
 		
 		return item:ShowMenu(gui.MousePos());
 	elseif mc==MOUSE_LEFT then
-		self.MouseDown=false;
-	
+		--If we were expecting a drag, forget it
+		self:ForgetDrag();
+		
 		--Ignore if we released the mouse while dragging
 		if IF.UI:IsDragging() then return false end
 		
@@ -289,6 +346,7 @@ end
 
 
 --Draw the panel
+--Good
 function PANEL:Paint()
 	if self.SlotOpen==true then
 		local item=self:GetItem();
@@ -304,28 +362,35 @@ function PANEL:Paint()
 			item:Event("OnDraw2D",nil,self:GetWide(),self:GetTall());
 		end
 		
-		--Draw slot border
+		--Draw slot border texture
 		surface.SetMaterial(SlotBorder);
 		surface.SetDrawColor(255,255,255,255);
 		surface.DrawTexturedRect(0,0,self:GetWide(),self:GetTall());
 		
-		local p=IF.UI:GetDragPanel();
-		local isDragging=p && p!=self && self.MouseOver;
+		
+		
+		--If a panel is being dragged, we want to know if it's an item being dragged.
+		--Not all dragged panels contain items.
+		local bValidDrop=false;
+		if self.Droppable && self.MouseOver then
+			local p=IF.UI:GetDragPanel();
+			if p && p.GetItem then
+				local s,r=pcall(p.GetItem,p);
+				if !s then
+					ErrorNoHalt(r.."\n");
+				elseif r && r!=item then
+					bValidDrop=true;
+				end
+			end
+		end
+		 
+		--Draw dragdrop border if an item is being dragged (and of course if we aren't displaying that same item)
+		if bValidDrop then
+			self:DrawBorder(BorderColorDrop);
 		
 		--Draw selection border
-		if self.DrawBorder==true || isDragging then
-			local a=191.25+(math.sin(CurTime()*5)*63.75);
-			
-			if !isDragging then surface.SetDrawColor(BorderColor.r,BorderColor.g,BorderColor.b,a);
-			else surface.SetDrawColor(BorderColorDrop.r,BorderColorDrop.g,BorderColorDrop.b,a) end
-			
-			--Vertical lines
-			surface.DrawRect(0,0,2,self:GetTall());
-			surface.DrawRect(self:GetWide()-2,0,2,self:GetTall());
-			
-			--Horizontal lines
-			surface.DrawRect(2,0,self:GetWide()-4,2);
-			surface.DrawRect(2,self:GetTall()-2,self:GetWide()-4,2);
+		elseif self.ShouldDrawBorder==true then
+			self:DrawBorder(BorderColor);
 		end
 	else
 		--Draw closed slot

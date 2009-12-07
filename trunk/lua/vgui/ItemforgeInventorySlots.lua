@@ -62,7 +62,7 @@ function PANEL:PerformLayout()
 	If the number of slots that can be displayed has changed from what it currently is, we remove any existing slots and make new ones.
 	We check because that way this panel can be resized as much as necessary without needlessly removing/creating slots each time
 	]]--
-	if sw~=self.SlotsWide or sh~=self.SlotsHigh then
+	if sw!=self.SlotsWide or sh!=self.SlotsHigh then
 		self.SlotsWide=sw;
 		self.SlotsHigh=sh;
 		
@@ -83,7 +83,7 @@ function PANEL:PerformLayout()
 				slot:SetDraggable(false);
 				slot:SetDroppable(true);
 				slot.DoClick=SlotClick;
-				slot.OnDrop=SlotDrop;
+				slot.OnDragDropHere=SlotDrop;
 				self.Slots[i]=slot;
 				i=i+1;
 			end
@@ -228,26 +228,27 @@ function PANEL:OnSlotClicked(slot)
 end
 
 --If a slot has a panel dropped on it this function runs. Slot is the panel that the drop happened on.
---TODO pcall events
 function PANEL:OnSlotDrop(slot,droppedPanel)
 	--If we don't have an inventory set, drag/drops are pointless
 	local inv=self:GetInventory();
 	if !inv then return false end
 	
-	--Ignore if we drop the panel on itself, or if the dropped panel wasn't an item slot (we can only deal with item slots at the moment) we'll quit here
-	if slot==droppedPanel || string.lower(droppedPanel.ClassName)!="itemforgeitemslot" then return false end
-	
-	--if we dropped a panel here we expect it to contain an item
-	local droppedItem=droppedPanel:GetItem();
-	if !droppedItem then return false end
+	--Can the dropped panel hold an item?
+	if !droppedPanel.GetItem then return false end
+
+	--Does the dropped panel have an item set?
+	local s,r=pcall(droppedPanel.GetItem,droppedPanel);
+	if !s then	ErrorNoHalt(r.."\n"); return false;
+	elseif !r then return false end
 	
 	local item=slot:GetItem();
-	if !item then
-		droppedItem:OnDragDropToInventory(inv,slot.invSlot);
-	else
-		if item:OnDragDropHere(droppedItem) then
-			droppedItem:OnDragDropToItem(item);
+	if item then
+		--Call the dragdrop events.
+		if item:Event("OnDragDropHere",true,r) then
+			r:Event("OnDragDropToItem",nil,item);
 		end
+	else
+		r:Event("OnDragDropToInventory",nil,inv,slot.invSlot);
 	end
 end
 

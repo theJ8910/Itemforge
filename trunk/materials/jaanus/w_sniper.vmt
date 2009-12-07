@@ -1,0 +1,14 @@
+"VertexLitGeneric"
+{
+	"$basetexture"	"jaanus/w_sniper_new"
+	"$selfillum" "1"
+	"$surfaceprop"	"Metal"
+	"$bumpmap"	"jaanus/w_sniper_new_n"
+	"$model" "1"
+	"$phong" "1"
+	"$phongboost" "1"
+	"$phongexponenttexture" "jaanus/w_sniper_phong"
+	"$phongalbedotint" "1"								
+	"$phongfresnelranges"	"[.5 1 2]"
+}
+

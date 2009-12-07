@@ -83,7 +83,7 @@ function ENT:OnRemove()
 	local item=self:GetItem();
 	if !item then return true end		--We didn't have an item set anyway. We can stop here.
 	self.Item=nil;
-	
+		
 	--[[
 	Here's a long winded version of the condition for item removal below:
 	This entity wasn't expecting to be removed (or in other words, this entity just got remover-gunned or something).

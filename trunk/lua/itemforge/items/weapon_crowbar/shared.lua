@@ -8,7 +8,7 @@ Bashes people. Opens doors.
 if SERVER then AddCSLuaFile("shared.lua") end
 
 ITEM.Name="Crowbar";
-ITEM.Description="A long, fairly heavy iron rod with teeth.\nGood for prying open doors or pulverising skulls.";
+ITEM.Description="A long, fairly heavy steel rod with teeth.\nGood for prying open doors or pulverising skulls.";
 ITEM.Base="base_melee";
 ITEM.Size=19;
 ITEM.Weight=1500;
@@ -74,8 +74,9 @@ CollisionData is information about the collision passed on from the entity's eve
 HitPhysObj is the physics object belonging to this entity which collided.
 ]]--
 function ITEM:OnPhysicsCollide(entity,CollisionData,HitPhysObj)
-	if (CollisionData.Speed > 50 && CollisionData.DeltaTime > 0.2 ) then
-		self:EmitSound(self.ImpactSounds[math.random(1,table.getn(self.ImpactSounds))],100+(CollisionData.Speed-70),100+math.Rand(-20,20));
+	if (CollisionData.Speed > 50 && CollisionData.DeltaTime > 0.05 ) then
+		print(CollisionData.Speed);
+		self:EmitSound(self.ImpactSounds[math.random(1,table.getn(self.ImpactSounds))],CollisionData.Speed,100+math.Rand(-20,20));
 	end
 end
 

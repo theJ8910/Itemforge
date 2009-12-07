@@ -10,6 +10,8 @@ if SERVER then AddCSLuaFile("shared.lua") end
 ITEM.Name="Flechette Gun";
 ITEM.Description="A standard pistol, modified to fire hunter flechettes instead.";
 ITEM.Base="base_ranged";
+ITEM.Weight=850;			--This is somewhat arbitrary. It's heavier than the H&K USP Match, which the Flechette Gun resembles somewhat.
+ITEM.Size=7;
 ITEM.ViewModel = "models/weapons/v_pistol.mdl";
 ITEM.WorldModel = "models/weapons/w_pistol.mdl";
 ITEM.Spawnable=true;
@@ -72,7 +74,7 @@ function ITEM:ShootFlechette(speed)
 		return true;
 	elseif self:InWorld() then
 		local eEnt=self:GetEntity();
-		local posang=self:GetMuzzle();
+		local posang=self:GetMuzzle(self:GetEntity());
 		
 		local pos=posang.Pos;
 		local ang=posang.Ang;

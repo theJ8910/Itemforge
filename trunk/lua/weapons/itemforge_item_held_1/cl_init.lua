@@ -118,12 +118,42 @@ function SWEP:DrawWorldModelTranslucent()
 	return true;
 end
 
---May allow items to take advantage of this later
-function SWEP:CustomAmmoDisplay()
+--Draw HUD while holding this
+function SWEP:DrawHUD()
+	local item=self:GetItem();
+	if !item then return false end
+	
+	item:Event("OnSWEPDrawHUD");
+	
+	return true;
+end
+
+--Change player's FOV while holding this
+function SWEP:TranslateFOV(current_fov)
+	local item=self:GetItem();
+	if !item then return current_fov end
+	
+	return item:Event("OnSWEPTranslateFOV",current_fov,current_fov);
+end
+
+--Freeze player's view rotation while holding this
+function SWEP:FreezeMovement()
+	local item=self:GetItem();
+	if !item then return false end
+	
+	return item:Event("OnSWEPFreezeView",false);
+end
+
+--Modify player's mouse sensitivity while holding this
+function SWEP:AdjustMouseSensitivity()
+	local item=self:GetItem();
+	if !item then return 1 end
+	
+	return item:Event("OnSWEPAdjustMouseSensitivity",1);
 end
 
 --May allow items to take advantage of this later
-function SWEP:DrawHUD()
+function SWEP:CustomAmmoDisplay()
 end
 
 --[[
@@ -134,25 +164,11 @@ function SWEP:OnRestore()
 end
 
 --May allow items to take advantage of this later
-function SWEP:FreezeMovement()
-	return false;
-end
-
---May allow items to take advantage of this later
 function SWEP:GetViewModelPosition(pos,ang)
 	return pos,ang;
 end
 
 
---May allow items to take advantage of this later
-function SWEP:TranslateFOV(current_fov)
-	return current_fov;
-end
-
---May allow items to take advantage of this later
-function SWEP:AdjustMouseSensitivity()
-	return nil;
-end
 
 
 --A lot of notes, code snippets, and console dumps here for my research on rotating angles

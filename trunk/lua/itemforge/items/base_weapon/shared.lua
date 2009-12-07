@@ -15,7 +15,6 @@ if SERVER then AddCSLuaFile("shared.lua") end
 
 ITEM.Name="Base Weapon";
 ITEM.Description="This item is the base weapon.\nWeapons inherit from this.\n\nThis is not supposed to be spawned.";
-ITEM.Base="item";
 ITEM.WorldModel="models/weapons/w_pistol.mdl";
 ITEM.ViewModel="models/weapons/v_pistol.mdl";
 
@@ -43,8 +42,6 @@ ITEM.PrimaryDelay=.5;
 ITEM.SecondaryDelay=.5;
 ITEM.PrimaryDelayAuto=-1;
 ITEM.SecondaryDelayAuto=-1;
-
---Don't modify/override these. They're set automatically.
 ITEM.PrimaryAuto=true;
 ITEM.SecondaryAuto=true;
 

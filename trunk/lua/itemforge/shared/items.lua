@@ -8,15 +8,21 @@ handle inheritence between item types, handle networking of items between client
 theJ89's BUG list
 BUG  Shotgun reload loop is failing when trying to reload from a stack of 1 items
 BUG  net_fakelag 500 produces noticable problems with weapons. *sigh*
-BUG  Players are complaining about missing weapon icons, investigate
 BUG  Weapons should have networked, predicted ammo counters instead of using :GetAmount() from the current ammo. This should fix the "dry fire on last shot clientside" bug with ranged weapons.
 BUG  sometimes the view model does not change; this has been noticed when picking up one item, dropping it, and picking up a separate item
-BUG  when a weapon is picked up clientside, the weapon will not automatically acquire the item clientside. This causes the weapon menu and pickup notify to report the weapon as "Itemforge Item" until it is swapped to for the first time. This happens when picking up an item while holding a "no-switch from" weapon such as the gravity gun.
-BUG  Item icons do not automatically appear in the upper-left hand corner
-BUG  SWEP pickup issues; waiting on garry for this
+BUG  apparently related to the view model having it's model changed through Lua, viewmodel animations do not play until Weapon:SendWeaponAnim(ACT_VM_PRIMARYATTACK) is called.
+BUG  SWEP pickup issues (Give player weapon but he doesn't pick it up); waiting on garry for this
 BUG	 Odd bug noticed; may be related to entity owner, entity collision group, or damage. Sometimes while in the world an item loses its collision, player can walk through it, can't use it, etc.
 BUG  fix bug with SetNetOwner; is complaining about non-existent inventories table 
+BUG  when updates are being sent to connecting players, the server often complains about not being able to index something on removed items... what is this about?
 BUG  the new reusable IDs may interfere with full-update checks - If an old item 5 (lets pretend it's a crowbar) exists clientside and a new item 5 (lets say it's a base_ranged) is created, then it needs to override. This may be troublesome.
+BUG  Possibly PVS related or something - players will often see other players holding nothing. Items like the lantern stop working during lag spikes. Lantern light sticks until the local player observes the player holding the lantern.
+BUG  Sometimes players see bullets fired from other players... wierd!
+BUG  Debug module is reporting message -114 is undefined for some clients
+BUG  Wiremod is erroring some clients with message: Lua Error: entities\itemforge_item\shared.lua:80: attempt to compare number with string
+BUG  Okay, WTF? The pumpkin was both inside and outside of an inventory at the same time...
+BUG  Singleplayer - Weapons do not deploy clientside or something - the item slot is not showing up.
+BUG  Hitting ammo results in serverside bugs
 
 theJ89's Giant TODO list
 This is why the system hasn't been released yet:
@@ -37,7 +43,6 @@ TODO migrate .ReloadsSingly related things from the shotgun to the base_ranged
 TODO base_ranged needs to have "Load" renamed to "FillClip"; StartReload needs to be called OnReload - if the weapon .ReloadsSingly this starts the reload loop, otherwise this immediately fills the clip; items that use :Load() must be configured this way
 
 Item Ideas
-TODO awesome idea! Been thinking about implementing "inventory locking" that prevents any player interaction for a while now, but what if we used the lock items for this? Password locked briefcase? Hell yeah!
 TODO Wearable gear as suggested by Mr. Bix
 
 Events related
@@ -53,7 +58,7 @@ TODO If OnInit returns false, remove the item
 
 UI related
 TODO when item model changes it doesn't update on the "hold" icon.
-TODO dragdrops + mousewheel scrolling in inventory window = not good!
+TODO The UI needs to be able to mouse-capture entities as intended
 TODO If drags are enabled on any slots in ItemforgeInventorySlots they stay on even if an item is no longer occupying the slot.
 TODO Need to come up with good looking Item Card
 TODO redux of button icons for inventory?
@@ -62,10 +67,9 @@ TODO button bars? Have it so individual items can decide what their button bar c
 Entity related
 TODO Spawning and Dragdropping to world often stick the items in the world... ideally we don't want this to happen
 TODO Need to have SetSkin function that takes appropriate action (NOTE: may have to engineer ItemSlot displaying item to check for changes in skin)
-TODO entities need to glow while the cursor is dragging something overhead (or perhaps have a hook on the item like OnDragDropHover/OnDragDropHoverWorld)
 
 Networking related
-TODO okay let me set this straight once and for all: An update is when an item syncs everything related to that item with a client. A full update is an update of all items sent to a client. I need to rename these things as such.
+TODO okay let me set this straight once and for all: A sync is when a variable changes on the server and is synced with the client. An update is when an item syncs everything related to that item with a client. A full update is an update of all items sent to a client. I need to rename these things as such.
 TODO check that when a full update is performed everything is intact...
 TODO Default network commands, consider putting in IFI instead?
 TODO Merge and split's networking can be macro'ed to save bandwidth
@@ -78,7 +82,6 @@ TODO Additionally I could rewrite the ownership to allow items clientside to be 
 Item creation/removal related
 TODO Duplicator support
 TODO split and join behavior - for example, a stack of 2 items with an inventory splits; what then? Or, a heavily damaged item stacks with an intact item - average? lowest on top? sum? what?
-TODO split and join; bSameLocation and bPartialMerge need to be at the end of the function as optional arguments
 TODO Need to have a tab on the spawn menu that allows you to spawn items in world(like entities)
 TODO Save and reload capabilities for both databases, files, and singleplayer saves (perhaps make one interface for several methods)
 TODO Need to have an entity that spawns a given item-type in the world (so items can be pre-placed on maps). Perhaps even an inventory-item entity which takes an item-type and an item (to allow items to be created in containers)
@@ -199,12 +202,23 @@ local function BindReference(iref,item,id)
 	
 	local function irefIsValid() return (i!=nil); end
 	local function irefInvalidate() i=nil; end
+	local function irefGetTable()
+		if !i then
+			ErrorNoHalt("Itemforge Items: Couldn't grab item table from removed item (used to be Item "..id..")\n");
+			return false;
+		end
+		local t={};
+		for k,v in pairs(i) do t[k]=v; end
+		return t;
+	end
 	local irefmt={};
 	
 	--We want to forward reads to the item, so long as it's valid
 	function irefmt:__index(k)
 		if k=="IsValid" then
 			return irefIsValid;
+		elseif k=="GetTable" then
+			return irefGetTable;
 		elseif k=="Invalidate" then
 			return irefInvalidate;
 		elseif i!=nil then
@@ -519,6 +533,7 @@ function MODULE:SetItemTypeNWVarAndCommandIDs()
 					NWVarCopy.Default=b.NWVarsByID[i].Default;
 					NWVarCopy.Predicted=b.NWVarsByID[i].Predicted;
 					NWVarCopy.HoldFromUpdate=b.NWVarsByID[i].HoldFromUpdate;
+					NWVarCopy.Save=b.NWVarsByID[i].Save;
 					NWVarCopy.Type=b.NWVarsByID[i].Type;
 					NWVarCopy.ID=table.insert(NWVarIDs,NWVarCopy);
 					NWVarNames[NWVarCopy.Name]=NWVarCopy;
@@ -598,8 +613,13 @@ bPredicted is an optional true/false that defaults to false.
 bHoldFromUpdate is an optional true/false that defaults to false.
 	If this is true, then whenever a player connects we won't send the networked var to him.
 	This is useful for things that aren't really that important for joining players to know, such as "Next Attack Time".
+bNoSave is an optional true/false that defaults to false.
+	If this is false, the value of this networked var will be saved when the item is saved.
+	If this is true, this networked var will never be saved when the item is saved.
+	
+	It should be known that networked vars are not saved if the networked var is the same as the default (IE, it has never been set, it has been set to nil, or has been set to something equal to the default value).
 ]]--
-function MODULE:CreateNWVar(itemtype,sName,sDatatype,vDefaultValue,bPredicted,bHoldFromUpdate)
+function MODULE:CreateNWVar(itemtype,sName,sDatatype,vDefaultValue,bPredicted,bHoldFromUpdate,bNoSave)
 	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't create networked var. sName wasn't provided.\n"); return false end
 	if itemtype==nil then ErrorNoHalt("Itemforge Items: Couldn't create networked var \""..sName.."\". itemtype wasn't provided (if this is being called inside of an item itemtype should be ITEM\n"); return false end
 	if sDatatype==nil then ErrorNoHalt("Itemforge Items: Couldn't create networked var. The datatype wasn't provided.\n"); return false end
@@ -616,6 +636,7 @@ function MODULE:CreateNWVar(itemtype,sName,sDatatype,vDefaultValue,bPredicted,bH
 	NewNWVar.Default=vDefaultValue;
 	NewNWVar.Predicted=bPredicted or false;
 	NewNWVar.HoldFromUpdate=bHoldFromUpdate or false;
+	NewNWVar.Save=bNoSave or false;
 	local t=string.lower(sDatatype);
 		
 	if t=="int" || t=="integer" || t=="long" || t=="char" || t=="short" || t=="uchar" || t=="uint" || t=="uinteger" || t=="ulong" || t=="ushort" then
@@ -1178,11 +1199,6 @@ If the item type exists, returns it. Otherwise, returns nil.
 ]]--
 function MODULE:GetType(sName)
 	return ItemTypes[sName];
-end
-
---TEMPORARY/DEBUG
-function MODULE:GetRaw(id)
-	return Items[id];
 end
 
 --TEMPORARY/DEBUG

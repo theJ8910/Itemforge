@@ -10,6 +10,8 @@ if SERVER then AddCSLuaFile("shared.lua") end
 ITEM.Name="Axe";
 ITEM.Description="A steel hatchet with a sturdy wooden handle.\nNot only is it good for chopping wood, it looks like it could serve as a decent weapon!";
 ITEM.Base="base_melee";
+ITEM.Weight=1400;			--Googling for steel axes produces weights between 1.3 and 1.5 kg... 
+ITEM.Size=16;
 --There are actually two copies of this axe's world model; one belongs to Counter-Strike: Source, the other belongs to Half-Life 2: Episode 2. I chose CS:S because I figured more people had that game.
 ITEM.WorldModel="models/props/CS_militia/axe.mdl";
 ITEM.Spawnable=true;

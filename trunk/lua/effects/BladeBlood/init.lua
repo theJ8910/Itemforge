@@ -22,6 +22,7 @@ local function ParticleCollide(self,hit)
 		util.Decal("Blood",hit+oneup,hit-oneup);
 		WorldSound(Sounds[math.random(1,#Sounds)],hit);
 		self.Hit=true;
+		self:SetDieTime(0);
 	end
 end
 

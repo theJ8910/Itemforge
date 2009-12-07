@@ -537,8 +537,7 @@ function ITEM:GetWaterLevel()
 end
 
 --Returns the muzzle position; expects the item to be in the world
-function ITEM:GetMuzzle()
-	local eEnt=self:GetEntity();
+function ITEM:GetMuzzle(eEnt)
 	if !self.MuzzleAP then		self.MuzzleAP=eEnt:LookupAttachment(self.MuzzleName) end
 	if self.MuzzleAP!=0 then	return eEnt:GetAttachment(self.MuzzleAP);
 	else						return {Pos=eEnt:GetPos(),Ang=eEnt:GetAngles()};

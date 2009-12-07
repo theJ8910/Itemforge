@@ -57,21 +57,20 @@ else
 ITEM.NWVarsThisTick=nil;	--Next time the client ticks, the predicted networked vars will be set to this.
 end
 
-
 --[[
 Default Networked Vars - ITEM, NameOfVar, Datatype, DefaultValue (optional), IsPredicted (optional), HoldFromUpdate (optional)
 ]]--
---Weight is how much an item weighs, in grams. This affects how much weight an item fills in an inventory with a weight cap, not the physics weight when the item is on the ground.
-IF.Items:CreateNWVar(ITEM,"Weight","int",function(self) return self.Weight end);
-
---Size is a measure of how much space an item takes up (think volume, not weight). Inventories can be set up to reject items that are too big.
-IF.Items:CreateNWVar(ITEM,"Size","int",function(self) return self.Size end);
-
 --What condition is this item in? If the item is actually a stack of items, the 'top' item is in this condition.
 IF.Items:CreateNWVar(ITEM,"Health","int",function(self) return self:GetMaxHealth() end);
 
 --How durable is the item (how many hit points total does it have)? Higher values mean the item is more durable.
 IF.Items:CreateNWVar(ITEM,"MaxHealth","int",function(self) return self.MaxHealth end);
+
+--Weight is how much an item weighs, in grams. This affects how much weight an item fills in an inventory with a weight cap, not the physics weight when the item is on the ground.
+IF.Items:CreateNWVar(ITEM,"Weight","int",function(self) return self.Weight end);
+
+--Size is a measure of how much space an item takes up (think volume, not weight). Inventories can be set up to reject items that are too big.
+IF.Items:CreateNWVar(ITEM,"Size","int",function(self) return self.Size end);
 
 --What is this item's world model? This is visible when the item is in the world, in item slots, and when held in third person.
 IF.Items:CreateNWVar(ITEM,"WorldModel","string",function(self) return self.WorldModel end);
@@ -81,6 +80,9 @@ IF.Items:CreateNWVar(ITEM,"ViewModel","string",function(self) return self.ViewMo
 
 --What color is the item? This affects model color and icon color by default.
 IF.Items:CreateNWVar(ITEM,"Color","color",function(self) return self.Color end);
+
+--What override material does the item use? This affects the world model material by default.
+IF.Items:CreateNWVar(ITEM,"OverrideMaterial","string",function(self) return self.OverrideMaterial end);
 
 --[[
 How many items are in this stack?
@@ -92,7 +94,7 @@ If amount reaches 0, the item is removed (this is why the default is 1).
 :Split() can be used to split the stack, making a new stack (a copy) of the item.
 Likewise, :Merge() can remove other items and add their amounts onto this item.
 ]]--
-IF.Items:CreateNWVar(ITEM,"Amount","int",function(self) return self.StartAmount end);
+IF.Items:CreateNWVar(ITEM,"Amount","int",function(self) return self.StartAmount end,true);
 
 --How many items can be in this stack? If this is set to 0, an unlimited amount of items of this type can be in the same stack.
 IF.Items:CreateNWVar(ITEM,"MaxAmount","int",function(self)
@@ -304,7 +306,7 @@ function ITEM:SetNWColor(sName,cColor,bSuppress)
 	
 	return true;
 end
-IF.Items:ProtectKey("SetNWItem");
+IF.Items:ProtectKey("SetNWColor");
 
 --[[
 Don't call this directly, it's called by the other SetNW* functions

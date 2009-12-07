@@ -7,7 +7,7 @@ NOTE: The item type is the name of the folder it is in (this is item/cl_init.lua
 ]]--
 include("shared.lua");
 include("events_client.lua");
-ITEM.Icon=Material("melonracer/go");				--This used to be displayed in item slots (and probably still could) but for now it's only used in the weapon selection menu by default.
+ITEM.Icon=Material("editor/env_cubemap");			--This used to be displayed in item slots (and probably still could) but for now it's only used in the weapon selection menu by default.
 ITEM.ThinkRate=0;									--Run think clientside every # of seconds set here. This can be set to 0 to think every frame.
 ITEM.UseModelFor2D=true;							--If this is true, when displaying the item in an item slot, we'll create a model panel and display this item's world model in it. If this is false, no model panel is created.
 ITEM.WorldModelNudge=Vector(0,0,0);					--The item's world model is shifted by this amount relative to the player's right hand. This is only used if this item's world model is a non-standard weapon model (doesn't have a "ValveBiped.Bip01_R_Hand" bone like the HL2 pistol, crowbar, smg, etc).
@@ -15,6 +15,7 @@ ITEM.WorldModelRotate=Angle(0,0,0);					--The item's world model is rotated by t
 ITEM.RCMenu=nil;									--Our right click menu (a DMenu).
 ITEM.ItemSlot=nil;									--When the item is held, this will be a panel displaying this item.
 ITEM.WorldModelAttach=nil;							--When the item is held, this will be an attached model (a GearAttach object specifically) attached to the player's right hand.
+ITEM.OverrideMaterialMat=nil;						--On the client this is a Material() whose path is the item's override material (item:GetOverrideMaterial()). Use item:GetOverrideMaterialMat() to get this.
 
 --[[
 Transfer from one inventory to another.
@@ -76,6 +77,36 @@ function ITEM:PlayerHold(pl)
 	return true;
 end
 IF.Items:ProtectKey("PlayerHold");
+
+--[[
+This is run when the player chooses "Examine" from his menu.
+Prints some info about the item (name, amount, weight, health, and description) to the local player's chat.
+]]--
+function ITEM:PlayerExamine()
+	
+	local amtstr="";
+	if self:IsStack() then amtstr=" x "..self:GetAmount(); end
+	
+	local w=self:GetStackWeight();
+	local weightstr;
+	if w>=1000 then	weightstr=(w*0.001).." kg"
+	else			weightstr=w.." grams"
+	end
+	
+	local h=self:GetHealth();
+	local m=self:GetMaxHealth();
+	
+	LocalPlayer():PrintMessage(HUD_PRINTTALK,self:Event("GetName","Error")..amtstr);
+	LocalPlayer():PrintMessage(HUD_PRINTTALK,"Total Weight: "..weightstr);
+	LocalPlayer():PrintMessage(HUD_PRINTTALK,"Condition: "..math.Round((h/m)*100).."% ("..h.."/"..m..")");
+	LocalPlayer():PrintMessage(HUD_PRINTTALK,self:Event("GetDescription","Error"));
+end
+IF.Items:ProtectKey("PlayerExamine");
+
+function ITEM:GetOverrideMaterialMat()
+	return self.OverrideMaterialMat;
+end
+IF.Items:ProtectKey("GetOverrideMaterialMat")
 
 --[[
 Returns this item's right click menu if one is currently open.
@@ -252,6 +283,10 @@ function ITEM:Tick()
 end
 IF.Items:ProtectKey("Tick");
 
+
+local NIL="%%00";		--If a command isn't given, this is substituted. It means we want to send nil (nothing).
+local SPACE="%%20";		--If a space is given in a string, this is substituted. It means " ".
+	
 --[[
 Sends a networked command by name with the supplied arguments
 Clientside, this runs console commands (sending data to the server in the process)
@@ -260,9 +295,6 @@ function ITEM:SendNWCommand(sName,...)
 	local command=self.NWCommandsByName[sName];
 	if command==nil then ErrorNoHalt("Itemforge Items: Couldn't send command '"..sName.."' on "..tostring(self)..", there is no NWCommand with this name on this item!\n"); return false end
 	if command.Hook!=nil then ErrorNoHalt("Itemforge Items: Command '"..command.Name.."' on "..tostring(self).." can't be sent clientside. It has a hook, meaning this command is recieved clientside, not sent.\n"); return false end
-	
-	local NIL="%%00";		--If a command isn't given, this is substituted. It means we want to send nil (nothing).
-	local SPACE="%%20";		--If a space is given in a string, this is substituted. It means " ".
 	
 	local arglist={};
 	
@@ -403,6 +435,6 @@ IF.Items:CreateNWCommand(ITEM,"TransferSlot",function(self,oldinv,oldslot,newslo
 IF.Items:CreateNWCommand(ITEM,"PlayerUse");
 IF.Items:CreateNWCommand(ITEM,"PlayerHold");
 IF.Items:CreateNWCommand(ITEM,"PlayerSendToInventory",nil,{"inventory","short"});
-IF.Items:CreateNWCommand(ITEM,"PlayerSendToWorld",nil,{"vector"});
+IF.Items:CreateNWCommand(ITEM,"PlayerSendToWorld",nil,{"vector","vector"});
 IF.Items:CreateNWCommand(ITEM,"PlayerMerge",nil,{"item"});
 IF.Items:CreateNWCommand(ITEM,"PlayerSplit",nil,{"int"});

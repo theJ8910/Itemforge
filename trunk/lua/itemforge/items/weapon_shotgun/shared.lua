@@ -9,9 +9,11 @@ Delays are taken from the SequenceDuration() of the viewmodel animations.
 
 if SERVER then AddCSLuaFile("shared.lua") end
 
-ITEM.Name="Shotgun";
-ITEM.Description="This is a 12 gauge, double-barrelled combat shotgun.\nThis weapon can fire up to two shells at once.\nThis shotgun can be loaded with any 12 gauge shotgun shells.";
+ITEM.Name="Franchi SPAS-12";
+ITEM.Description="This is a Franchi SPAS-12, a double-barrelled combat shotgun.\nThis weapon can fire up to two shells at once.\nThis shotgun can be loaded with any 12 gauge shotgun shells.";
 ITEM.Base="base_firearm";
+ITEM.Weight=4400;	--Based on http://half-life.wikia.com/wiki/SPAS-12_(HL2) and http://en.wikipedia.org/wiki/Franchi_SPAS-12
+ITEM.Size=19;
 ITEM.WorldModel="models/weapons/w_shotgun.mdl";
 ITEM.ViewModel="models/weapons/v_shotgun.mdl";
 ITEM.Spawnable=true;

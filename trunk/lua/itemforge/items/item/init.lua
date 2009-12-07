@@ -114,22 +114,27 @@ IF.Items:ProtectKey("OnStartTouchSafe");
 
 --[[
 Changes the item's world model.
+False is returned if this cannot be done for some reason. True is returned if the model was changed.
 ]]--
 function ITEM:SetWorldModel(sModel)
 	if !sModel then ErrorNoHalt("Itemforge Items: Couldn't change world model. No model was given.\n"); return false end
+	
+	local sOldModel=self:GetWorldModel();
+	if sModel==sOldModel then return true end
+	
 	self:SetNWString("WorldModel",sModel);
 	
+	--If we're in the world when the model changes...
 	if self:InWorld() then
 		local ent=self:GetEntity();
+		local pos=ent:GetPos();
+		local ang=ent:GetAngles();
 		
-		--If this item's ent has a model it needs to change
-		ent:SetModel(sModel);
-		
-		--If this item's ent has a physics model it needs to be updated
-		if (ent:GetPhysicsObject():IsValid()) then
-			ent:PhysicsInit(SOLID_VPHYSICS);
-		end
+		--We must respawn the entity. This means taking the item out of the world and returning it to where it was. In the case of a failure, false is returned and the world model is reset.
+		if !self:ToVoid() || !self:ToWorld(pos,ang) then self:SetNWString("WorldModel",sOldModel); return false end
 	end
+	
+	return true;
 end
 
 --[[
@@ -139,6 +144,8 @@ TODO actually change visible viewmodel.
 function ITEM:SetViewModel(sModel)
 	if !sModel then ErrorNoHalt("Itemforge Items: Couldn't change view model. No model was given.\n"); return false end
 	self:SetNWString("ViewModel",sModel);
+	
+	return true;
 end
 IF.Items:ProtectKey("SetViewModel");
 
@@ -363,9 +370,18 @@ IF.Items:ProtectKey("PlayerSendToInventory");
 
 --Runs when a client requests to send this item to the world somewhere
 --TODO range checking on "where"
-function ITEM:PlayerSendToWorld(pl,where)
+function ITEM:PlayerSendToWorld(pl,from,to)
 	if !self:Event("CanPlayerInteract",false,pl) then return false end
-	self:ToWorld(where);
+	
+	local ent=self:ToWorld(from);
+	
+	local tr={};
+	tr.start		=	from;
+	tr.endpos		=	from+((to-from):Normalize()*64);
+	tr.filter		=	{pl,pl:GetViewEntity(),ent};
+	traceRes		=	util.TraceEntity(tr,ent);
+	
+	self:ToWorld(traceRes.HitPos);
 end
 IF.Items:ProtectKey("PlayerSendToWorld");
 
@@ -398,6 +414,6 @@ IF.Items:CreateNWCommand(ITEM,"TransferSlot",nil,{"inventory","short","short"});
 IF.Items:CreateNWCommand(ITEM,"PlayerUse",function(self,...) self:Use(...) end);
 IF.Items:CreateNWCommand(ITEM,"PlayerHold",function(self,...) self:PlayerHold(...) end);
 IF.Items:CreateNWCommand(ITEM,"PlayerSendToInventory",function(self,...) self:PlayerSendToInventory(...) end,{"inventory","short"});
-IF.Items:CreateNWCommand(ITEM,"PlayerSendToWorld",function(self,...) self:PlayerSendToWorld(...) end,{"vector"});
+IF.Items:CreateNWCommand(ITEM,"PlayerSendToWorld",function(self,...) self:PlayerSendToWorld(...) end,{"vector","vector"});
 IF.Items:CreateNWCommand(ITEM,"PlayerMerge",function(self,...) self:PlayerMerge(...) end,{"item"});
 IF.Items:CreateNWCommand(ITEM,"PlayerSplit",function(self,...) self:PlayerSplit(...) end,{"int"});

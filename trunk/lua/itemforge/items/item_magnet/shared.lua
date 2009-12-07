@@ -3,6 +3,8 @@ item_magnet
 SHARED
 
 This item attracts other items to it. It can be turned on or off.
+
+Icon by Karolis O.
 ]]--
 
 if SERVER then AddCSLuaFile("shared.lua") end
@@ -10,6 +12,7 @@ if SERVER then AddCSLuaFile("shared.lua") end
 ITEM.Name="Item Magnet";
 ITEM.Description="An object of mysterious origin, it attracts any items to it when turned on.";
 ITEM.Base="item";
+ITEM.Size=8;
 ITEM.WorldModel="models/Items/combine_rifle_ammo01.mdl";
 ITEM.MaxHealth=300;
 ITEM.Strength=150;
@@ -18,6 +21,10 @@ ITEM.Sounds={
 	Sound("buttons/button19.wav"),
 	Sound("ambient/levels/citadel/extract_loop1.wav"),
 };
+
+if CLIENT then
+	ITEM.Icon=Material("itemforge/items/item_magnet");
+end
 
 --Server only
 if SERVER then
