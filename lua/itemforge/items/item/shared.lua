@@ -28,6 +28,7 @@ ITEM.WorldModel="models/dav0r/buttons/button.mdl";		--When dropped on the ground
 ITEM.ViewModel="models/weapons/v_pistol.mdl";			--When held by a player, the player holding it sees this model in first-person.
 ITEM.Size=1;											--Default size of a single item in this stack. Size has nothing to do with how big the item looks or how much it weighs. Instead, size determines if an item can be placed in an inventory or not. In my opinion, a good size can be determined if you put the item into the world and get the entity's bounding sphere size.
 ITEM.Color=Color(255,255,255,255);						--Default color of this item's model and icon. Can be changed.
+ITEM.OverrideMaterial=nil;								--Default override material of this item's world model. Use nil if the model's material is not being overridden, or "path" if it is (where path is the path of the material). Can be changed.
 
 --Restrictions on who can spawn
 ITEM.Spawnable=false;									--Can this item be spawned by any player via the spawn menu on the items tab?
@@ -304,13 +305,14 @@ function ITEM:ToWorld(vPos,aAng,eEnt,bPredict)
 				ent:SetItem(self);
 				ent:SetPos(vPos);
 				ent:SetAngles(aAng);
-				
 				self:SetEntity(ent);
 			end
 		end
 	else
 		if !eEnt || !eEnt:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't set entity for "..tostring(self).." clientside... no valid entity was given.\n"); return false end
-		if bTeleport then ErrorNoHalt("Itemforge Items: Warning! Setting entity of "..tostring(self).." to "..tostring(eEnt).." even though it already has an entity ("..tostring(ent)..")!\n"); end
+		
+		--Ideally, this item should never already have an entity when a new one is given to it clientside. However, it happens - sometimes an item acquires a new entity before an old one can be removed, so I'm making it ignore this check.
+		--if bTeleport then ErrorNoHalt("Itemforge Items: Warning! Setting entity of "..tostring(self).." to "..tostring(eEnt).." even though it already has an entity ("..tostring(ent)..")!\n"); end
 		
 		ent=eEnt;
 		self:SetEntity(ent);
@@ -396,7 +398,7 @@ function ITEM:Hold(pl,bNoMerge,wep,bPredict)
 			--local ent=ents.Create("itemforge_item_held_"..iEmptySlot);
 			--ent:SetPos(pl:GetPos()+Vector(0,0,64));
 		
-			if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Items: Tried to create itemforge_item_held entity for "..tostring(self).." but failed.\n"); return false end
+			if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Items: Tried to create itemforge_item_held_"..iEmptySlot.." entity for "..tostring(self).." but failed.\n"); return false end
 		
 			--This function triggers the item's OnSWEPInit hook.
 			ent:SetItem(self);
@@ -542,8 +544,8 @@ function ITEM:ToVoid(forced,vDoubleCheck,bNotFromClient,bPredict)
 		
 		if !forced && (SERVER || bPredict) && !self:Event("CanRelease",true,pOwner) then return false end
 		if !bPredict then
-			self:ClearWeapon(vDoubleCheck);
 			if SERVER then ent:ExpectedRemoval(); end
+			self:ClearWeapon(vDoubleCheck);
 			
 			--TODO: DETERMINE IF SERVER FORCED REMOVAL
 			self:Event("OnRelease",nil,pOwner,forced);
@@ -615,6 +617,14 @@ function ITEM:SetColor(cCol)
 end
 IF.Items:ProtectKey("SetColor");
 
+--[[
+This sets the override material this item uses for it's model.
+]]--
+function ITEM:SetOverrideMaterial(sMat)
+	self:SetNWString("OverrideMaterial",sMat);
+end
+IF.Items:ProtectKey("SetOverrideMaterial");
+
 
 
 
@@ -675,6 +685,14 @@ function ITEM:GetColor()
 	return self:GetNWColor("Color");
 end
 IF.Items:ProtectKey("GetColor");
+
+--[[
+This returns the override material this item uses for it's model.
+]]--
+function ITEM:GetOverrideMaterial()
+	return self:GetNWString("OverrideMaterial");
+end
+IF.Items:ProtectKey("GetOverrideMaterial");
 
 --[[
 Returns the player who is NetOwner of this item.

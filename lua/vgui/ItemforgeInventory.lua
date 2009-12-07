@@ -47,6 +47,7 @@ local TitleEndCapPadding=0;						--How much space between the end of the title b
 local TitleTextColor=Color(255,255,255,255);	--What color is the title bar text?
 local TitleTextX=69;							--Where does the text start drawing?
 local TitleTextY=17;
+local TitleX2=TitleX+TitleStartCapWidth;		--The portion of the title bar between the start and end caps starts drawing here
 
 --Borders and corners
 local BorderMats={
@@ -87,17 +88,17 @@ if true then
 	
 	--[[
 	The radius is half the length of the diameter, so radius/diameter = .5.
-	Or it would be if we weren't working with a texture. Our radius isn't _exactly_ .5, due to technical restrictions of what we're working with, you understand.
+	Except for one problem - the "diameter" is the width of the circle texture. The border actually makes the texture's width larger than the diameter of the circle!
+	So unfortunately, the UV radius is not 0.5. We do have the circle radius and circle width at our disposal here though, so we can get the UV radius here.
 	UV coordinates are between 0 and 1, which is why we're converting here.
 	We need both pixel coordinates (for drawing at a given location) and UV coordinates (used to "cut out" part of a texture; we're drawing a rough circle, right? So we need to "cut out" a circle from whatever texture we're using.)
 	]]--
 	local uvRadius=CircleRadius/CircleWidth;
-	local slice=360/CircleVertDetail;
+	local slice=2*math.pi/CircleVertDetail;
 	
 	--Precompute circle vertices
 	for i=1,CircleVertDetail do
-		local ang=math.Deg2Rad(slice*i);
-		
+		local ang=slice*i;
 		--x and y are coordinates describing the position of a point in the direction of ang from 0,0.
 		--x and y are between [-1,1].
 		local x=math.cos(ang);
@@ -164,17 +165,9 @@ local ActionButtonIcons={
 	Material("itemforge/inventory/releaseicon")
 }
 
-
 function PANEL:Init()
 	--Set inital size
-	self:SetSize(437,353);
-	
-	--Precompute number of background tiles
-	self.BackgroundTilesX=math.ceil((self:GetWide()-BackgroundX)/BackgroundTileWidth);
-	self.BackgroundTilesY=math.ceil((self:GetTall()-BackgroundY)/BackgroundTileHeight);
-	
-	--Precompute size of title bar
-	self.TitleBarWidth=self:GetWide()-TitleX-TitleStartCapWidth-TitleEndCapWidth;
+	self:Resize(437,353);	
 	
 	--Create close button
 	self.CloseButton=vgui.Create("DSysButton",self);
@@ -239,16 +232,34 @@ function PANEL:Init()
 	self:SetAutoDelete(true);
 end
 
+local function MakeRectPoly(x1,y1,x2,y2,xTile,yTile)
+	local u,v=((x2-x1)/xTile),((y2-y1)/yTile);
+	return {
+		{x=x1,	y=y1,	u=0,	v=0},
+		{x=x2,	y=y1,	u=u,	v=0},
+		{x=x2,	y=y2,	u=u,	v=v},
+		{x=x1,	y=y2,	u=0,	v=v},
+	};
+end
+
+function PANEL:Resize(w,h)
+	self:SetSize(w,h);
+	
+	self.BackgroundVerts	= MakeRectPoly(BackgroundX,				BackgroundY,				w,							h,							BackgroundTileWidth,	BackgroundTileHeight);
+	self.TopBorderVerts		= MakeRectPoly(BackgroundX+CornerWidth,	BackgroundY,				w-CornerWidth,				BackgroundY+BorderWidth,	BorderHeight,			BorderWidth);
+	self.BottomBorderVerts	= MakeRectPoly(BackgroundX+CornerWidth,	h-BorderWidth,				w-CornerWidth,				h,							BorderHeight,			BorderWidth);
+	self.LeftBorderVerts	= MakeRectPoly(BackgroundX,				BackgroundY+CornerHeight,	BackgroundX+BorderWidth,	h-CornerHeight,				BorderWidth,			BorderHeight);
+	self.RightBorderVerts	= MakeRectPoly(w-BorderWidth,			BackgroundY+CornerHeight,	w,							h-CornerHeight,				BorderWidth,			BorderHeight);
+	
+	self.TitleBarWidth=self:GetWide()-TitleX-TitleStartCapWidth-TitleEndCapWidth;
+end
+
 function PANEL:Paint()
 	surface.SetDrawColor(255,255,255,255);
 	
 	--Background
 	surface.SetMaterial(BackgroundMat);
-	for y=0,self.BackgroundTilesY-1 do
-		for x=0,self.BackgroundTilesX-1 do
-			surface.DrawTexturedRect(BackgroundX+(x*BackgroundTileWidth),BackgroundY+(y*BackgroundTileHeight),BackgroundTileWidth,BackgroundTileHeight);
-		end
-	end
+	surface.DrawPoly(self.BackgroundVerts);
 	
 	--Title start cap
 	surface.SetMaterial(TitleMats[1]);
@@ -256,11 +267,11 @@ function PANEL:Paint()
 	
 	--Title Bar
 	surface.SetMaterial(TitleMats[2]);
-	surface.DrawTexturedRect(TitleX+TitleStartCapWidth,TitleY,self.TitleBarWidth,TitleHeight);
+	surface.DrawTexturedRect(TitleX2,TitleY,self.TitleBarWidth,TitleHeight);
 	
 	--Title end cap
 	surface.SetMaterial(TitleMats[3]);
-	surface.DrawTexturedRect(TitleX+TitleStartCapWidth+self.TitleBarWidth,TitleY,TitleEndCapWidth,TitleHeight);
+	surface.DrawTexturedRect(TitleX2+self.TitleBarWidth,TitleY,TitleEndCapWidth,TitleHeight);
 	
 	--Title text
 	if self.Inventory && self.Inventory:IsValid() then
@@ -278,44 +289,21 @@ function PANEL:Paint()
 		end
 		
 		local selected=self.Slots:GetSelectedItem()
-		if selected then
-			--[[
-			surface.SetFont("DefaultSmall");
-			surface.SetTextColor(NameLabelColor.r,NameLabelColor.g,NameLabelColor.b,NameLabelColor.a);
-			surface.SetTextPos(NameLabelX,NameLabelY);
-			surface.DrawText(selected:GetName().."\n"..selected:GetDescription());
-			]]--
-			draw.DrawText(selected:GetName().."\n"..selected:GetDescription(),"DefaultSmall",NameLabelX,NameLabelY,NameLabelColor,TEXT_ALIGN_LEFT);
-		end
+		if selected then draw.DrawText(selected:GetName().."\n"..selected:GetDescription(),"DefaultSmall",NameLabelX,NameLabelY,NameLabelColor,TEXT_ALIGN_LEFT); end
 	end
 	
 	--Right border
-	local x=self:GetWide()-BorderWidth;
 	surface.SetMaterial(BorderMats[1]);
-	for y=0,self.BackgroundTilesY-1 do
-		surface.DrawTexturedRect(x,BackgroundY+(y*BorderHeight),BorderWidth,BorderHeight);
-	end
-	
+	surface.DrawPoly(self.RightBorderVerts);
 	--Top border
-	local y=BackgroundY;
 	surface.SetMaterial(BorderMats[2]);
-	for x=0,self.BackgroundTilesX-1 do
-		surface.DrawTexturedRect(BackgroundX+(x*BorderHeight),y,BorderHeight,BorderWidth);
-	end
-	
+	surface.DrawPoly(self.TopBorderVerts);
 	--Left border
-	local x=BackgroundX;
 	surface.SetMaterial(BorderMats[3]);
-	for y=0,self.BackgroundTilesY-1 do
-		surface.DrawTexturedRect(x,BackgroundY+(y*BorderHeight),BorderWidth,BorderHeight);
-	end
-	
+	surface.DrawPoly(self.LeftBorderVerts);
 	--Bottom border
-	local y=self:GetTall()-BorderWidth;
 	surface.SetMaterial(BorderMats[4]);
-	for x=0,self.BackgroundTilesX-1 do
-		surface.DrawTexturedRect(BackgroundX+(x*BorderHeight),y,BorderHeight,BorderWidth);
-	end
+	surface.DrawPoly(self.BottomBorderVerts);
 	
 	--Corners
 	--SW
@@ -327,12 +315,11 @@ function PANEL:Paint()
 	--NE
 	surface.SetMaterial(CornerMats[3]);
 	surface.DrawTexturedRect(self:GetWide()-CornerWidth,BackgroundY,CornerWidth,CornerHeight);
-	
-	--Circle (in the NW corner)
+	--Circle in the NW corner
+	--Background
 	surface.SetMaterial(CircleMats[1]);
 	surface.DrawTexturedRect(CircleX,CircleY,CircleWidth,CircleHeight);
-	
-	--Icon Circle; we draw the icon for this inventory inside of a circle
+	--Icon
 	if self.Inventory && self.Inventory:IsValid() then
 		local icon=self.Inventory:GetIcon();
 		if icon then
@@ -340,7 +327,7 @@ function PANEL:Paint()
 			surface.DrawPoly(CircleVerts);
 		end
 	end
-	--This draws the border to obscure any rough edges on the icon circle
+	--Border (obscures any rough edges on icon)
 	surface.SetMaterial(CircleMats[2]);
 	surface.DrawTexturedRect(CircleX,CircleY,CircleWidth,CircleHeight);
 	
@@ -350,11 +337,13 @@ end
 function PANEL:OnMousePressed()
 	self.MouseDownX,self.MouseDownY=self:ScreenToLocal(gui.MousePos());
 	if (self.MouseDownX>=TitleX && self.MouseDownX<TitleX+TitleStartCapWidth+self.TitleBarWidth+TitleEndCapWidth && self.MouseDownY>=TitleY && self.MouseDownY<TitleY+TitleDisplayHeight) || (math.sqrt(math.pow(self.MouseDownX-circleCenterX,2)+math.pow(self.MouseDownY-circleCenterY,2))<=CircleRadius) then
+		self:MouseCapture(true);
 		self.Dragging=true;
 	end
 end
 
 function PANEL:OnMouseReleased()
+	self:MouseCapture(false);
 	self.Dragging=false;
 end
 

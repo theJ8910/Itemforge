@@ -21,7 +21,8 @@ end
 
 ITEM.Name="Sawblade";
 ITEM.Description="A circular steel sawblade with razor-sharp teeth.\nThese types of blades are often a part of woodworking machinery.";
-ITEM.Base="item";
+ITEM.Size=26;
+ITEM.Weight=35856;				--Weighs approximately 36 kg or around 72 pounds (YEESH - the sawblade is about 2 feet in diameter though, and made out of steel. It's not that surprising is it?). Calculated using density of steel #1 (http://hypertextbook.com/facts/2004/KarenSutherland.shtml) multiplied by the volume in cubic centimeters (converted from game units) of an inner cylinder subtracted from an outer cylinder. The thickness and radii were calculated by getting the distance between trace .HitPos itions on the sawblade model.
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 

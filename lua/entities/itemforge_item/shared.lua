@@ -30,10 +30,9 @@ function ENT:SetItem(item)
 	if self:IsBeingRemoved() || !item then return false end
 	
 	self.Item=item;
-	item:Event("OnEntityInit",nil,self.Entity);
-	
 	self:GiveWire();	--WIRE
-	
+	item:Event("OnEntityInit",nil,self.Entity);
+	self.PrintName=item:Event("GetName","Itemforge Item");
 	if SERVER then
 		--WIRE
 		if self.IsWire then

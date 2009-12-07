@@ -8,6 +8,9 @@ NOTE: The item type is the name of the folder it is in (this is item/events_clie
 This specific file deals with events that are present on the client.
 ]]--
 
+local mWhite=Material("white_outline");
+local oneVector=Vector(1,1,1);
+
 --[[
 ENTITY SPECIFIC EVENTS
 ]]--
@@ -76,6 +79,36 @@ end
 
 --This function is run when it comes time to draw a viewmodel. This will only happen while a player is holding an item
 function ITEM:OnSWEPDrawViewmodel()
+end
+
+--This function is run when it comes time to draw something on the player's HUD. This will only happen while a player is holding an item as a weapon and has it out.
+function ITEM:OnSWEPDrawHUD()	
+end
+
+--[[
+You receive the player's current FOV here and are allowed to change it while this item is held as a weapon and is out.
+This is useful for items with scopes.
+]]--
+function ITEM:OnSWEPTranslateFOV(current_fov)
+	return current_fov;
+end
+
+--[[
+This event determines if we should freeze the view (stop the player from rotating his view) of the player holding this item as a weapon.
+Returning true prevents the player holding this item.
+Returning anything else (or nothing at all).
+]]--
+function ITEM:OnSWEPFreezeView()
+	return false;
+end
+
+--[[
+This event can be used to adjust the mouse sensitivity while holding the weapon.
+You may return a multiplier to change how sensitive the mouse is (such as 2 for double the mouse sensitivity, 3 for triple the sensitivity, 0 for no mouse movement at all).
+You may also return nil or 1 for no change in mouse sensitivity.
+]]--
+function ITEM:OnSWEPAdjustMouseSensitivity()
+	return nil;
 end
 
 --[[
@@ -166,7 +199,7 @@ function ITEM:OnPopulateMenu(pMenu)
 	--Add basic "Use" and "Hold" options
 	pMenu:AddOption("Use",function(panel) self:Use(LocalPlayer()) end);
 	if !self:IsHeld() then pMenu:AddOption("Hold",function(panel) self:PlayerHold(LocalPlayer()) end); end
-	
+	pMenu:AddOption("Examine",function(panel) self:PlayerExamine(LocalPlayer()) end)
 	--Add "Split" option; as long as there are enough items to split (at least 2); also, the CanPlayerSplit event must indicate it's possible
 	if self:IsStack() && self:GetAmount()>1 && self:Event("CanPlayerSplit",true,LocalPlayer()) then
 		pMenu:AddOption("Split",function(panel) self:PlayerSplit(LocalPlayer()); end);
@@ -204,10 +237,13 @@ TODO if client determines merge is impossible return false
 ]]--
 function ITEM:OnDragDropHere(otherItem)
 	--Don't even bother telling the server to merge if we know we can't interact with the two
-	if !self:Event("CanPlayerInteract",false,LocalPlayer()) || !otherItem:Event("CanPlayerInteract",false,pl) then return false end
+	if !self:Event("CanPlayerInteract",false,LocalPlayer()) || !otherItem:Event("CanPlayerInteract",false,LocalPlayer()) then return true end
+	
+	--Predict if we can merge, fail if prediction says we can't
+	if !self:Merge(otherItem) then return true end
 	
 	self:SendNWCommand("PlayerMerge",otherItem);
-	return true;
+	return false;
 end
 
 --[[
@@ -217,7 +253,7 @@ traceRes is a full trace results table.
 ]]--
 function ITEM:OnDragDropToWorld(traceRes)
 	if !self:Event("CanPlayerInteract",false,LocalPlayer()) then return false end
-	self:SendNWCommand("PlayerSendToWorld",traceRes.HitPos);
+	self:SendNWCommand("PlayerSendToWorld",traceRes.StartPos,traceRes.HitPos);
 end
 
 --[[
@@ -285,11 +321,27 @@ If bTranslucent is true, this means that the entity is in the Translucent render
 	Or in other words, the entity is most likely partially see-through (has an alpha of less than 255).
 ]]--
 function ITEM:OnDraw3D(eEntity,bTranslucent)
+	if IF.UI:GetDropEntity()==eEntity then
+		render.SuppressEngineLighting(true);
+		render.SetAmbientLight(1,1,1);
+		render.SetColorModulation(1,0.7,0);
+		SetMaterialOverride(mWhite);
+		local f=1 + math.abs(-1+2*math.fmod(CurTime()*5,1))*0.1;
+		eEntity:SetModelScale(Vector(f,f,f));
+		
+		eEntity:DrawModel();
+		
+		eEntity:SetModelScale(oneVector);
+		SetMaterialOverride(nil);
+		render.SuppressEngineLighting(false);
+	end
+	
 	local c=self:GetColor();
 	render.SetColorModulation(c.r/255,c.g/255,c.b/255);
 	render.SetBlend(c.a/255);
-	
+	SetMaterialOverride(self:GetOverrideMaterialMat());
 	eEntity:DrawModel();
+	SetMaterialOverride(nil);
 end
 
 --[[
@@ -330,9 +382,15 @@ end
 function ITEM:OnSetNWVar(sName,vValue)
 	--Changing the weight or amount of an item affects the weight stored in the inventory so update it
 	--If the world model changes we need to update the inventory so it refreshes the model displayed
-	if sName=="Amount" || sName=="Weight" || sName=="WorldModel" then
+	if sName=="Amount" || sName=="Weight" || sName=="WorldModel" || sName=="OverrideMaterial" then
 		local container=self:GetContainer();
 		if container then container:Update() end
+	end
+	
+	if sName=="OverrideMaterial" then
+		if vValue!=nil then self.OverrideMaterialMat=Material(vValue);
+		else				self.OverrideMaterialMat=nil;
+		end
 	end
 	return true;
 end

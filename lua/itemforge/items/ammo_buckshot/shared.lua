@@ -7,10 +7,23 @@ This is ammunition for the HL2 shotgun. Or, I guess, any 12 gauge shotgun.
 
 if SERVER then AddCSLuaFile("shared.lua") end
 
-ITEM.Name="Shotgun Shells";
-ITEM.Description="Shotgun shells for a 12 gauge shotgun.";
+ITEM.Name="Buckshot";
+ITEM.Description="This is 12 gauge buckshot.\nThese lead-shot filled shotgun shells are used for combat purposes as well as for hunting large game.";
 ITEM.Base="base_ammo";
 ITEM.StartAmount=20;
+ITEM.Size=4;
+ITEM.Weight=32;
+
+if SERVER then
+
+ITEM.HoldType="slam";
+
+else
+
+ITEM.WorldModelNudge=Vector(-2,-3,-4);
+ITEM.WorldModelRotate=Angle(0,0,0);
+
+end
 
 --[[
 Just to demonstrate what you can do with this system, the shotgun ammo has two world models!

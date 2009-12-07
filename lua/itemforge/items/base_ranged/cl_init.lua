@@ -68,8 +68,12 @@ ammo is the item we want to load.
 function ITEM:PlayerLoadAmmo(pl,ammo)
 	if !self:Event("CanPlayerInteract",false,pl) then return false end
 	for i=1,table.getn(self.Clips) do
-		if self:CanLoadClipWith(ammo,i) then return self:SendNWCommand("PlayerLoadAmmo",ammo); end
+		if self:CanLoadClipWith(ammo,i) then 
+			self:SendNWCommand("PlayerLoadAmmo",ammo);
+			return true;
+		end
 	end
+	return false;
 end
 
 --We have a nice menu for ranged weapons!
@@ -118,8 +122,7 @@ end
 
 --If usable ammo is dragged here we ask the server to load it
 function ITEM:OnDragDropHere(otherItem)
-	self:PlayerLoadAmmo(LocalPlayer(),otherItem);
-	return false;
+	return !self:PlayerLoadAmmo(LocalPlayer(),otherItem);
 end
 
 --Draw ammo bar(s)

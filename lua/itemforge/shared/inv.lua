@@ -1066,7 +1066,7 @@ end
 Returns the position of the inventory in the world
 If you get the position of an inventory, it returns the position(s) of the inventory's connected object(s).
 	So, if our item is in an inventory connected with a barrel entity, it returns the position of the barrel entity.
-	If our inventory is connected with, lets say, two bags that share the same inventory, then it returns both the positon of the first bag and the second (as a table).
+	If our inventory is connected with, lets say, two bags that share the same inventory, then it returns both the position of the first bag and the second (as a table).
 	
 	If this is a player's inventory, it returns the player's position.
 	If our item is in a bottle inside of a crate in the world, it returns the crate's position.

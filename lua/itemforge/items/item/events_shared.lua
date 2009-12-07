@@ -199,10 +199,33 @@ Can the item be held as a weapon?
 Serverside, if this returns false, attempts to hold the item as a weapon will fail.
 Clientside, the function returning true/false is only good for prediction purposes.
 
+By default, items cannot be held if they are too large (30 or more).
+You can override this in your items.
+
 pl is the player who will be holding the weapon.
 ]]--
 function ITEM:CanHold(pl)
-	return true;
+	return self:GetSize()<30;
+end
+
+--This is the default slot drop function for a held weapon's item slot
+--Self is this slot, panel is the panel this was dropped on
+local SlotDrop=function(self,droppedPanel)
+	local item=self:GetItem();
+	if !item then return false end
+	
+	--Can the dropped panel hold an item?
+	if !droppedPanel.GetItem then return false end
+
+	--Does the dropped panel have an item set, and is it different from this panel's item?
+	local s,r=pcall(droppedPanel.GetItem,droppedPanel);
+	if !s then	ErrorNoHalt(r.."\n"); return false;
+	elseif !r || r==item then return false end
+	
+	--Call the dragdrop events.
+	if item:Event("OnDragDropHere",true,r) then
+		r:Event("OnDragDropToItem",nil,item);
+	end
 end
 
 --[[
@@ -217,18 +240,28 @@ function ITEM:OnHold(pl,weapon)
 	
 	if SERVER then return end
 	
+	--If the weapon isn't out when OnHold gets called, we need to hide the world model and item slot
+	local bNotOut=(pl:GetActiveWeapon()!=weapon);
+	
 	--Create world model
 	if !self.WMAttach then
 		--First we create the gear, attached to the holding player
 		self.WMAttach=IF.GearAttach:Create(self:GetWOwner(),self:GetWorldModel());
-		self.WMAttach:SetOffset(self.WorldModelNudge);
-		self.WMAttach:SetOffsetAngles(self.WorldModelRotate);
-		self.WMAttach:SetDrawFunction(function(ent) return self:Event("OnDraw3D",nil,ent,false) end);
-		
-		--We try to bone-merge first and if that fails we try to attach to the right-hand attachment point instead
-		if !self.WMAttach:BoneMerge("ValveBiped.Bip01_R_Hand") && !self.WMAttach:ToAP("anim_attachment_RH") then
-			--Otherwise we need to remove it since it can't be attached to anything
-			self.WMAttach:Remove();
+		if self.WMAttach then
+			self.WMAttach:SetOffset(self.WorldModelNudge);
+			self.WMAttach:SetOffsetAngles(self.WorldModelRotate);
+			self.WMAttach:SetDrawFunction(function(ent) return self:Event("OnDraw3D",nil,ent,false) end);
+			
+			--Hide if we're not out
+			if bNotOut then self.WMAttach:Hide() end
+			
+			--We try to bone-merge first and if that fails we try to attach to the right-hand attachment point instead
+			if !self.WMAttach:BoneMerge("ValveBiped.Bip01_R_Hand") && !self.WMAttach:ToAP("anim_attachment_RH") then
+				--Otherwise we need to remove it since it can't be attached to anything
+				self.WMAttach:Remove();
+				self.WMAttach=nil;
+			end
+		else
 			self.WMAttach=nil;
 		end
 	end
@@ -240,8 +273,11 @@ function ITEM:OnHold(pl,weapon)
 		slot:SetSize(64,64);
 		slot:SetPos(2,2);
 		slot:SetDraggable(true);
-		slot:SetDroppable(false);
+		slot:SetDroppable(true);
 		slot:SetItem(self);
+		slot.OnDragDropHere=SlotDrop;
+		
+		if bNotOut then slot:SetVisible(false); end
 		
 		self.ItemSlot=slot;
 	end
@@ -359,7 +395,7 @@ otherItem is the other item that this item is attempting to merge with.
 player is the player currently holding an item that is going to be merged.
 
 Return true to allow the item to merge together as a single stack held by the player,
-or false to keep the items stacks seperate (which will stop the item from being held)
+or false to keep the items stacks seperate (which means the player will pick up the item as a seperate stack, or if he's holding the max number of items already, stops the item from being held)
 ]]--
 function ITEM:CanHoldMerge(otherItem,player)
 	return true;

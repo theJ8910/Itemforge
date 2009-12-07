@@ -8,6 +8,8 @@ A gun that fires random crap from it's inventory.
 ITEM.Name="Rock-It Launcher";
 ITEM.Description="An odd device that propels ordinary objects at deadly speed.\nThe words \"Vault Dweller\" are etched into the stock. You're not sure who that is.";
 ITEM.Base="base_ranged";
+ITEM.Weight=6000;		--This thing easily weighs 6kg / over 12 pounds, unloaded.
+ITEM.Size=20;
 ITEM.ViewModel = "models/weapons/v_physcannon.mdl";
 ITEM.WorldModel = "models/weapons/w_physics.mdl";
 ITEM.Spawnable=true;
@@ -152,7 +154,7 @@ function ITEM:Chuck(speed)
 		return true;
 	elseif self:InWorld() then
 		local eEnt=self:GetEntity();
-		local posang=self:GetMuzzle();
+		local posang=self:GetMuzzle(self:GetEntity());
 		local fwd=posang.Ang:Forward();
 		
 		local ent=item:ToWorld(posang.Pos,posang.Ang);

@@ -247,6 +247,13 @@ value is also a string. It describes what 'key' should be set to. For example, "
 function ITEM:OnKeyValue(bSWEP,eEntity,key,value)
 	--DEBUG
 	Msg("Itemforge Item: Keyvalue "..key.."/"..value.." set on "..tostring(eEntity).." ("..tostring(self)..")\n");
+	
+	--Whenever the color tool is used the renderfx key is set to 0
+	--So we take this opportunity to set the item's color
+	if key=="renderfx" then
+		--Entity:GetColor returns four values instead of a color structure... so we use them as the four arguments of a Color() to make a Color structure.
+		self:SetColor(Color( eEntity:GetColor() ))
+	end
 end
 
 --[[

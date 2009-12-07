@@ -7,9 +7,12 @@ The Itemforge version of the Half-Life 2 .357 revolver.
 
 if SERVER then AddCSLuaFile("shared.lua") end
 
-ITEM.Name=".357 Revolver";
-ITEM.Description="This is a .357 revolver.\nThis weapon is designed for use with .357 rounds.";
+ITEM.Name="Colt Python";
+ITEM.Description="This is a Colt Python, a .357 revolver.\nThis weapon is designed for use with .357 rounds.";
 ITEM.Base="base_firearm";
+ITEM.Weight=1360;			--48 oz from http://half-life.wikia.com/wiki/.357_Magnum and http://en.wikipedia.org/wiki/Colt_Python
+ITEM.Size=13;
+
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 

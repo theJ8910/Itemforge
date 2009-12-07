@@ -13,7 +13,6 @@ if SERVER then AddCSLuaFile("shared.lua") end
 
 ITEM.Name="Base Container";
 ITEM.Description="This item is the base container.\nItems that can store other items can inherit from this to make their creation easier.\n\nThis is not supposed to be spawned.";
-ITEM.Base="item";
 ITEM.WorldModel="models/props_junk/wood_crate001a.mdl";
 
 --We don't want players spawning it.
@@ -60,11 +59,6 @@ function ITEM:OnInit()
 	return true;
 end
 
---Containers can't be held like weapons.
-function ITEM:CanHold(pl)
-	return false;
-end
-
 --Automatically take items that touch the container
 function ITEM:OnStartTouch(ent,activator)
 	local touchItem=IF.Items:GetEntItem(activator);
@@ -102,6 +96,9 @@ function ITEM:HideInventory()
 end
 
 function ITEM:OnDragDropHere(otherItem)
+	--Predict whether or not the container can take the other item
+	if !otherItem:ToInv(self.Inventory) then return true end
+	
 	otherItem:SendNWCommand("PlayerSendToInventory",self.Inventory,0);
 	return false;
 end

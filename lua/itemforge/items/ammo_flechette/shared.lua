@@ -10,7 +10,9 @@ if SERVER then AddCSLuaFile("shared.lua") end
 ITEM.Name="Flechette";
 ITEM.Description="Explosive, dagger-like hunter flechettes.";
 ITEM.Base="base_ammo";
-ITEM.StartAmount=10;
+ITEM.Weight=20;			--The flechettes are pretty big, eh? Seems appropriate.
+ITEM.Size=11;
+ITEM.StartAmount=30;
 
 ITEM.WorldModel="models/weapons/hunter_flechette.mdl";
 

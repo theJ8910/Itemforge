@@ -20,7 +20,6 @@ if SERVER then AddCSLuaFile("shared.lua") end
 
 ITEM.Name="Base Lock";
 ITEM.Description="This item is the base lock.\nThis item contains common functionality used by all locks.\n\nThis is not supposed to be spawned.";
-ITEM.Base="item";
 ITEM.WorldModel="models/props_combine/combine_lock01.mdl";
 ITEM.ViewModel="models/Weapons/v_crossbow.mdl";
 ITEM.MaxHealth=500;
@@ -179,18 +178,12 @@ function ITEM:OnExitWorld(forced)
 end
 
 function ITEM:OnUse(pl)
-	if self:InWorld() then
-		local att=self:GetAttachedEnt();
-		
-		if att then
-			if self:IsAttachmentLocked() then	self:UnlockAttachment();
-			else								self:LockAttachment();
-			end
-		else		self:WorldAttach();
+	if self:GetAttachedEnt() || self:GetAttachedItem() then
+		if self:IsAttachmentLocked() then	self:UnlockAttachment();
+		else								self:LockAttachment();
 		end
-	elseif self:IsHeld() then
-		
 	else
+		self:WorldAttach();
 	end
 	return true;
 end
@@ -211,8 +204,9 @@ function ITEM:WorldAttach()
 	if traceRes.Hit && traceRes.Entity && traceRes.Entity:IsValid() then
 		local item=IF.Items:GetEntItem(traceRes.Entity);
 		if item && item.OnAttachLock then
+			if !item:Event("OnAttachLock",false,self) then return false end
 			self:EmitSound(self.CanAttachSound);
-			item:Event("OnAttachLock",nil,self);
+			
 			self:SetNWItem("AttachedItem",item);
 		elseif (traceRes.Entity:GetClass()=="prop_door_rotating" || traceRes.Entity:GetClass()=="func_door" || traceRes.Entity:GetClass()=="func_door_rotating") then
 			--We remove the item's current world entity, and then send it back to the world without physics
@@ -288,7 +282,10 @@ function ITEM:LockAttachment()
 		ent.ItemforgeLocked=true;
 	elseif item then
 		item:Event("Lock",nil,self);
+	else
+		return false;
 	end
+	return true;
 end
 
 --[[
@@ -301,9 +298,12 @@ function ITEM:UnlockAttachment()
 	if ent then
 		ent:Fire("Unlock","",0);
 		ent.ItemforgeLocked=false;
-	else
+	elseif item then
 		item:Event("Unlock",nil,self);
+	else
+		return false;
 	end
+	return true;
 end
 
 IF.Items:CreateNWCommand(ITEM,"PlayerDetach",function(self,...) self:PlayerDetach(...) end);

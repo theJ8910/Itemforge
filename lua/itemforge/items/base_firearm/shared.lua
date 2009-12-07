@@ -27,10 +27,13 @@ ITEM.AdminSpawnable=false;
 
 --Base Firearm
 ITEM.BulletDamage=12;								--How much damage do bullets fired from this weapon do?
+ITEM.BulletForce=1;									--This is a bullet impact force multiplier. Higher numbers knock around physics objects more.
 ITEM.BulletsPerShot=1;								--How many bullets are fired with a single shot? This is usually one, but may be more: Think shotgun.
 ITEM.BulletSpread=Vector(0,0,0);					--What is the maximum amount bullets deviate from the direction they're aimed at? This appears to take a vector, whose x,y, and z are positive half-angles in radians. So, if you wanted a 3 degree spread cone, you'd divide 3 by 2 and then convert that to radians; then replace x in Vector(x,x,x) with that value.
+ITEM.BulletTracer="Tracer";							--What do you see when you fire bullets? Valid values: "Tracer","AR2Tracer","AirboatGunHeavyTracer","LaserTracer","" for none
 ITEM.ViewKickMin=Angle(0,0,0);						
 ITEM.ViewKickMax=Angle(0,0,0);
+
 --[[
 When a player is holding it and tries to primary attack
 ]]--
@@ -38,7 +41,7 @@ function ITEM:OnPrimaryAttack()
 	--This does all the base ranged stuff - determine if we can fire, do cooldown, consume ammo, play sounds, etc
 	if !self["base_ranged"].OnPrimaryAttack(self) then return false end
 	
-	self:ShootBullets(self.BulletsPerShot,self.BulletDamage,1,self:GetBulletSpread());
+	self:ShootBullets(self.BulletsPerShot,self.BulletDamage,self.BulletForce,self:GetBulletSpread());
 	self:MuzzleFlash();
 	self:AddViewKick(self.ViewKickMin,self.ViewKickMax);
 	
@@ -59,7 +62,7 @@ Fires bullets from this item. Doesn't consume ammo or play sounds or anything, j
 function ITEM:ShootBullets(num,damage,force,spread)
 	local bullet={
 		Tracer=1,
-		TracerName="Tracer",
+		TracerName=self.BulletTracer,
 		Num=num or 1,
 		Spread=spread,
 		Force=force,
@@ -75,7 +78,7 @@ function ITEM:ShootBullets(num,damage,force,spread)
 		pOwner:FireBullets(bullet);
 	elseif self:InWorld() then
 		local eEnt=self:GetEntity();
-		local posang=self:GetMuzzle();
+		local posang=self:GetMuzzle(self:GetEntity());
 		
 		bullet.Src    = posang.Pos;
 		bullet.Dir    = posang.Ang:Forward();
@@ -101,7 +104,7 @@ Only works when the item is in the world
 ]]--
 function ITEM:MuzzleFlash()
 	if CLIENT || !self:InWorld() then return false end
-	local posang=self:GetMuzzle();
+	local posang=self:GetMuzzle(self:GetEntity());
 	local effect = EffectData();
 	effect:SetOrigin(posang.Pos);
 	effect:SetAngle(posang.Ang);

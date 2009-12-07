@@ -164,14 +164,14 @@ end
 
 --[[
 Shows the attachment.
-There's no need to do this unless you did :Hide() before.
+Attachments are shown by default. You don't need to call this unless :Hide() has been called before.
 ]]--
 function af:Show()
 	self.Hidden=false;
 end
 
 --[[
-Gets rid of the attachment
+Gets rid of the attachment.
 ]]--
 function af:Remove()
 	IF.GearAttach:Remove(self);
@@ -201,7 +201,7 @@ Changes the offset of gear relative to the bone/attachment point on it's parent.
 NOTE: This will have no visible effect if the attachment is :BoneMerge()'d.
 ]]--
 function af:SetOffset(vPos)
-	if !vPos then ErrorNoHalt("Itemforge Gear Attach: Couldn't set offset; no angular offset given!\n"); return false end
+	if !vPos then ErrorNoHalt("Itemforge Gear Attach: Couldn't set offset; no offset given!\n"); return false end
 	
 	self.vOffset=vPos;
 	return true;
@@ -243,13 +243,13 @@ function MODULE:Create(parent,model)
 	local newAttach={};
 	newAttach.parent=parent;			--Attached to this
 	newAttach.type=0;					--0: None; 1: On Bone; 2: On Attachment Point; 3: Bone-Merge
-	newAttach.hidden=false;				--The model exists but is not drawn
 	newAttach.vOffset=Vector(0,0,0);	--Offset of model relative to bone/attachment
 	newAttach.aOffset=Angle(0,0,0);		--Rotation offset of model relative to bone/attachment
 	newAttach.DrawFunc=nil;				--This function is called prior to drawing
-	newAttach.AP="";					--Name of bone/attachment on parent/model
+	newAttach.Hidden=false;				--The model exists but is not drawn
+	newAttach.AP="";					--Name of bone/attachment on parent (and model if dealing with a bone-merge)
 	newAttach.PAP=0;					--Index of bone/attachment on parent
-	newAttach.MAP=0;					--Index of reference bone on model (for bone-merge)
+	newAttach.MAP=0;					--Index of reference bone on gear model (for bone-merge)
 	newAttach.MAPPos=nil;				--Position/angle of reference bone relative to center of entity
 	newAttach.MAPAng=nil;
 	

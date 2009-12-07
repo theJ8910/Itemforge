@@ -10,6 +10,8 @@ if SERVER then AddCSLuaFile("shared.lua") end
 ITEM.Name="H&K USP Match";
 ITEM.Description="This is a Heckler & Koch USP (or Universal Self-Loading Pistol), Match variant.\nThis weapon is designed for use with 9mm rounds.";
 ITEM.Base="base_firearm";
+ITEM.Weight=771;				--Based on http://en.wikipedia.org/wiki/Heckler_&_Koch_USP Tactical 9mm (USP Match weight unavailable)
+ITEM.Size=7;
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 
@@ -44,8 +46,19 @@ ITEM.PenaltyMax=1.5;			--The max accuracy penality is 1.5 seconds
 ITEM.BulletSpreadMax=Vector(0.05234,0.05234,0.05234);			--Taken directly from modcode; this is 6 degrees deviation
 
 function ITEM:OnPrimaryAttack()
-	if !self["base_firearm"].OnPrimaryAttack(self) then return false end
+	--This does all the base ranged stuff - determine if we can fire, do cooldown, consume ammo, play sounds, etc
+	if !self["base_ranged"].OnPrimaryAttack(self) then return false end
 	
+	local pAmmo=self:GetAmmo(self.PrimaryClip);
+	if !pAmmo then return false end
+	
+	self:ShootBullets(pAmmo.BulletsPerShot,pAmmo.BulletDamage,1,self:GetBulletSpread(pAmmo.BulletSpread,pAmmo.BulletSpreadMax));
+	self:MuzzleFlash();
+	
+	local owner=self:GetWOwner();
+	if owner then owner:ViewPunchReset() end
+	
+	self:AddViewKick(self.ViewKickMin,self.ViewKickMax);
 	self:AddPenalty(self.PenaltyPerShot);
 end
 
@@ -68,8 +81,8 @@ function ITEM:AddPenalty(amt)
 end
 
 --Bullet spread depends on penalty amount
-function ITEM:GetBulletSpread()
-	return self.BulletSpread+((self.BulletSpreadMax-self.BulletSpread)*(self:GetNWFloat("Penalty")/self.PenaltyMax));
+function ITEM:GetBulletSpread(min,max)
+	return min+((max-min)*(self:GetNWFloat("Penalty")/self.PenaltyMax));
 end
 
 --[[

@@ -3,19 +3,53 @@ item_rope
 SHARED
 
 It's rope! You can rope things together with it.
+This item is so poorly coded I don't even know where to begin.
+TODO I'll come back and fix this up later.
 ]]--
 
 if SERVER then AddCSLuaFile("shared.lua") end
 
 ITEM.Name="Rope";
 ITEM.Description="A rope woven from strands of hemp fibers. ";
-ITEM.Base="item";
 ITEM.WorldModel="models/Items/CrossbowRounds.mdl";
-ITEM.StartAmount=1000;
+ITEM.StartAmount=500;
+
+--[[
+To determine the weight, http://compostablegoods.com/product_info.php?products_id=102 was used.
+According to this page, 63 meters of 4mm diameter hemp rope was 1kg.
+For what we are going to do, we want the radius, so we divide the diameter by half to get 2mm.
+We convert 63 meters to 2480.31496 inches, and convert the 2 mm to 0.0787401575.
+We then convert from inches to game units, according to http://developer.valvesoftware.com/wiki/Dimensions, by dividing both numbers by .75 (1 game unit = .75 inches).
+
+This gives us 3307.086613 gu and .1049868767 gu, respectively.
+By treating the rope as a very tall cylinder, we can get it's volume:
+	PI * (0.1049868767 gu)^2 * 3307.086613 gu = 114.5158165 gu^3
+Density is mass/volume. We know the rope weighs 1 kg, or 1000 grams. We know that it's volume is 114.5158165 gu^3, so we can use this to calculate the density of the rope.
+	d=1000 grams/114.5158165 gu^3 = 8.732418198 grams/gu^3
+We then get the volume of our rope; we assume the rope is one gu tall:
+	PI * (1.5 gu)^2 * 1 gu = 7.068583471 gu^3
+Then we mutliply the density of rope times the volume of our rope to get the mass of our rope:
+	7.06883471 gu^3 * 8.732418198 grams/gu^3 = 61.72582693 grams
+	
+	so, a one unit rope with a radius of 3 has a mass of ~62 grams.
+]]--
+ITEM.Weight=62;
+ITEM.Size=2;			--I'm thinking the rope's "size" is it's radius in game units... this works out to about 1.5.
 ITEM.MaxAmount=0;
 
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
+
+if SERVER then
+
+ITEM.HoldType="normal";
+
+else
+
+ITEM.WorldModelNudge=Vector(2,0,5);
+ITEM.WorldModelRotate=Angle(90,0,0);
+
+end
 
 --Rope Item
 ITEM.Strength=40000;				--The rope breaks when this much force is applied to it
@@ -26,7 +60,11 @@ ITEM.FirstBone=0;
 ITEM.FirstAnchor=Vector(0,0,0);
 
 function ITEM:GetDescription()
-	return self.Description.."It is "..self:GetAmount().." units long.";
+	--Length of rope in meters
+	local len=self:GetAmount()/0.01905;
+	if len > 1 then		return self.Description.."It is "..len.." meters long.";
+	else				return self.Description.."It is "..(len*100).." centimeters long."
+	end
 end
 
 --The player can't split the rope directly
