@@ -629,9 +629,18 @@ end
 --If a player leaves we need to cleanup private inventories
 function MODULE:CleanupInvs(pl)
 	for k,v in pairs(InventoryRefs) do
-		if k!=0 && v:GetOwner()==pl then
+		if v:GetOwner()==pl then
 			v:SetOwner(nil);
 		end
+		
+		--If the player is a connected object of an inventory...
+		for i,c in pairs(v.ConnectedObjects) do
+			if c.Obj==pl then
+				print(v);
+				v.ConnectedEntityRemoved(pl,v);
+			end
+		end
+		
 	end
 end
 
@@ -1457,7 +1466,7 @@ function _INV:ConnectEntity(ent,pl)
 		newCon.Obj=ent;
 		
 		i=table.insert(self.ConnectedObjects,newCon);
-		ent:CallOnRemove("ifinv_"..self:GetID().."_connect",self.ConnectedEntityRemoved,self);
+		if !ent:IsPlayer() then ent:CallOnRemove("ifinv_"..self:GetID().."_connect",self.ConnectedEntityRemoved,self); end
 		ent.ConnectionSlot=i;
 	end
 	
@@ -2145,7 +2154,10 @@ function _INV:RemoveItem(itemid,forced,bPredict)
 	return true;
 end
 
-
+--Connected entities will call this function if removed
+function _INV.ConnectedEntityRemoved(ent,self)
+	self:SeverEntity(ent:GetTable().ConnectionSlot);
+end
 
 
 if SERVER then
@@ -2170,11 +2182,6 @@ function _INV:RecvFullUpdate(weightCap,sizeLimit,maxSlots)
 	self:SetWeightCapacity(weightCap);
 	self:SetSizeLimit(sizeLimit);
 	self:SetMaxSlots(maxSlots);
-end
-
---Connected entities will call this function if removed
-function _INV.ConnectedEntityRemoved(ent,self)
-	self:SeverEntity(ent:GetTable().ConnectionSlot);
 end
 
 --[[

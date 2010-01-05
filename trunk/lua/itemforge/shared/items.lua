@@ -232,7 +232,7 @@ local function BindReference(iref,item,id)
 	function irefmt:__newindex(k,v)
 		if i!=nil then
 			if IF.Items:IsProtectedKey(k) then
-				ErrorNoHalt("Itemforge Items: WARNING! Item "..id.." tried to override \""..tostring(k).."\", a protected function or value in the base item-type.\n");
+				ErrorNoHalt("Itemforge Items: WARNING! "..tostring(self).." tried to override \""..tostring(k).."\", a protected function or value in the base item-type.\n");
 				return false;
 			end
 			i[k]=v;
@@ -251,7 +251,7 @@ local function BindReference(iref,item,id)
 	]]--
 	function irefmt:__tostring()
 		if i!=nil then
-			if self:GetMaxAmount()!=1 then return "Item "..self:GetID().." ["..self:GetType().."]x"..self:GetAmount();
+			if self:GetMaxAmount()!=1 then return "Item "..self:GetID().." ["..self:GetType().." x "..self:GetAmount().."]";
 			else return "Item "..self:GetID().." ["..self:GetType().."]"; end
 		else
 			return "Item "..id.." [invalid]";
@@ -410,6 +410,8 @@ function MODULE:LoadItemTypes()
 			
 			ItemTypes[ITEM.Type]=ITEM;				--Store the item type just loaded
 			ItemsByType[ITEM.Type]={};				--Create an Items by Type table to store any items spawned of this type
+			
+			--IF.Base:RegisterClass(ITEM,string.lower(v));
 			
 			if SERVER then
 				umsg.PoolString(ITEM.Type);			--Pool this string (increases network efficiency by substituting a smaller placeholder for this string when networked)

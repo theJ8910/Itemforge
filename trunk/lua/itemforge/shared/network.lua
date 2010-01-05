@@ -9,7 +9,10 @@ It also implements a base networked object.
 MODULE.Name="Network";											--Our module will be stored at IF.Network
 MODULE.Disabled=false;											--Our module will be loaded
 
-local NWObjs=nil;												--Networked objects are stored here
+local BaseNWClassName="base_nw";								--The name of the Base Networked class
+
+local _OBJECTS={};												--Networked objects are stored here
+local ChangedNWObjects=nil;										--When a network object has a networked property changed, it is added here temporarily
 
 local IFN_DTYPE_CHAR = 1;
 local IFN_DTYPE_SHORT = 2;
@@ -25,11 +28,10 @@ By default, Itemforge uses IFN_DTYPE_SHORT.
 If for some reason, however, you feel the need to change this, NWIDType can be set to:
 	IFN_DTYPE_CHAR: Up to 256 networked objects may exist at any time. This is a pitiful amount, but the char datatype uses the least amount of bandwidth.
 	IFN_DTYPE_SHORT: Up to 65,536 unique networked objects may exist at any time. The short datatype is twice as big as the char datatype in terms of bandwidth used, but the number of networked objects you can have in increased dramatically.
-	IFN_DTYPE_LONG: Up to 4,294,967,296 unique networked objects may exist at any time. The long datatype is four times as big as the char datatype in terms of bandwidth used. This datatype will likely slow things down, especially if you actually manage to surpass 65,536 items. If you have to, absolutely have to, the long datatype is here for you.
+	IFN_DTYPE_LONG: Up to 4,294,967,296 unique networked objects may exist at any time. The long datatype is four times as big as the char datatype in terms of bandwidth used. This datatype will likely slow things down, especially if you actually manage to surpass 65,536 networked objects. If you have to, absolutely have to, the long datatype is here for you.
 ]]--
 MODULE.NWIDType=IFN_DTYPE_SHORT;
 
-local _NWBASEmt={};
 local _NWBASE={};
 
 --[[
@@ -46,10 +48,10 @@ I have organized the SET* list by message size.
 The exact size of the message sent is hard to know because of encapsulation.
 However, I can calculate part of the message's sized based on my knowledge of datatypes.
 If something is marked with "?", I am estimating what the size of the datatype is.
-Remember, less is more! Do your part to make Garry's Mod playable for everyone - use small datatpes whenever!
+Remember, less is more! Do your part to make Garry's Mod playable for everyone - use small datatpes whenever possible!
 ]]--
 local IFN_MSG_SETNIL		=	-124;	--(Server > Client) [0 bits]				Sync a networked var - changes whatever was there before to nil
-local IFN_MSG_SETBOOL		=	-123;	--(Server > Client) [1 bit]					Sync a networked boolean
+local IFN_MSG_SETBOOL		=	-123;	--(Server > Client) [8 bits]				Sync a networked boolean
 local IFN_MSG_SETCHAR		=	-122;	--(Server > Client) [8 bits]				Sync a networked char (an int from -128 to 127)
 local IFN_MSG_SETUCHAR		=	-121;	--(Server > Client) [8 bits]				Sync a networked unsigned char (an int from 0 to 255)
 local IFN_MSG_SETSHORT		=	-120;	--(Server > Client) [16 bits]				Sync a networked short (an int from -32,768 to 32,767)
@@ -96,23 +98,16 @@ local IFN_MSG_UNLOCK		=	-84;	--(Server > Client) The inventory has been unlocked
 
 --Initilize network module
 function MODULE:Initialize()
-	IF.Base:Derive(_NWBASE);
+	IF.Base:RegisterClass(_NWBASE,BaseNWClassName)
 end
 
 --Cleanup network module
 function MODULE:Cleanup()
-end
-
---Creates a network object
-function MODULE:Create()
-end
-
---Removes a network object
-function MODULE:Remove()
+	self:StopTick();
 end
 
 function MODULE:Get(id)
-	return NWObjs[id];
+	return _OBJECTS[id];
 end
 
 --[[
@@ -133,8 +128,9 @@ end
 Ticks all network objects clientside and serverside
 ]]--
 function MODULE:Tick()
-	for k,v in pairs(NetworkObjects) do
+	for k,v in pairs(ChangedNetworkObjects) do
 		v:Tick();
+		ChangedNetworkObjects[k]=nil;
 	end
 end
 
@@ -248,6 +244,9 @@ function _NWBASE:Tick()
 	end
 end
 
+function _NWBASE:ToString()
+	return "Networked Object";
+end
 
 if SERVER then
 

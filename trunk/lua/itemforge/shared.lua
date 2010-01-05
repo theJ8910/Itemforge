@@ -28,6 +28,9 @@ function IF:Initialize()
 		end
 	end
 	
+	--Base needs to handle inheritance of registered types
+	if IF.Base then IF.Base:DoInheritance(); end
+	
 	--Call serverside or clientside initilization after initializing modules.
 	if SERVER then	self:ServerInitialize()
 	else			self:ClientInitialize() end
