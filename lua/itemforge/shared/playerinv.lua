@@ -30,6 +30,7 @@ if SERVER then
 
 
 function MODULE:GivePlayerInventory(pl)
+	if !pl || !pl:IsValid() then return false end
 	if pl.Inventory then return false end
 	
 	local inv=IF.Inv:Create();
@@ -37,6 +38,8 @@ function MODULE:GivePlayerInventory(pl)
 	inv:ConnectEntity(pl);
 	pl.Inventory=inv;
 	pl:SetNWInt("itemforge_inventory_id",inv:GetID());
+	
+	return true;
 end
 
 

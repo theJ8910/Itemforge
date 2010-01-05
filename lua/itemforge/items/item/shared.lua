@@ -1106,3 +1106,12 @@ function ITEM:GetInventoryConnectionSlot(invid)
 	return self.Inventories[invid].ConnectionSlot;
 end
 IF.Items:ProtectKey("GetInventoryConnectionSlot");
+
+--[[
+Returns a string when tostring() is performed upon a reference to this item
+]]--
+function ITEM:ToString()
+	if self:GetMaxAmount()!=1 then	return "Item "..self:GetID().." ["..self:GetType().." x "..self:GetAmount().."]";
+	else							return "Item "..self:GetID().." ["..self:GetType().."]"; end
+end
+IF.Items:ProtectKey("ToString");
