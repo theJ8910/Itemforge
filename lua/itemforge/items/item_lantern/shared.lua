@@ -184,7 +184,7 @@ function ITEM:SwapToHip()
 end
 
 function ITEM:OnHold(pl,weapon)	
-	self["item"].OnHold(self,pl,weapon);
+	self["base_item"].OnHold(self,pl,weapon);
 	
 	if pl:GetActiveWeapon()==weapon then	self:SwapToHand();
 	else									self:SwapToHip();
@@ -212,7 +212,7 @@ end
 
 --Called when a model associated with this item needs to be drawn
 function ITEM:OnDraw3D(eEntity,bTranslucent)
-	self["item"].OnDraw3D(self,eEntity,bTranslucent);
+	self["base_item"].OnDraw3D(self,eEntity,bTranslucent);
 	self:DrawGlow(eEntity);
 end
 

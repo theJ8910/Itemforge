@@ -2,8 +2,8 @@
 events_server
 SERVER
 
-item is the default item. All items except item inherit from this item-type.
-NOTE: The item type is the name of the folder it is in (this is item/events_server.lua, so this item's type is "item")
+base_item is the default item. All items except base_item inherit from this item-type.
+NOTE: The item type is the name of the folder it is in (this is base_item/events_server.lua, so this item's type is "base_item")
 
 This specific file deals with events that are present on the server.
 ]]--

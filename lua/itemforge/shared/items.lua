@@ -30,15 +30,12 @@ This is why the system hasn't been released yet:
 TODO code maintainence... make sure that multi-line comments are used for function descriptions, check arguments, do cleanup code (for items listed in an inventory for example), for collections check to see if something being inserted still exists, check events to make sure they are all being pcalled, consider putting base item's events into their own lua file.
 TODO remember to divide default files into sections: Methods, events, internal methods (things scripters won't be calling)
 TODO Have it so item types can be reloaded without needing a full map change/restart
-TODO redux of itemforge_item and itemforge_item_held, need to reduce complexity and homogenize
-TODO consider renaming default item "item" to "base" or "base_item"
 TODO eliminate redundancy; ex: IF.Items:CreateItem becomes IF.Items:Create
 TODO pay attention to function return values; false should be returned for failures, true most of the other times
 TODO wire outputs are forgotten when the item is taken out of the world and put back in; make an item wrapper that remembers them, restore when entity enters world
 TODO looping sounds should resume when possible
 TODO change inventory functions from MoveSlot to SwapSlot (functionality and name)
 TODO SetWorldModel and SetViewModel need to work clientside too
-TODO MaxHealth=0 means item is invincible
 TODO migrate .ReloadsSingly related things from the shotgun to the base_ranged
 TODO base_ranged needs to have "Load" renamed to "FillClip"; StartReload needs to be called OnReload - if the weapon .ReloadsSingly this starts the reload loop, otherwise this immediately fills the clip; items that use :Load() must be configured this way
 
@@ -108,9 +105,8 @@ MODULE.FullUpItemsUpdated={};								--Every time an item is created while a ful
 end
 
 --These are local on purpose. I want to prevent people from messing with ItemTypes so shit doesn't get screwy in case of some bad code. I'd also like people to use the Get function, and not grab the items directly from the table.
-local BaseType="item";										--This is the undisputed absolute base item-type. All items inherit from this item.
+local BaseType="base_item";									--This is the undisputed absolute base item-type. All items inherit from this item.
 local ItemTypes={};											--Item types. After being loaded from the script they are placed here
-local Items={};												--Items collection - all items are stored here
 local ItemRefs={};											--Item references - there's an item reference for every item. We pass this instead of the actual item. By storing the references, the actual item the reference refers to can be properly garbage collected when it's removed (freeing up memory). It also informs the scripter of any careless mistakes (referencing an item after it has been deleted mostly).
 local ItemsByType={};										--Items by type are stored here (ex ItemsByType["item_crowbar"] contains all item_crowbar items currently spawned)
 local NextItem=1;											--This is a pointer of types, that records where the next item will be made. IDs are assigned based on this number. This only serves as a starting point to search for a free ID. If this slot is taken then it will search through the entire items array once to look for a free slot.
@@ -148,120 +144,6 @@ IFI_MSG_MERGE			=	-102;	--(Server > Client) Macro; Merge two items (change amoun
 IFI_MSG_PARTIALMERGE	=	-101;	--(Server > Client) Macro; Merge two items partially (change amount of two items, saves bandwidth)
 IFI_MSG_SPLIT			=	-100;	--(Server > Client) Macro; Split an item (saves bandwidth)
 
-
-
---[[
-This is handled automatically, there's no need for a scripter to do anything here.
-
-Setting an itemtype's metatable to this will cause it to look in it's baseclass (inheritence).
-This means the itemtype can use everything from the itemtype it's based off of.
-If both the itemtype and the base itemtype don't have it, nil is returned.
-]]--
-local itmt={};
---The inheritence is carried out here
-function itmt:__index(k)
-	return self.BaseClass[k];
-end
-
---[[
-After an item type is loaded, it shouldn't be modified. This can be bypassed, but it's here as a safeguard.
-If an Item-Type is accidentally modified a warning message will be generated and no changes will occur.
-]]--
-function itmt:__newindex(k,v)
-	ErrorNoHalt("Itemforge Items: WARNING! Override on Item-Type \""..self.Type.."\" blocked: Tried to set \""..k.."\" to \""..v.."\".\n");
-end
-
-
-
-
-
---[[
-This is handled automatically, there's no need for a scripter to do anything here.
-
-Setting an item's metatable to this allows an item to use everything it's item type can use.
-]]--
-local imt={};
-function imt:__index(k)
-	return self.Class[k];
-end
-
---[[
-Item references indirectly reference an item.
-By doing this, we can garbage collect any removed item properly (unless somebody hacks around it on purpose).
-This function binds a newly created reference to a newly created item.
-References have an internal item, "i", that can only be accessed from internal functions here.
-References have internal functions "IsValid", and "Invalidate".
-	Call item:IsValid() on a reference to see if a reference is still good (item hasn't been deleted).
-		This will return true if the item hasn't been removed, and false otherwise.
-	Don't bother calling item:Invalidate(). This is called by Itemforge after the item is removed.
-		This will clear the internal item, "i". This makes any further reads/writes to the item (except for IsValid and Invalidate) fail.
-]]--
-local function BindReference(iref,item,id)
-	local i=item;
-	local id=id;
-	
-	local function irefIsValid() return (i!=nil); end
-	local function irefInvalidate() i=nil; end
-	local function irefGetTable()
-		if !i then
-			ErrorNoHalt("Itemforge Items: Couldn't grab item table from removed item (used to be Item "..id..")\n");
-			return false;
-		end
-		local t={};
-		for k,v in pairs(i) do t[k]=v; end
-		return t;
-	end
-	local irefmt={};
-	
-	--We want to forward reads to the item, so long as it's valid
-	function irefmt:__index(k)
-		if k=="IsValid" then
-			return irefIsValid;
-		elseif k=="GetTable" then
-			return irefGetTable;
-		elseif k=="Invalidate" then
-			return irefInvalidate;
-		elseif i!=nil then
-			return i[k];
-		else
-			ErrorNoHalt("Itemforge Items: Couldn't reference \""..tostring(k).."\" on removed item (used to be Item "..id..")\n");
-		end
-	end
-	
-	--We want to forward writes to the item, so long as it's valid
-	function irefmt:__newindex(k,v)
-		if i!=nil then
-			if IF.Items:IsProtectedKey(k) then
-				ErrorNoHalt("Itemforge Items: WARNING! "..tostring(self).." tried to override \""..tostring(k).."\", a protected function or value in the base item-type.\n");
-				return false;
-			end
-			i[k]=v;
-		else
-			ErrorNoHalt("Itemforge Items: Couldn't set \""..tostring(k).."\" to \""..tostring(v).."\" on removed item (used to be Item "..id..")\n");
-			return false;
-		end
-	end
-	
-	--[[
-	When tostring() is performed on an item reference, returns a string containing some information about the item.
-	Format: "Item ID [ITEM_TYPE]xAMT" 
-	Ex:     "Item 5 [item_crowbar]" (Item 5, a single crowbar)
-	Ex:		"Item 3 [item_rock]x53" (Item 3, a stack of 53 item_rocks)
-	Ex:		"Item 7 [invalid]" (used to be Item 7, invalid/has been removed/no longer exists)
-	]]--
-	function irefmt:__tostring()
-		if i!=nil then
-			if self:GetMaxAmount()!=1 then return "Item "..self:GetID().." ["..self:GetType().." x "..self:GetAmount().."]";
-			else return "Item "..self:GetID().." ["..self:GetType().."]"; end
-		else
-			return "Item "..id.." [invalid]";
-		end
-	end
-	
-	setmetatable(iref,irefmt);
-end
-
-
 --[[
 DoesLuaFileExist returns true if the given path in the lua directory does exist, false otherwise
 LuaPath should be something like "itemforge/items/item/shared.lua"
@@ -297,8 +179,6 @@ end
 function MODULE:Initialize()
 	self:LoadItemTypes();
 	self:FixItemTypeMissingData();
-	self:SetItemTypeBases();
-	self:SetItemTypeNWVarAndCommandIDs();
 	self:StartTick();
 end
 
@@ -310,7 +190,6 @@ function MODULE:Cleanup()
 	end
 	
 	ItemTypes=nil;
-	Items=nil;
 	ItemRefs=nil;
 	ItemsByType=nil;
 	ProtectedKeys=nil;
@@ -403,19 +282,22 @@ function MODULE:LoadItemTypes()
 			end
 			
 			
+			local type=string.lower(v);
 			
+			--If a base was not given, the base is set to the base item-type
+			if ITEM.Base==nil then ITEM.Base=BaseType end
 			
-			ITEM.Type=string.lower(v);				--Set type to the name of the folder
-			if ITEM.Base!=nil then	ITEM.Base=string.lower(ITEM.Base) end
+			--Register class; The type is set to the name of the folder.
+			IF.Base:RegisterClass(ITEM,type);
 			
-			ItemTypes[ITEM.Type]=ITEM;				--Store the item type just loaded
-			ItemsByType[ITEM.Type]={};				--Create an Items by Type table to store any items spawned of this type
+			--Store the item type just loaded
+			ItemTypes[type]=ITEM;
 			
-			--IF.Base:RegisterClass(ITEM,string.lower(v));
+			--Create an Items by Type table to store any items spawned of this type
+			if ItemsByType[type]==nil then ItemsByType[type]={}; end
 			
-			if SERVER then
-				umsg.PoolString(ITEM.Type);			--Pool this string (increases network efficiency by substituting a smaller placeholder for this string when networked)
-			end 
+			--Pool this string (increases network efficiency by substituting a smaller placeholder for this string when networked)
+			if SERVER then umsg.PoolString(type); end
 			
 			ITEM=nil;								--Get rid of the temporary ITEM table
 			AllowProtect=false;
@@ -434,67 +316,6 @@ function MODULE:FixItemTypeMissingData()
 		v.NWVarsByID		=	v.NWVarsByID		or {};
 		v.NWCommandsByName	=	v.NWCommandsByName	or {};
 		v.NWCommandsByID	=	v.NWCommandsByID	or {};
-		
-		--[[
-		if SERVER then	--Server Only
-		else			--Client only
-		end
-		]]--
-		
-		--Make sure the item-type hasn't overridden any protected functions or values in the base-item type; if it has, set them to nil (so it will use the base item-type's stuff)
-		if k!=BaseType then
-			for a,b in pairs(v) do
-				if self:IsProtectedKey(a) then
-					ErrorNoHalt("Itemforge Items: WARNING! Itemtype \""..k.."\" tried to override \""..a.."\", a protected function or value in the base item-type.\n");
-					v[a]=nil;
-				end
-			end
-		end
-	end
-end
-
---We set the base classes/base item types for items here. This is where inheritence for item types is set.
-function MODULE:SetItemTypeBases()
-	for k,v in pairs(ItemTypes) do
-		if v.Type!=BaseType then			--The absolute base item-type can't have a base class, all items are based off of it. Inheriting from itself would cause an infinite loop.
-			
-			--Set base class to the base item type. Can't inherit from self.
-			if v.Base then
-				if v.Base!=v.Type then
-					--Set itemtype's base-class to another itemtype
-					v.BaseClass=ItemTypes[v.Base];
-					
-					if v.BaseClass==nil then	--Couldn't find the base-class (note that all classes are loaded before bases are set - so the only reason this would happen is if the base isn't loaded or couldn't be loaded)
-						ErrorNoHalt("Itemforge Items: Item-Type \""..k.."\" could not inherit from Item-Type \""..v.Base.."\". \""..v.Base.."\"  could not be found.\n");
-					end
-				else
-					ErrorNoHalt("Itemforge Items: Item-Type \""..k.."\" couldn't inherit from Item-Type \""..v.Base.."\". The item was trying to inherit from itself, which would cause an infinite loop.\n");
-				end
-			end
-			
-			--If BaseClass still hasn't been set, then we'll set the base to the base for all item-types (except for itself of course)
-			if v.BaseClass==nil then
-				v.Base=BaseType;
-				v.BaseClass=ItemTypes[BaseType];
-			end
-			
-			--We'll also do something like C++ does with "myObject::InheritedClass" here.
-			--[[
-			Lets say you have items that inherit like this (top inherits from bottom):
-			item_crowbar
-			base_melee
-			base_weapon
-			item
-			
-			You spawn an item_crowbar called "myItem".
-			You can do myItem.BaseClass or myItem.base_melee to access base_melee's stuff.
-			Likewise, if you want myItem to access base_weapon's stuff, you can do myItem.base_weapon.
-			]]--
-			v[v.Base]=v.BaseClass;
-			
-			--Set the meta table finally. Make this item type inherit from another item type.
-			setmetatable(ItemTypes[k],itmt);
-		end
 	end
 end
 
@@ -527,30 +348,34 @@ function MODULE:SetItemTypeNWVarAndCommandIDs()
 		local b=v;
 
 		while b!=nil do
-			for i=1,table.getn(b.NWVarsByID) do
-				--If our itemtype doesn't have a var by this name yet then make a copy of it
-				if NWVarNames[b.NWVarsByID[i].Name]==nil then
-					local NWVarCopy={};
-					NWVarCopy.Name=b.NWVarsByID[i].Name;
-					NWVarCopy.Default=b.NWVarsByID[i].Default;
-					NWVarCopy.Predicted=b.NWVarsByID[i].Predicted;
-					NWVarCopy.HoldFromUpdate=b.NWVarsByID[i].HoldFromUpdate;
-					NWVarCopy.Save=b.NWVarsByID[i].Save;
-					NWVarCopy.Type=b.NWVarsByID[i].Type;
-					NWVarCopy.ID=table.insert(NWVarIDs,NWVarCopy);
-					NWVarNames[NWVarCopy.Name]=NWVarCopy;
+			if b.NWVarsByID then
+				for i=1,table.getn(b.NWVarsByID) do
+					--If our itemtype doesn't have a var by this name yet then make a copy of it
+					if NWVarNames[b.NWVarsByID[i].Name]==nil then
+						local NWVarCopy={};
+						NWVarCopy.Name=b.NWVarsByID[i].Name;
+						NWVarCopy.Default=b.NWVarsByID[i].Default;
+						NWVarCopy.Predicted=b.NWVarsByID[i].Predicted;
+						NWVarCopy.HoldFromUpdate=b.NWVarsByID[i].HoldFromUpdate;
+						NWVarCopy.Save=b.NWVarsByID[i].Save;
+						NWVarCopy.Type=b.NWVarsByID[i].Type;
+						NWVarCopy.ID=table.insert(NWVarIDs,NWVarCopy);
+						NWVarNames[NWVarCopy.Name]=NWVarCopy;
+					end
 				end
 			end
 			
-			for i=1,table.getn(b.NWCommandsByID) do
-				--If our itemtype doesn't have a command by this name yet then make a copy of it
-				if NWCommandNames[b.NWCommandsByID[i].Name]==nil then
-					local NWCommandCopy={};
-					NWCommandCopy.Name=b.NWCommandsByID[i].Name;
-					NWCommandCopy.Hook=b.NWCommandsByID[i].Hook;
-					NWCommandCopy.Datatypes=b.NWCommandsByID[i].Datatypes;
-					NWCommandCopy.ID=table.insert(NWCommandIDs,NWCommandCopy);
-					NWCommandNames[NWCommandCopy.Name]=NWCommandCopy;
+			if b.NWCommandsByID then
+				for i=1,table.getn(b.NWCommandsByID) do
+					--If our itemtype doesn't have a command by this name yet then make a copy of it
+					if NWCommandNames[b.NWCommandsByID[i].Name]==nil then
+						local NWCommandCopy={};
+						NWCommandCopy.Name=b.NWCommandsByID[i].Name;
+						NWCommandCopy.Hook=b.NWCommandsByID[i].Hook;
+						NWCommandCopy.Datatypes=b.NWCommandsByID[i].Datatypes;
+						NWCommandCopy.ID=table.insert(NWCommandIDs,NWCommandCopy);
+						NWCommandNames[NWCommandCopy.Name]=NWCommandCopy;
+					end
 				end
 			end
 			
@@ -582,22 +407,17 @@ Protects a key in the base item-type
 Stops items from overriding these keys by removing overrides after parsing item-types (and additionally if a protected key is being overwritten on an item, such as... myItem.Use="TEST").
 Additionally this will alert the scripter that he's tried to override a protected key.
 I know it's not 100% foolproof but the reason it's in place is to make sure that the items system keeps working in case of a careless mistake.
+
+TODO nix this in favor of more generic
 ]]-- 
 function MODULE:ProtectKey(key)
 	if !key then ErrorNoHalt("Itemforge Items: Can't protect key - key not given.\n"); return false end
 	if !AllowProtect then ErrorNoHalt("Itemforge Items: Can't protect key \""..key.."\" - can only protect keys from the base item-type.\n"); return false end
 	
-	ProtectedKeys[key]=true;
+	if !ITEM._ProtectedKeys then ITEM._ProtectedKeys={} end
+	
+	ITEM._ProtectedKeys[key]=true;
 	return true;
-end
-
---[[
-Returns true if the given key is a protected key in the base item-type and can't (more like shouldn't) be overridden.
-Returns false if it isn't.
-]]--
-function MODULE:IsProtectedKey(key)
-	if ProtectedKeys[key]==true then return true end
-	return false;
 end
 
 --[[
@@ -782,9 +602,9 @@ function MODULE:FindEmptySlot(iFrom)
 	--Wrap around to 1 if iFrom wasn't given or was under zero or was over the item limit
 	if !iFrom || iFrom>self.MaxItems || iFrom<1 then iFrom=1; end
 	
-	local count=1;
-	while count<=self.MaxItems do
-		if Items[iFrom]==nil then return iFrom end
+	local count=0;
+	while count<self.MaxItems do
+		if ItemRefs[iFrom]==nil then return iFrom end
 		count=count+1;
 		iFrom=iFrom+1;
 		if iFrom>self.MaxItems then iFrom=1 end
@@ -841,22 +661,15 @@ function MODULE:Create(type,id,fullUpd,owner,bPredict)
 	if type==nil then ErrorNoHalt("Itemforge Items: Could not create item. No type was provided.\n"); return nil end
 	type=string.lower(type);
 	
-	if bPredict==nil then bPredict=CLIENT end
-	
-	--[[
-	Make sure the itemtype we want is valid (has loaded succesfully)
-	If it's not, a few things could be causing this.
-	    Parsing errors serverside or clientside may be at work (meaning there's probably a typo in your script)
-	    If the item can be created serverside with no trouble, but can't be created clientside...
-	        Make sure that all the necessary files are being sent (included with AddCSLuaFile). You can check this with the "dumptables" console command.
-	        Check the server console. Apparantly, lua files are compiled before they are sent to the clients. If there are parsing errors dealing with clientside files, this may be to blame.
-	]]--
-	if ItemTypes[type]==nil then
-		if SERVER then	ErrorNoHalt("Itemforge Items: Could not create item, \""..type.."\" is not a valid item-type. Check for parsing errors in console or mis-spelled item-type.\n"); 
-		else			ErrorNoHalt("Itemforge Items: Could not create item, \""..type.."\" is not a valid item-type. Check for item scripts not being sent!\n");
-		end
+	if !IF.Base:ClassExists(type) then
+		ErrorNoHalt("Itemforge Items: Could not create item. \""..type.."\" is not a registered class.");
+		return nil;
+	elseif ItemTypes[type]==nil then
+		ErrorNoHalt("Itemforge Items: Could not create item. \""..type.."\" is a registered class, but is not an item-type. Naming conflicts can cause this error.");
 		return nil;
 	end
+	
+	if bPredict==nil then bPredict=CLIENT end
 	
 	--[[
 	We need to find an ID for the soon-to-be created item.
@@ -866,14 +679,19 @@ function MODULE:Create(type,id,fullUpd,owner,bPredict)
 	local n;
 	if SERVER || (bPredict && !id) then
 		n=NextItem;
-		if Items[n]!=nil then
+		if ItemRefs[n]!=nil then
 			n=self:FindEmptySlot(n+1);
 			
-			if n==nil then ErrorNoHalt("Itemforge Items: Couldn't create item - no free slots (all "..self.MaxItems.." slots occupied)!\n"); return nil; end
+			if n==nil then
+				if !bPredict then ErrorNoHalt("Itemforge Items: Couldn't create \""..type.."\" - no free slots (all "..self.MaxItems.." slots occupied)!\n"); end
+				return nil;
+			end
 		end
 		
-		NextItem=n+1;
-		if NextItem>self.MaxItems then NextItem=1 end
+		if !bPredict then
+			NextItem=n+1;
+			if NextItem>self.MaxItems then NextItem=1 end
+		end
 	else
 		if id==nil then ErrorNoHalt("Itemforge Items: Could not create \""..type.."\" clientside, the ID of the item to be created wasn't given!\n"); return nil end
 		n=id;
@@ -887,7 +705,7 @@ function MODULE:Create(type,id,fullUpd,owner,bPredict)
 	
 	--Does the item exist already? No need to recreate it.
 	--TODO possible bug here; what if a dead item clientside blocks new items with the same ID from being created?
-	if Items[n] then
+	if ItemRefs[n] then
 		--We only need to bitch about this on the server. Full updates of an item clientside will tell the item to be created regardless of whether it exists or not. If it exists clientside we'll just ignore it.
 		if SERVER && !bPredict then
 			ErrorNoHalt("Itemforge Items: Could not create \""..type.."\", with id "..n..". An item with this ID already exists!\n");
@@ -898,6 +716,7 @@ function MODULE:Create(type,id,fullUpd,owner,bPredict)
 	
 	if bPredict then n=0 end
 	
+	--[[
 	local newitem={};					--Create a new item
 	newitem.Class=ItemTypes[type];		--Set the item type to the type provided
 	newitem.ID=n;						--Set item ID (the item ID is stored in both the reference and the item itself)
@@ -905,22 +724,27 @@ function MODULE:Create(type,id,fullUpd,owner,bPredict)
 	
 	local newref={};					--Create a new item reference
 	BindReference(newref,newitem,n);	--We tell the new reference to refer to the new item and store the ID it uses
+	]]--
+	
+	local newItem=IF.Base:CreateObject(type);
+	if newItem==nil then return nil end
+	
+	newItem.ID=n;
 	
 	if !bPredict then
-		Items[n]=newitem;					--Register the item in array
-		ItemRefs[n]=newref;
-		ItemsByType[type][n]=newref;		--Register in "items by type" array
+		ItemRefs[n]=newItem;
+		ItemsByType[type][n]=newItem;		--Register in "items by type" array
 		
 		--We'll tell the clients to create and initialize the item as well
-		if SERVER then self:CreateClientside(newref,owner); end
+		if SERVER then self:CreateClientside(newItem,owner); end
 		
 		--Items will be initialized right after being created
 		--TODO predicted items need to initialize too but not do any networking shit
-		newref:Initialize(owner);
+		newItem:Initialize(owner);
 	end
 	
 	--Return a reference to the newly created item
-	return newref;
+	return newItem;
 end
 
 --[[
@@ -1082,8 +906,8 @@ function MODULE:Remove(item)
 		self:RemoveClientside(id);
 	end
 	
-	--Clear item from collection, invalidate item reference (disconnect it from the actual item), remove reference from collection, remove from ItemsByType collection
-	Items[id]=nil;
+	--Invalidate item reference (disconnect it from the actual item), remove reference from collection, remove from ItemsByType collection
+	
 	ItemRefs[id]:Invalidate();
 	ItemRefs[id]=nil;
 	ItemsByType[type][id]=nil;
@@ -1106,10 +930,7 @@ Returns true if the given weapon is actually an item being held by a player (an 
 ]]--
 function MODULE:IsWeaponItem(eWep)
 	if !eWep || !eWep:IsValid() then return false end
-	for i=1,self.MaxHeldItems do
-		if eWep:GetClass()=="itemforge_item_held_"..i then return true end
-	end
-	return false;
+	return string.sub(eWep:GetClass(),1,20)=="itemforge_item_held_";
 end
 
 --[[
@@ -1200,7 +1021,7 @@ NOTE: If your item is based off of another item, you can access it's type by doi
 If the item type exists, returns it. Otherwise, returns nil.
 ]]--
 function MODULE:GetType(sName)
-	return ItemTypes[sName];
+	return ItemTypes[string.lower(sName)];
 end
 
 --TEMPORARY/DEBUG
@@ -1215,7 +1036,7 @@ end
 
 --TEMPORARY/DEBUG
 function MODULE:DumpItem(id)
-	dumpTable(Items[id]);
+	dumpTable(ItemRefs[id]:GetTable());
 end
 
 

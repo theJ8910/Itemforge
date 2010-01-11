@@ -12,7 +12,7 @@ MODULE.Disabled=false;											--Our module will be loaded
 local BaseNWClassName="base_nw";								--The name of the Base Networked class
 
 local _OBJECTS={};												--Networked objects are stored here
-local ChangedNWObjects=nil;										--When a network object has a networked property changed, it is added here temporarily
+local ChangedNWObjects={};										--When a network object has a networked property changed, it is added here temporarily
 
 local IFN_DTYPE_CHAR = 1;
 local IFN_DTYPE_SHORT = 2;
@@ -39,10 +39,10 @@ The following commands apply to all networked objects.
 ]]--
 local IFN_MSG_CREATE		=	-128;	--(Server > Client) Sync creation clientside
 local IFN_MSG_REMOVE		=	-127;	--(Server > Client) Sync removal clientside
-local IFN_MSG_REQUP			=	-128;	--(Client > Server) Client requests full update of an item
-local IFN_MSG_REQFULLUP		=	-127;	--(Client > Server) Client requests full update of all items
-local IFN_MSG_STARTFULLUP	=	-126;	--(Server > Client) A full update of all items is going to being sent - expect this many.
-local IFN_MSG_ENDFULLUP		=	-125;	--(Server > Client) A full update of all items has finished.
+local IFN_MSG_REQUP			=	-128;	--(Client > Server) Client requests full update of a networked object
+local IFN_MSG_REQFULLUP		=	-127;	--(Client > Server) Client requests full update of all networked objects
+local IFN_MSG_STARTFULLUP	=	-126;	--(Server > Client) A full update of all networked objects is going to being sent - expect this many.
+local IFN_MSG_ENDFULLUP		=	-125;	--(Server > Client) A full update of all networked objects has finished.
 --[[
 I have organized the SET* list by message size.
 The exact size of the message sent is hard to know because of encapsulation.
@@ -99,6 +99,7 @@ local IFN_MSG_UNLOCK		=	-84;	--(Server > Client) The inventory has been unlocked
 --Initilize network module
 function MODULE:Initialize()
 	IF.Base:RegisterClass(_NWBASE,BaseNWClassName)
+	self:StartTick()
 end
 
 --Cleanup network module
@@ -114,7 +115,7 @@ end
 Starts the network tick
 ]]--
 function MODULE:StartTick()
-	hook.Add("Tick","itemforge_tick",self.Tick,self)
+	--hook.Add("Tick","itemforge_tick",self.Tick,self)
 end
 
 --[[
@@ -139,7 +140,14 @@ if SERVER then
 
 
 
-function MODULE:IFSendStart(pl,msg,id) umsg.Start("if",pl); umsg.Char(msg); umsg.Short((id or 0)-32768) end
+if MODULE.NWIDType==IFN_DTYPE_CHAR then
+	function MODULE:IFSendStart(pl,msg,id) umsg.Start("if",pl); umsg.Char(msg); umsg.Char((id or 0)-128) end
+elseif MODULE.NWIDType==IFN_DTYPE_SHORT then
+	function MODULE:IFSendStart(pl,msg,id) umsg.Start("if",pl); umsg.Char(msg); umsg.Short((id or 0)-32768) end
+elseif MODULE.NWIDType==IFN_DTYPE_LONG then
+	function MODULE:IFSendStart(pl,msg,id) umsg.Start("if",pl); umsg.Char(msg); umsg.Long((id or 0)-2147483648) end
+end
+
 function MODULE:IFSendAngle(v) umsg.Angle(v) end
 function MODULE:IFSendBool(v) umsg.Bool(v) end
 function MODULE:IFSendChar(v) umsg.Char(v) end
@@ -151,13 +159,12 @@ function MODULE:IFSendString(v) umsg.String(v) end
 function MODULE:IFSendVector(v) umsg.Vector(v) end
 function MODULE:IFSendVectorNormal(v) umsg.VectorNormal(v) end
 
---TODO GetID of v
 if MODULE.NWIDType==IFN_DTYPE_CHAR then
-	function MODULE:IFSendNWObj(v) umsg.Char(v-128) end
+	function MODULE:IFSendNWObj(v) umsg.Char(v:GetID()-128) end
 elseif MODULE.NWIDType==IFN_DTYPE_SHORT then
-	function MODULE:IFSendNWObj(v) umsg.Short(v-32768) end
+	function MODULE:IFSendNWObj(v) umsg.Short(v:GetID()-32768) end
 elseif MODULE.NWIDType==IFN_DTYPE_LONG then
-	function MODULE:IFSendNWObj(v) umsg.Long(v-2147483648) end
+	function MODULE:IFSendNWObj(v) umsg.Long(v:GetID()-2147483648) end
 end
 
 function MODULE:IFSendEnd() umsg.End() end
@@ -181,13 +188,12 @@ function MODULE:IFReadString(msg)		return msg:ReadString()				end
 function MODULE:IFReadVector(msg)		return msg:ReadVector()				end
 function MODULE:IFReadVectorNormal(msg) return msg:ReadVectorNormal()		end
 
---TODO return GetNWObj(id)
 if MODULE.NWIDType==IFN_DTYPE_CHAR then
-	function MODULE:IFReadNWObj(msg)	return msg:ReadChar()+128			end
+	function MODULE:IFReadNWObj(msg)	return Get(msg:ReadChar()+128)			end
 elseif MODULE.NWIDType==IFN_DTYPE_SHORT then
-	function MODULE:IFReadNWObj(msg)	return msg:ReadShort(v)+32768		end
+	function MODULE:IFReadNWObj(msg)	return Get(msg:ReadShort(v)+32768)		end
 elseif MODULE.NWIDType==IFN_DTYPE_LONG then
-	function MODULE:IFReadNWObj(msg)	return msg:ReadLong(v)+2147483648	end
+	function MODULE:IFReadNWObj(msg)	return Get(msg:ReadLong(v)+2147483648)	end
 end
 
 
@@ -195,26 +201,38 @@ end
 
 end
 
+_NWBASE._ProtectedKeys={};
 
 --[[
-SHARED
-Per Class
+* SHARED
+* Different for each Class
+
+The Base Networked class is based off of the Base class.
+]]--
+_NWBASE.Base="base";
+
+--[[
+* SHARED
+* Different for each Class
 
 This table lists the names of networked vars on _this type of_ networked object.
 This table is sorted by each networked var's ID.
 ]]--
 _NWBASE._NWVars=nil;
---[[
-SHARED
-Class & Object
 
-This is an ID number used to identify what object is intended for.
+--[[
+* SHARED
+* Default defined in this class
+* Different for each object
+
+This is an ID number used to identify what object a network update is intended for.
 ID numbers range from 0 to n. n is the max size of the integer datatype used (see MODULE.NWIDType at top of file)
 ]]--
 _NWBASE._NWID=0;
+
 --[[
-SHARED
-Per Object
+* SHARED
+* Different for each object
 
 This table serves different purposes Serverside and Clientside.
 Serverside:
@@ -229,23 +247,41 @@ Clientside:
 ]]--
 _NWBASE._NWVar=nil;
 
+--[[
+* SHARED
+* Protected
+
+This function returns the Network ID of this object.
+]]--
+--[[
 function _NWBASE:GetID()
 	return self._NWID;
 end
+_NWBASE._ProtectedKeys["GetID"]=true;
+]]--
 
 --[[
-SHARED
+* SHARED
+* Protected
 
 This function runs every tick, both serverside and clientside.
 ]]--
+--[[
 function _NWBASE:Tick()
 	if SERVER then
 	else
 	end
 end
+_NWBASE._ProtectedKeys["Tick"]=true;
+]]--
 
+--[[
+* SHARED
+
+When tostring() is used on this object, this function returns a string describing the object.
+]]--
 function _NWBASE:ToString()
-	return "Networked Object";
+	return "Networked Object ["..self.ClassName.."]";
 end
 
 if SERVER then
@@ -254,8 +290,9 @@ if SERVER then
 
 
 --[[
-SERVER
-Class & Object
+* SERVER
+* Default defined per-class
+* Different for each object
 
 A Network Client has two purposes:
 	A.) The server will only send data about an object to it's network client(s).
@@ -279,12 +316,14 @@ _NWBASE._NWClient=IF_PVS;
 SERVER
 Object
 
-A table of players that saw this object last frame. This table is indexed by Player ID.
+A table of players that saw this object last frame.
+This table is indexed by Player ID.
 ]]--
 _NWBASE._PVS=nil;
 
 --[[
-SERVER
+* SERVER
+* Protected
 
 Can a player "see" this object? This is really only important if your networked object uses IF_PVS for it's _NWClient.
 Override this function in classes that inherit from this.
@@ -294,7 +333,24 @@ Returns true if the given player can see this object, and false otherwise.
 function _NWBASE:DoesPlayerSee(pl)
 	return false;
 end
+_NWBASE._ProtectedKeys["DoesPlayerSee"]=true;
 
+--[[
+* SERVER
+* Protected
+
+This function detects when something has been set on the object.
+It's first prerogative is to stop overrides of any protected keys from the _BASE and _NWBASE.
+
+But it's main purpose is this:
+If a networked value was set to something different, then the object is marked as "changed",
+and an update will be sent to the approprite clients next tick.
+]]--
+function _NWBASE:OnNewIndex(k,v)
+	--TODO detect changed keys
+	return true;
+end
+_NWBASE._ProtectedKeys["OnNewIndex"]=true;
 
 
 

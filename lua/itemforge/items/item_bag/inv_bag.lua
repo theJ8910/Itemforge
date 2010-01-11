@@ -11,4 +11,4 @@ INV.SizeLimit=12;			--Bag's size-1; this stops other bags and items bigger than 
 INV.WeightCapacity=1000;	--Holds 1kg
 INV.MaxSlots=5;				--5 unique stacks of items can be stored here - Couple of burger boxes, couple of boxes of fries, and some napkins?
 
-IF.Inv:RegisterTemplate("inv_bag",INV);
+IF.Inv:RegisterType(INV,"inv_bag");

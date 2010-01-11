@@ -61,7 +61,7 @@ end
 Default Networked Vars - ITEM, NameOfVar, Datatype, DefaultValue (optional), IsPredicted (optional), HoldFromUpdate (optional)
 ]]--
 --What condition is this item in? If the item is actually a stack of items, the 'top' item is in this condition.
-IF.Items:CreateNWVar(ITEM,"Health","int",function(self) return self:GetMaxHealth() end);
+IF.Items:CreateNWVar(ITEM,"Health","int",function(self) return self.MaxHealth end);
 
 --How durable is the item (how many hit points total does it have)? Higher values mean the item is more durable.
 IF.Items:CreateNWVar(ITEM,"MaxHealth","int",function(self) return self.MaxHealth end);
@@ -102,10 +102,10 @@ IF.Items:CreateNWVar(ITEM,"MaxAmount","int",function(self)
 												end);
 --Set a networked angle on this item
 function ITEM:SetNWAngle(sName,aAng,bSuppress)
-	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked angle on "..tostring(self)..". sName wasn't given!\n"); return false end
-	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
-	if self.NWVarsByName[sName].Type!=7 then ErrorNoHalt("Itemforge Items: Couldn't set networked angle on "..tostring(self)..". "..sName.." is not a networked angle.\n"); return false end
-	if aAng!=nil && type(aAng)!="Angle" then ErrorNoHalt("Itemforge Items: Couldn't set networked angle on "..tostring(self)..". Given value was a \""..type(aAng).."\", not an angle!\n"); return false end
+	if sName==nil							then return self:Error("Couldn't set networked angle. sName wasn't given!\n") end
+	if self.NWVarsByName[sName]==nil		then return self:Error("There is no networked var by the name "..sName..".\n") end
+	if self.NWVarsByName[sName].Type!=7		then return self:Error("Couldn't set networked angle. "..sName.." is not a networked angle.\n") end
+	if aAng!=nil && type(aAng)!="Angle"		then return self:Error("Couldn't set networked angle. Given value was a \""..type(aAng).."\", not an angle!\n") end
 	
 	local upd=self:SetNWVar(sName,aAng);
 	
@@ -119,10 +119,10 @@ IF.Items:ProtectKey("SetNWAngle");
 
 --Set a networked bool on this item
 function ITEM:SetNWBool(sName,bBool,bSuppress)
-	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked bool on "..tostring(self)..". sName wasn't given!\n"); return false end
-	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
-	if self.NWVarsByName[sName].Type!=3 then ErrorNoHalt("Itemforge Items: Couldn't set networked bool on "..tostring(self)..". "..sName.." is not a networked bool.\n"); return false end
-	if bBool!=nil && type(bBool)!="boolean" then ErrorNoHalt("Itemforge Items: Couldn't set networked bool on "..tostring(self)..". Given value was a \""..type(bBool).."\", not a bool!\n"); return false end
+	if sName==nil								then return self:Error("Couldn't set networked bool. sName wasn't given!\n") end
+	if self.NWVarsByName[sName]==nil			then return self:Error("There is no networked var by the name "..sName..".\n") end
+	if self.NWVarsByName[sName].Type!=3			then return self:Error("Couldn't set networked bool. "..sName.." is not a networked bool.\n") end
+	if bBool!=nil && type(bBool)!="boolean"		then return self:Error("Couldn't set networked bool. Given value was a \""..type(bBool).."\", not a bool!\n") end
 	
 	local upd=self:SetNWVar(sName,bBool);
 	
@@ -136,10 +136,10 @@ IF.Items:ProtectKey("SetNWBool");
 
 --Set a networked entity on this item
 function ITEM:SetNWEntity(sName,cEnt,bSuppress)
-	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked entity on "..tostring(self)..". sName wasn't given!\n"); return false end
-	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
-	if self.NWVarsByName[sName].Type!=5 then ErrorNoHalt("Itemforge Items: Couldn't set networked entity on "..tostring(self)..". "..sName.." is not a networked entity.\n"); return false end
-	if cEnt!=nil && type(cEnt)!="Entity" && type(cEnt)!="Player" && type(cEnt)!="Weapon" && type(cEnt)!="NPC" && type(cEnt)!="Vehicle" then ErrorNoHalt("Itemforge Items: Couldn't set networked entity on "..tostring(self)..". Given value was a \""..type(cEnt).."\", not an entity! Valid entity types are: Entity, Player, NPC, Vehicle, and Weapon\n"); return false end
+	if sName==nil							then return self:Error("Couldn't set networked entity. sName wasn't given!\n") end
+	if self.NWVarsByName[sName]==nil		then return self:Error("There is no networked var by the name "..sName..".\n") end
+	if self.NWVarsByName[sName].Type!=5		then return self:Error("Couldn't set networked entity. "..sName.." is not a networked entity.\n") end
+	if cEnt!=nil && type(cEnt)!="Entity" && type(cEnt)!="Player" && type(cEnt)!="Weapon" && type(cEnt)!="NPC" && type(cEnt)!="Vehicle" then return self:Error("Couldn't set networked entity. Given value was a \""..type(cEnt).."\", not an entity! Valid entity types are: Entity, Player, NPC, Vehicle, and Weapon\n") end
 	
 	local upd=self:SetNWVar(sName,cEnt);
 	
@@ -153,10 +153,10 @@ IF.Items:ProtectKey("SetNWEntity");
 
 --Set a networked float on this item
 function ITEM:SetNWFloat(sName,fFloat,bSuppress)
-	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked float on "..tostring(self)..". sName wasn't given!\n"); return false end
-	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
-	if self.NWVarsByName[sName].Type!=2 then ErrorNoHalt("Itemforge Items: Couldn't set networked float on "..tostring(self)..". "..sName.." is not a networked float.\n"); return false end
-	if fFloat!=nil && type(fFloat)!="number" then ErrorNoHalt("Itemforge Items: Couldn't set networked float on "..tostring(self)..". Given value was a \""..type(fFloat).."\", not a number!\n"); return false end
+	if sName==nil								then return self:Error("Couldn't set networked float. sName wasn't given!\n") end
+	if self.NWVarsByName[sName]==nil			then return self:Error("There is no networked var by the name "..sName..".\n") end
+	if self.NWVarsByName[sName].Type!=2			then return self:Error("Couldn't set networked float. "..sName.." is not a networked float.\n") end
+	if fFloat!=nil && type(fFloat)!="number"	then return self:Error("Couldn't set networked float. Given value was a \""..type(fFloat).."\", not a number!\n") end
 	
 	local upd=self:SetNWVar(sName,fFloat);
 	
@@ -174,12 +174,12 @@ We opt to use the smallest datatypes possible.
 If run on the server, and the number given is too large to be sent (even larger than an unsigned int) the number will be set to 0, both serverside and clientside.
 ]]--
 function ITEM:SetNWInt(sName,iInt,bSuppress)
-	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked integer on "..tostring(self)..". sName wasn't given!\n"); return false end
-	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
-	if self.NWVarsByName[sName].Type!=1 then ErrorNoHalt("Itemforge Items: Couldn't set networked int on "..tostring(self)..". "..sName.." is not a networked int.\n"); return false end
+	if sName==nil							then return self:Error("Couldn't set networked integer. sName wasn't given!\n") end
+	if self.NWVarsByName[sName]==nil		then return self:Error("There is no networked var by the name "..sName..".\n") end
+	if self.NWVarsByName[sName].Type!=1		then return self:Error("Couldn't set networked int. "..sName.." is not a networked int.\n") end
 	if iInt!=nil then
 		--We were given something, were we given a valid number?
-		if type(iInt)!="number" then ErrorNoHalt("Itemforge Items: Couldn't set networked int on "..tostring(self)..". Given value was a \""..type(iInt).."\", not a number!\n"); return false end
+		if type(iInt)!="number"				then return self:Error("Couldn't set networked int. Given value was a \""..type(iInt).."\", not a number!\n") end
 		
 		--If we /were/ given a valid number, we need to truncate the decimal, if there is any.
 		iInt=math.floor(iInt);
@@ -197,10 +197,10 @@ IF.Items:ProtectKey("SetNWInt");
 
 --Set a networked string on this item
 function ITEM:SetNWString(sName,sString,bSuppress)
-	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked string on "..tostring(self)..". sName wasn't given!\n"); return false end
-	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
-	if self.NWVarsByName[sName].Type!=4 then ErrorNoHalt("Itemforge Items: Couldn't set networked string on "..tostring(self)..". "..sName.." is not a networked string.\n"); return false end
-	if sString!=nil && type(sString)!="string" then ErrorNoHalt("Itemforge Items: Couldn't set networked string on "..tostring(self)..". Given value was a \""..type(sString).."\", not a string!\n"); return false end
+	if sName==nil								then return self:Error("Couldn't set networked string. sName wasn't given!\n") end
+	if self.NWVarsByName[sName]==nil			then return self:Error("There is no networked var by the name "..sName..".\n") end
+	if self.NWVarsByName[sName].Type!=4			then return self:Error("Couldn't set networked string. "..sName.." is not a networked string.\n") end
+	if sString!=nil && type(sString)!="string"	then return self:Error("Couldn't set networked string. Given value was a \""..type(sString).."\", not a string!\n") end
 	
 	local upd=self:SetNWVar(sName,sString);
 	
@@ -214,10 +214,10 @@ IF.Items:ProtectKey("SetNWString");
 
 --Set a networked vector on this item
 function ITEM:SetNWVector(sName,vVec,bSuppress)
-	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked vector on "..tostring(self)..". sName wasn't given!\n"); return false end
-	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
-	if self.NWVarsByName[sName].Type!=6 then ErrorNoHalt("Itemforge Items: Couldn't set networked vector on "..tostring(self)..". "..sName.." is not a networked vector.\n"); return false end
-	if vVec!=nil && type(vVec)!="Vector" then ErrorNoHalt("Itemforge Items: Couldn't set networked vector on "..tostring(self)..". Given value was a \""..type(vVec).."\", not a vector!\n"); return false end
+	if sName==nil							then return self:Error("Couldn't set networked vector. sName wasn't given!\n") end
+	if self.NWVarsByName[sName]==nil		then return self:Error("There is no networked var by the name "..sName..".\n") end
+	if self.NWVarsByName[sName].Type!=6		then return self:Error("Couldn't set networked vector. "..sName.." is not a networked vector.\n") end
+	if vVec!=nil && type(vVec)!="Vector"	then return self:Error("Couldn't set networked vector. Given value was a \""..type(vVec).."\", not a vector!\n") end
 	
 	local upd=self:SetNWVar(sName,vVec);
 	
@@ -231,13 +231,12 @@ IF.Items:ProtectKey("SetNWVector");
 
 --Set a networked item on this item
 function ITEM:SetNWItem(sName,cItem,bSuppress)
-	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked item on "..tostring(self)..". sName wasn't given!\n"); return false end
-	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name \""..sName.."\" on "..tostring(self)..".\n"); return false end
-	if self.NWVarsByName[sName].Type!=8 then ErrorNoHalt("Itemforge Items: Couldn't set networked item on "..tostring(self)..". \""..sName.."\" is not a networked item.\n"); return false end
+	if sName==nil							then return self:Error("Couldn't set networked item. sName wasn't given!\n") end
+	if self.NWVarsByName[sName]==nil		then return self:Error("There is no networked var by the name \""..sName.."\".\n") end
+	if self.NWVarsByName[sName].Type!=8		then return self:Error("Couldn't set networked item. \""..sName.."\" is not a networked item.\n") end
 	if cItem!=nil then
 		if type(cItem)!="table" then
-			ErrorNoHalt("Itemforge Items: Couldn't set networked item on "..tostring(self)..". Given value was a \""..type(cItem).."\", not an item!\n");
-			return false;
+			return self:Error("Couldn't set networked item. Given value was a \""..type(cItem).."\", not an item!\n");
 		elseif !cItem:IsValid() then
 			cItem=nil;
 		end
@@ -255,13 +254,12 @@ IF.Items:ProtectKey("SetNWItem");
 
 --Set a networked inventory on this item
 function ITEM:SetNWInventory(sName,cInv,bSuppress)
-	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked inventory on "..tostring(self)..". sName wasn't given!\n"); return false end
-	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return false end
-	if self.NWVarsByName[sName].Type!=9 then ErrorNoHalt("Itemforge Items: Couldn't set networked inventory on "..tostring(self)..". "..sName.." is not a networked inventory.\n"); return false end
+	if sName==nil							then return self:Error("Couldn't set networked inventory. sName wasn't given!\n") end
+	if self.NWVarsByName[sName]==nil		then return self:Error("There is no networked var by the name "..sName..".\n") end
+	if self.NWVarsByName[sName].Type!=9		then return self:Error("Couldn't set networked inventory. "..sName.." is not a networked inventory.\n") end
 	if cInv!=nil then
 		if type(cInv)!="table" then
-			ErrorNoHalt("Itemforge Items: Couldn't set networked inventory on "..tostring(self)..". Given value was a \""..type(cInv).."\", not an inventory!\n");
-			return false;
+			return self:Error("Couldn't set networked inventory. Given value was a \""..type(cInv).."\", not an inventory!\n");
 		elseif !cInv:IsValid() then
 			cInv=nil;
 		end
@@ -279,16 +277,15 @@ IF.Items:ProtectKey("SetNWInventory");
 
 --Set a networked color on this item
 function ITEM:SetNWColor(sName,cColor,bSuppress)
-	if sName==nil then ErrorNoHalt("Itemforge Items: Couldn't set networked color on "..tostring(self)..". sName wasn't given!\n"); return false end
-	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name \""..sName.."\" on "..tostring(self)..".\n"); return false end
-	if self.NWVarsByName[sName].Type!=10 then ErrorNoHalt("Itemforge Items: Couldn't set networked color on "..tostring(self)..". \""..sName.."\" is not a networked color.\n"); return false end
+	if sName==nil							then return self:Error("Couldn't set networked color. sName wasn't given!\n") end
+	if self.NWVarsByName[sName]==nil		then return self:Error("There is no networked var by the name \""..sName.."\".\n") end
+	if self.NWVarsByName[sName].Type!=10	then return self:Error("Couldn't set networked color. \""..sName.."\" is not a networked color.\n") end
+	
 	if cColor!=nil then
 		if type(cColor)!="table" then
-			ErrorNoHalt("Itemforge Items: Couldn't set networked color on "..tostring(self)..". Given value was a \""..type(cColor).."\", not a color!\n");
-			return false;
+			return self:Error("Couldn't set networked color. Given value was a \""..type(cColor).."\", not a color!\n");
 		elseif !cColor.r || !cColor.g || !cColor.b || !cColor.a then
-			ErrorNoHalt("Itemforge Items: Couldn't set networked color on "..tostring(self)..". Given table didn't have an 'r','g','b', and/or 'a' entry; maybe this table is not a color?\n");
-			return false;
+			return self:Error("Couldn't set networked color. Given table didn't have an 'r','g','b', and/or 'a' entry; maybe this table is not a color?\n");
 		else
 			--Lets make sure values are in range here
 			cColor.r=math.Clamp(cColor.r,0,255);
@@ -314,7 +311,7 @@ This actually sets the networked var to the given value serverside/clientside.
 This returns true if the networked value changed from what it was, or false if it didn't.
 ]]--
 function ITEM:SetNWVar(sName,vValue)
-	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return nil; end
+	if self.NWVarsByName[sName]==nil then return self:Error("There is no networked var by the name "..sName..".\n") end
 	
 	--If NWVars hasn't been created yet, we'll create it
 	if self.NWVars==nil then self.NWVars={} end
@@ -378,7 +375,7 @@ IF.Items:ProtectKey("GetNWInventory");
 Returns a networked var.
 ]]--
 function ITEM:GetNWVar(sName)
-	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return nil; end
+	if self.NWVarsByName[sName]==nil then self:Error("There is no networked var by the name "..sName..".\n"); return nil; end
 	
 	if self.NWVars && self.NWVars[sName]!=nil then		--Return this NWVar if it has been set
 		return self.NWVars[sName];
@@ -459,10 +456,11 @@ sName is the name of a networked var to send.
 pTo is an optional player to send to.
 	If this is nil, we will send the networked var to everybody (or to the owner if the item is private).
 True is returned if the networked var was sent to the requested player.
-	If we tried to send to everybody, true is returned if the networked var
+	If we tried to send to everybody, true is returned if the networked var was successfully sent to all players.
+False is returned otherwise.
 ]]--
 function ITEM:SendNWVar(sName,pTo)
-	if self.NWVarsByName[sName]==nil then ErrorNoHalt("Itemforge Items: There is no networked var by the name "..sName.." on "..tostring(self)..".\n"); return nil; end
+	if self.NWVarsByName[sName]==nil then return self:Error("There is no networked var by the name "..sName..".\n") end
 	
 	local owner=self:GetOwner();
 	if pTo==nil && owner==nil then
@@ -517,7 +515,7 @@ function ITEM:SendNWVar(sName,pTo)
 			IF.Items:IFIEnd();
 		else
 			--TODO better error handling here
-			ErrorNoHalt("Itemforge Items: Error - Trying to set NWVar "..sName.." on "..tostring(self).." failed - number '"..val.."' is too big to be sent!\n");
+			self:Error("Trying to send NWVar "..sName.." failed - the number "..val.." is too large to be sent!\n");
 			
 			--It's an invalid number to send
 			self:SetNWVar(sName,0);
@@ -590,8 +588,8 @@ else
 Whenever a networked var is received from the server, this function is called.
 ]]--
 function ITEM:ReceiveNWVar(sName,vVal)
-	if !sName then ErrorNoHalt("Itemforge Items: Couldn't receive network var from server. Name of network var wasn't given.\n"); return false end
-	if !self.NWVarsByName[sName] then ErrorNoHalt("Itemforge Items: Couldn't receive network var from server. Network var by name \""..sName.."\" doesn't exist clientside.\n"); return false end
+	if !sName						then return self:Error("Couldn't receive network var from server. Name of network var wasn't given.\n") end
+	if !self.NWVarsByName[sName]	then return self:Error("Couldn't receive network var from server. Network var by name \""..sName.."\" doesn't exist clientside.\n") end
 	
 	if self.NWVarsByName[sName].Predicted then
 		if !self.NWVarsThisTick then self.NWVarsThisTick={} end

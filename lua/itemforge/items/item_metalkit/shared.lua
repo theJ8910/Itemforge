@@ -40,7 +40,8 @@ function ITEM:ApplyTo(pl,otherItem)
 	if !self:Event("CanPlayerInteract",false,pl) then return false end
 	
 	if SERVER then
-		self:StartApplying(otherItem);
+		if self:StartApplying(otherItem) then IF.Vox:PlayRandomSuccess(pl);
+		else								  IF.Vox:PlayRandomFailure(pl); end
 	else
 		self:SendNWCommand("ApplyTo",otherItem);
 	end
@@ -58,8 +59,11 @@ function ITEM:OnUse(pl)
 end
 
 function ITEM:StartApplying(otherItem)
-	--Don't apply if we're already applying to something. Also, don't apply if we're spreading out the reinforcement over too many items (in other words, 5 or less reinforcement per item really isn't much of a reinforcement, is it?)
-	if self.Applying==true || self.ReinforceBy/otherItem:GetAmount()<=5  then return false end
+	--Don't apply if we're already applying to something.
+	--If the item we're applying to is invincible, forget about it.
+	--Also, don't apply if we're spreading out the reinforcement over too many items (in other words, 5 or less reinforcement per item really isn't much of a reinforcement, is it?)
+	if self.Applying==true || self.ReinforceBy/otherItem:GetAmount()<=5 then return false end
+	
 	self.Applying=true;
 	
 	self:EmitSound(self.Sounds[math.random(4,7)]);
@@ -68,6 +72,7 @@ function ITEM:StartApplying(otherItem)
 	self:SimpleTimer(0.4,self.EmitSound,self.Sounds[math.random(1,3)]);
 	self:SimpleTimer(0.6,self.EmitSound,self.Sounds[math.random(1,3)]);
 	self:SimpleTimer(1.0,self.FinishApplying,otherItem);
+	return true;
 end
 
 function ITEM:FinishApplying(otherItem)

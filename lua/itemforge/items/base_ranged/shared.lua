@@ -296,7 +296,7 @@ function ITEM:OnUse(pl)
 	end
 	
 	--We couldn't load whatever the gun with whatever the player was carrying, so just do the default OnUse
-	return self["item"].OnUse(self,pl);
+	return self["base_item"].OnUse(self,pl);
 end
 
 

@@ -96,7 +96,7 @@ The item can't exit the world while it's attached to an entity,
 in addition to any other case that it can't exit.
 ]]--
 function ITEM:CanExitWorld(ent)
-	return (self:GetAttachedEnt()==nil && self["item"].CanExitWorld(self,ent));
+	return (self:GetAttachedEnt()==nil && self["base_item"].CanExitWorld(self,ent));
 end
 
 --[[
@@ -306,6 +306,10 @@ function ITEM:UnlockAttachment()
 	return true;
 end
 
+function ITEM:OnRemove()
+	self:Detach();
+end
+
 IF.Items:CreateNWCommand(ITEM,"PlayerDetach",function(self,...) self:PlayerDetach(...) end);
 
 
@@ -317,7 +321,7 @@ else
 
 
 function ITEM:OnPopulateMenu(pMenu)
-	self["item"].OnPopulateMenu(self,pMenu);
+	self["base_item"].OnPopulateMenu(self,pMenu);
 	if self:GetAttachedEnt() || self:GetAttachedItem() then
 		if self:IsAttachmentLocked() then	pMenu:AddOption("Unlock",function(panel) self:PlayerUnlock(LocalPlayer()) end);
 		else								pMenu:AddOption("Lock",function(panel) self:PlayerLock(LocalPlayer()) end)

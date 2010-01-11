@@ -29,4 +29,4 @@ end
 
 end
 
-IF.Inv:RegisterTemplate("inv_footlocker",INV);
+IF.Inv:RegisterType(INV,"inv_footlocker");

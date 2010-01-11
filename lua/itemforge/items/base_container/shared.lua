@@ -114,7 +114,7 @@ function ITEM:OnSeverInventory(inv)
 end
 
 function ITEM:OnPopulateMenu(pMenu)
-	self["item"].OnPopulateMenu(self,pMenu);
+	self["base_item"].OnPopulateMenu(self,pMenu);
 	pMenu:AddOption("Check Inventory",function(panel) self:ShowInventory(LocalPlayer()) end);
 end
 

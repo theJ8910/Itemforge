@@ -29,16 +29,13 @@ If a player uses this ammo while holding an item based off of base_ranged, we'll
 If the ammo is used clientside, we won't actually load the gun, we'll just return true to indiciate we want the server to load the gun.
 ]]--
 function ITEM:OnUse(pl)
-	local wep=pl:GetActiveWeapon();
-	if wep:IsValid() then
-		local item=IF.Items:GetWeaponItem(wep);
-		if item && item:InheritsFrom("base_ranged") && (CLIENT || item:Load(self) ) then
-			return true;
-		end
+	local item=IF.Items:GetWeaponItem(pl:GetActiveWeapon());
+	if item && item:InheritsFrom("base_ranged") && (CLIENT || item:Load(self) ) then
+		return true;
 	end
 	
 	--We couldn't load whatever the player was carrying, so just do the default OnUse
-	return self["item"].OnUse(self,pl);
+	return self["base_item"].OnUse(self,pl);
 end
 
 if CLIENT then
@@ -50,7 +47,7 @@ if CLIENT then
 If the player has a base_ranged weapon out, we'll give him the option to load his weapon with this ammo
 ]]--
 function ITEM:OnPopulateMenu(pMenu)
-	self["item"].OnPopulateMenu(self,pMenu);
+	self["base_item"].OnPopulateMenu(self,pMenu);
 	
 	--TODO more than one clip
 	local wep=LocalPlayer():GetActiveWeapon();
