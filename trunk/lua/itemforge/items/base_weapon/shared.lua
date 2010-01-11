@@ -170,7 +170,7 @@ function ITEM:SetNextBoth(fNext,fNextAuto)
 end
 
 function ITEM:OnDraw2D(width,height)
-	self["item"].OnDraw2D(self,width,height);
+	self["base_item"].OnDraw2D(self,width,height);
 	
 	local remaining=self:GetNWFloat("PrimaryNext")-CurTime();
 	local delay=self:GetNWFloat("LastPrimaryDelay");

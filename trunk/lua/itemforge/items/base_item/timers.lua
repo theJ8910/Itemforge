@@ -16,10 +16,10 @@ Starts a timer connected to this item.
 See AdjustTimer below for an explanation of the arguments
 ]]--
 function ITEM:CreateTimer(vID,delay,reps,fCallback,...)
-	if !vID then ErrorNoHalt("Itemforge Items: Couldn't create timer on "..tostring(self).." - timer ID not given! ID needs to be a string or number.\n"); return false end
-	if !delay then ErrorNoHalt("Itemforge Items: Couldn't create timer on "..tostring(self).." - delay not given. \n"); return false end
-	if !reps then ErrorNoHalt("Itemforge Items: Couldn't create timer on "..tostring(self).." - number of times to repeat not given. \n"); return false end
-	if !fCallback then ErrorNoHalt("Itemforge Items: Couldn't create timer on "..tostring(self).." - function not given. \n"); return false end
+	if !vID			then return self:Error("Couldn't create timer - timer ID not given! ID needs to be a string or number.\n") end
+	if !delay		then return self:Error("Couldn't create timer - delay not given.\n") end
+	if !reps		then return self:Error("Couldn't create timer - number of times to repeat not given.\n") end
+	if !fCallback	then return self:Error("Couldn't create timer - function not given.\n")  end
 	
 	--Create timers collection if it hasn't been created already
 	if !self.Timers then self.Timers={}; end
@@ -42,8 +42,8 @@ Any other arguments given to StartTimer will be given to fCallback whenever it r
 This returns the unique ID (a string) if successful, or false if unsuccessful.
 ]]--
 function ITEM:SimpleTimer(delay,fCallback,...)
-	if !delay then ErrorNoHalt("Itemforge Items: Couldn't create simple timer on "..tostring(self).." - delay not given. \n"); return false end
-	if !fCallback then ErrorNoHalt("Itemforge Items: Couldn't create simple timer on "..tostring(self).." - function not given. \n"); return false end
+	if !delay		then return self:Error("Couldn't create simple timer - delay not given. \n") end
+	if !fCallback	then return self:Error("Couldn't create simple timer - function not given. \n") end
 	
 	--Create timers collection if it hasn't been created already
 	if !self.Timers then self.Timers={}; end
@@ -81,10 +81,10 @@ Any other arguments given to StartTimer will be given to fCallback whenever it r
 Then five seconds after you run SetAlarm, WatchAlarm runs and tells the player you gave it that his watch is going off.
 ]]--
 function ITEM:AdjustTimer(vID,delay,reps,fCallback,...)
-	if !vID then ErrorNoHalt("Itemforge Items: Couldn't adjust timer on "..tostring(self).." - timer ID not given! ID needs to be a string or number.\n"); return false end
-	if !delay then ErrorNoHalt("Itemforge Items: Couldn't adjust timer on "..tostring(self).." - delay not given. \n"); return false end
-	if !reps then ErrorNoHalt("Itemforge Items: Couldn't adjust timer on "..tostring(self).." - number of times to repeat not given. \n"); return false end
-	if !fCallback then ErrorNoHalt("Itemforge Items: Couldn't adjust timer on "..tostring(self).." - function not given. \n"); return false end
+	if !vID			then return self:Error("Couldn't adjust timer - timer ID not given! ID needs to be a string or number.\n") end
+	if !delay		then return self:Error("Couldn't adjust timer - delay not given.\n") end
+	if !reps		then return self:Error("Couldn't adjust timer - number of times to repeat not given.\n") end
+	if !fCallback	then return self:Error("Couldn't adjust timer - function not given.\n") end
 	
 	--Create timers collection if it hasn't been created already
 	if !self.Timers then self.Timers={}; end
@@ -176,7 +176,7 @@ Permanantly stops an active timer.
 Returns false if the timer was not found or couldn't be stopped for some reason, and true if it was stopped successfully.
 ]]--
 function ITEM:DestroyTimer(vID)
-	if !vID then ErrorNoHalt("Itemforge Items: Couldn't destroy/remove timer on "..tostring(self).." - timer ID not given! ID needs to be a string or number.\n"); return false end
+	if !vID then return self:Error("Couldn't destroy/remove timer - timer ID not given! ID needs to be a string or number.\n") end
 	if !self:HasTimer(vID) then return false end
 	
 	timer.Destroy(self.Timers[vID]);

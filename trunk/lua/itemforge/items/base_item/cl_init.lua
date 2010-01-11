@@ -1,9 +1,9 @@
 --[[
-item
+base_item
 CLIENT
 
-item is the default item. All items except item inherit from this item-type.
-NOTE: The item type is the name of the folder it is in (this is item/cl_init.lua, so this item's type is "item")
+base_item is the default item. All items except base_item inherit from this item-type.
+NOTE: The item type is the name of the folder it is in (this is base_item/cl_init.lua, so this item's type is "base_item")
 ]]--
 include("shared.lua");
 include("events_client.lua");
@@ -25,9 +25,9 @@ This function merely voids an item from the old inventory and inserts it into th
 True is returned if these operations were successful. False is returned otherwise.
 ]]--
 function ITEM:TransInventory(old,new,newSlot)
-	if !old || !old:IsValid() then ErrorNoHalt("Itemforge Items: Could not transfer "..tostring(self).." from one inventory to another clientside, 'old' inventory given is not valid.\n"); return false end
-	if !new || !new:IsValid() then ErrorNoHalt("Itemforge Items: Could not transfer "..tostring(self).." from inventory "..old:GetID().." to another inventory clientside, 'new' inventory given is not valid.\n"); return false end
-	if newSlot==nil then ErrorNoHalt("Itemforge Items: Could not transfer "..tostring(self).." from inventory "..old:GetID().." to inventory "..newInv:GetID().." clientside! newSlot was not given!\n"); return false end
+	if !old || !old:IsValid()	then return self:Error("Could not transfer item from one inventory to another clientside, 'old' inventory given is not valid.\n") end
+	if !new || !new:IsValid()	then return self:Error("Could not transfer item from "..tostring(old).." to another inventory clientside, 'new' inventory given is not valid.\n") end
+	if newSlot==nil				then return self:Error("Could not transfer item from "..tostring(old).." to "..tostring(new).." clientside! newSlot was not given!\n") end
 	
 	if old!=new && !self:ToVoid(false,old,nil,false) then end
 	if !self:ToInventory(new,newSlot,nil,nil,false) then return false end
@@ -40,7 +40,7 @@ This function is designed to save bandwidth.
 True is returned if the move was successful. False is returned otherwise.
 ]]--
 function ITEM:TransSlot(inv,oldslot,newslot)
-	if !inv || !inv:IsValid() then ErrorNoHalt("Itemforge Items: Could not transfer "..tostring(self).." from one slot to another clientside, inventory given is not valid.\n"); return false end
+	if !inv || !inv:IsValid() then return self:Error("Could not transfer item from one slot to another clientside, inventory given is not valid.\n") end
 	if !inv:MoveItem(self,oldslot,newslot,false) then return false end
 end
 IF.Items:ProtectKey("TransSlot");
@@ -93,13 +93,17 @@ function ITEM:PlayerExamine()
 	else			weightstr=w.." grams"
 	end
 	
-	local h=self:GetHealth();
-	local m=self:GetMaxHealth();
+	
+	
 	
 	LocalPlayer():PrintMessage(HUD_PRINTTALK,self:Event("GetName","Error")..amtstr);
 	LocalPlayer():PrintMessage(HUD_PRINTTALK,"Total Weight: "..weightstr);
-	LocalPlayer():PrintMessage(HUD_PRINTTALK,"Condition: "..math.Round((h/m)*100).."% ("..h.."/"..m..")");
-	LocalPlayer():PrintMessage(HUD_PRINTTALK,self:Event("GetDescription","Error"));
+	local m=self:GetMaxHealth();
+	if m!=0 then
+		local h=self:GetHealth();
+		LocalPlayer():PrintMessage(HUD_PRINTTALK,"Condition: "..math.Round((h/m)*100).."% ("..h.."/"..m..")");
+	end
+	LocalPlayer():PrintMessage(HUD_PRINTTALK,self:Event("GetDescription","[Error getting description]"));
 end
 IF.Items:ProtectKey("PlayerExamine");
 
@@ -293,8 +297,8 @@ Clientside, this runs console commands (sending data to the server in the proces
 ]]--
 function ITEM:SendNWCommand(sName,...)
 	local command=self.NWCommandsByName[sName];
-	if command==nil then ErrorNoHalt("Itemforge Items: Couldn't send command '"..sName.."' on "..tostring(self)..", there is no NWCommand with this name on this item!\n"); return false end
-	if command.Hook!=nil then ErrorNoHalt("Itemforge Items: Command '"..command.Name.."' on "..tostring(self).." can't be sent clientside. It has a hook, meaning this command is recieved clientside, not sent.\n"); return false end
+	if command==nil			then return self:Error("Couldn't send command \""..sName.."\", there is no NWCommand with this name on this item!\n") end
+	if command.Hook!=nil	then return self:Error("Command \""..command.Name.."\" can't be sent clientside. It has a hook, meaning this command is recieved clientside, not sent.\n") end
 	
 	local arglist={};
 	
@@ -374,8 +378,8 @@ function ITEM:ReceiveNWCommand(msg)
 	local commandid=msg:ReadChar()+128;
 	local command=self.NWCommandsByID[commandid];
 	
-	if command==nil then ErrorNoHalt("Itemforge Items: Couldn't find a NWCommand with ID '"..commandid.."' on "..tostring(self)..". Make sure commands are created in the same order BOTH serverside and clientside. \n"); return false end
-	if command.Hook==nil then ErrorNoHalt("Itemforge Items: Command '"..command.Name.."' was received on "..tostring(self)..", but there is no Hook to run!\n"); return false end
+	if command==nil			then return self:Error("Couldn't find a NWCommand with ID "..commandid..". Make sure commands are created in the same order BOTH serverside and clientside.\n") end
+	if command.Hook==nil	then return self:Error("Command \""..command.Name.."\" was received, but there is no Hook to run!\n") end
 	
 	--If our command sends data, then we need to receive the appropriate type of data.
 	--We'll pass this onto the hook function.

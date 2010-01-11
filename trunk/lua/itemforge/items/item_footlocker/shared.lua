@@ -121,6 +121,27 @@ function ITEM:Unlock()
 	self:SetWorldModel(self.WorldModelOpen);
 end
 
+--The lock can take damage.
+function ITEM:OnEntTakeDamage(entity,dmgInfo)
+	local lock=self:GetLock();
+	
+	if lock then
+		local totalDamage=dmgInfo:GetDamage();
+		local footlockerDamage=totalDamage*.60;
+		
+		self:Hurt(footlockerDamage,dmgInfo:GetAttacker());
+		lock:Hurt(totalDamage-footlockerDamage,dmgInfo:GetAttacker());
+	else
+		self:Hurt(dmgInfo:GetDamage(),dmgInfo:GetAttacker());
+	end
+	
+	print("Attacker",dmgInfo:GetAttacker());
+	print("Inflictor",dmgInfo:GetInflictor());
+	
+	--GetWeaponItem(eWep)
+	entity:TakePhysicsDamage(dmgInfo);
+end
+
 --Remove any attached lock items
 function ITEM:OnRemove()
 	local l=self:GetLock();

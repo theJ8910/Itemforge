@@ -57,7 +57,7 @@ Returns the loaded item.
 Returns false if the item could not be loaded.
 ]]--
 function MODULE:LoadItem(tDat)
-	local i=IF.Items:Create(tDat.Type);
+	local i=IF.Items:Create(tDat.ClassName);
 	if !i then return false end			--No error description here because The IF.Items:Create() function will report specific errors in the case of a failure to create.
 	
 	return i;
@@ -71,7 +71,7 @@ function MODULE:SaveToString(tDat)
 	local n="\n";
 	
 	local sSave= self.TextFileVer..n;
-	sSave=sSave..iItem.Type..n;
+	sSave=sSave..iItem.ClassName..n;
 	
 	local function takeKV(k,v) sSave=sSave..tostring(k).."/"..tostring(v)..n end
 	self:SaveItem(iItem,takeKV);
@@ -90,8 +90,8 @@ function MODULE:LoadFromString(sStr)
 	
 	local tDat={};
 	
-	tDat.Type=lines[2];
-	if !tDat.Type then ErrorNoHalt("Itemforge Save/Load: Couldn't load item from text file. The item-type was missing from the file!\n"); return false end
+	tDat.ClassName=lines[2];
+	if !tDat.ClassName then ErrorNoHalt("Itemforge Save/Load: Couldn't load item from text file. The item-type was missing from the file!\n"); return false end
 	
 	tDat.NWVars={};
 	

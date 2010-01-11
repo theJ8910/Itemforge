@@ -109,10 +109,10 @@ TODO get rid of (or repurpose) split/merge and make Transfer all purpose
 	amt is all items and otherStack given: Merges this stack with the given stack entirely.
 ]]--
 function ITEM:Transfer(amt,otherStack)
-	if !otherStack || !otherStack:IsValid() then ErrorNoHalt("Itemforge Items: Can't transfer items from "..tostring(self).."; a valid stack of items to transfer to was not given.\n"); return false end
-	if !amt then ErrorNoHalt("Itemforge Items: Can't transfer items from "..tostring(self).." to "..tostring(otherStack).."; the number of items to transfer wasn't given!\n"); return false end
-	if amt<1 then ErrorNoHalt("Itemforge Items: Can't transfer "..amt.." items from "..tostring(self).." to "..tostring(otherStack).."; At least one item must be transferred!\n"); return false end
-	if amt>self:GetAmount() then ErrorNoHalt("Itemforge Items: Can't transfer "..amt.." items from "..tostring(self).." to "..tostring(otherStack).."; This stack only has "..self:GetAmount().." items.\n"); return false end
+	if !otherStack || !otherStack:IsValid()	then self:Error("Can't transfer items from this stack; a valid stack of items to transfer to was not given.\n"); return false end
+	if !amt									then self:Error("Can't transfer items from this stack to "..tostring(otherStack).."; the number of items to transfer wasn't given!\n"); return false end
+	if amt<1								then self:Error("Can't transfer "..amt.." items from this stack to "..tostring(otherStack).."; At least one item must be transferred!\n"); return false end
+	if amt>self:GetAmount()					then self:Error("Can't transfer "..amt.." items from this stack to "..tostring(otherStack).."; This stack only has "..self:GetAmount().." items.\n"); return false end
 	
 	if !otherStack:AddAmount(amt) then return false end
 	self:SubAmount(amt);
@@ -220,7 +220,7 @@ If you are merging several stacks, you can store the values :Merge() returns lik
 Hope this is an adequate explanation of how this works.
 ]]--
 function ITEM:Merge(...)
-	if type(arg[1])!="table" then ErrorNoHalt("Itemforge Items: Couldn't merge "..tostring(self).." with another item. No item was given!\n"); return false end
+	if type(arg[1])!="table" then self:Error("Couldn't merge this stack with another stack. No item was given!\n"); return false end
 	
 	local bPartialMerge=true;
 	local bPredict=CLIENT;
@@ -349,7 +349,7 @@ TODO return false if a stack can't be broken
 ]]--
 function ITEM:Split(...)
 	--Forgot to tell us how many items to split
-	if type(arg[1])!="number" then ErrorNoHalt("Itemforge Items: Couldn't split "..tostring(self).." - number of items to transfer to a new stack into wasn't given!\n"); return false end
+	if type(arg[1])!="number" then self:Error("Couldn't split this stack - number of items to transfer to a new stack into wasn't given!\n"); return false end
 	
 	local bSameLocation=true;
 	local bPredict=CLIENT;

@@ -2,8 +2,8 @@
 item
 SHARED
 
-item is the default item. All items except item inherit from this item-type.
-NOTE: The item type is the name of the folder it is in (this is item/shared.lua, so this item's type is "item")
+base_item is the default item. All items except item inherit from this item-type.
+NOTE: The item type is the name of the folder it is in (this is base_item/shared.lua, so this item's type is "base_item")
 ]]--
 
 include("health.lua");
@@ -23,7 +23,7 @@ This section is good for things that don't change often but need to be known to 
 --Basic info
 ITEM.Name="Default Item Name";							--An item's name is displayed by the UI in several different locations, such as the weapon selection menu (when the item is held), or displayed when selected in an inventory.
 ITEM.Description="This is the default description.";	--An item's description gives additional details about the item. One place it is displayed is in the inventory when selected.
-ITEM.Base=nil;											--The item is based off of this kind of item. Set this to nil if it's not based off of an item. Set it to the type of another item (ex: ITEM.Base="hammer") to base it off of that. (NOTE: This is useful for tools. For example: If you have an item called "Hammer" that "Stone Hammer" and "Iron Hammer" are based off of, and you have a combination that takes "Hammer" as one of it's ingredients, both the "Stone Hammer" and "Iron Hammer" can be used!)
+ITEM.Base="base_nw";									--The item is based off of this kind of item. Set this to nil if it's not based off of an item. Set it to the type of another item (ex: ITEM.Base="hammer") to base it off of that. (NOTE: This is useful for tools. For example: If you have an item called "Hammer" that "Stone Hammer" and "Iron Hammer" are based off of, and you have a combination that takes "Hammer" as one of it's ingredients, both the "Stone Hammer" and "Iron Hammer" can be used!)
 ITEM.WorldModel="models/dav0r/buttons/button.mdl";		--When dropped on the ground, held by a player, or viewed on some places on the UI (like an inventory icon), the world model is the model displayed.
 ITEM.ViewModel="models/weapons/v_pistol.mdl";			--When held by a player, the player holding it sees this model in first-person.
 ITEM.Size=1;											--Default size of a single item in this stack. Size has nothing to do with how big the item looks or how much it weighs. Instead, size determines if an item can be placed in an inventory or not. In my opinion, a good size can be determined if you put the item into the world and get the entity's bounding sphere size.
@@ -40,7 +40,7 @@ ITEM.SecondaryAuto=false;								--If this item is held as a weapon, is it's sec
 
 --Don't modify/override these. They're either set automatically, don't need to be changed, or are listed here so I can keep track of them.
 --Belongs to item-type
-ITEM.Type="";											--The item-type. This is the same as the name of the folder these files are in. This is set automatically when loading item-types.
+ITEM.ClassName="";										--The item-type. This is the same as the name of the folder these files are in. This is set automatically when loading item-types.
 ITEM.BaseClass=nil;										--Set to the Item-Type that ITEM.Base identifies after loading all item-types
 ITEM.NWCommandsByName=nil;								--Networked commands are stored here. The key is the name, value is the command. These trigger networked hooks on the other side (Client to Server or Server to Client).
 ITEM.NWCommandsByID=nil;								--Networked commands are stored here. The key is the id, value is the command. These trigger networked hooks on the other side (Client to Server or Server to Client).
@@ -73,34 +73,6 @@ end
 IF.Items:ProtectKey("Remove");
 
 --[[
-Calls an event on the item.
-If there is an error calling the event, a non-halting error message is generated and a default value is returned.
-
-sEventName is a string which should be the name of the event to call (EX: "OnDraw2D", "OnThink", etc)
-vDefaultReturn is what will be returned in case of errors calling the hook.
-... - You can pass arguments to the hook here
-
-This function returns two values: vReturn,bSuccess
-	vReturn will be what the event returned, or if there were errors, then it will be vDefaultReturn.
-	bSuccess will be true if the event was called successfully or false if there were errors.
-
-Example: I want to call this item's CanEnterWorld event:
-	self:Event("CanEnterWorld",false,vPos,aAng);
-	This runs the item's CanEnterWorld and gives it vPos and aAng as arguments.
-	If there's a problem running the event, we want false to be returned.
-]]--
-function ITEM:Event(sEventName,vDefaultReturn,...)
-	local f=self[sEventName];
-	if !f then ErrorNoHalt("Itemforge Items: "..sEventName.." ("..tostring(self)..") failed: This event does not exist.\n"); return vDefaultReturn,false end
-		
-	local s,r=pcall(f,self,...);
-	if !s then ErrorNoHalt("Itemforge Items: "..sEventName.." ("..tostring(self)..") failed: "..r.."\n"); return vDefaultReturn,false end
-	
-	return r,true;
-end
-IF.Items:ProtectKey("Event");
-
---[[
 This function puts an item inside of an inventory.
 inv is the inventory to add the item to.
 slot is an optional number that requests a certain slot to insert the item into. This should be the slot number you want to place the item in (starting at 1), or nil if any slot will do.
@@ -125,11 +97,11 @@ TODO: This function needs to be reworked to reduce it's complexity
 ]]--
 function ITEM:ToInventory(inv,slot,pl,bNoMerge,bPredict)
 	if self.BeingRemoved then return false end
-	if !inv || !inv:IsValid() then ErrorNoHalt("Itemforge Items: Could not insert "..tostring(self).." into an inventory - given inventory was invalid!\n"); return false end
+	if !inv || !inv:IsValid()					then return self:Error("Could not insert item into an inventory - given inventory was invalid!\n") end
 	if pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't insert "..tostring(self).." into "..tostring(inv)..". Player given is not valid!\n"); return false;
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Items: Couldn't insert "..tostring(self).." into "..tostring(inv)..". The player given is not a player.\n"); return false;
-		elseif !inv:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Items: Couldn't insert "..tostring(self).." into "..tostring(inv)..". The inventory given is private, and the player given is not the owner of the inventory.\n"); return false;
+		if !pl:IsValid()						then return self:Error("Couldn't insert item into "..tostring(inv)..". Player given is not valid!\n");
+		elseif !pl:IsPlayer()					then return self:Error("Couldn't insert item into "..tostring(inv)..". The player given is not a player.\n");
+		elseif !inv:CanSendInventoryData(pl)	then return self:Error("Couldn't insert item into "..tostring(inv)..". The inventory given is private, and the player given is not the owner of the inventory.\n");
 		end
 	end
 	
@@ -138,7 +110,7 @@ function ITEM:ToInventory(inv,slot,pl,bNoMerge,bPredict)
 	
 	if SERVER || bPredict then
 		local bSameInv=(oldinv==inv);
-		if bSameInv && !slot then ErrorNoHalt("Itemforge Items: Couldn't insert "..tostring(self).." into "..tostring(inv)..". The item is already in this inventory. No slot was given, so the item can't be moved to a different slot, either.\n"); return false; end
+		if bSameInv && !slot					then return self:Error("Couldn't insert item into "..tostring(inv)..". The item is already in this inventory. No slot was given, so the item can't be moved to a different slot, either.\n") end
 		
 		local bSameSlot=(oldslot==slot);
 		local bSendingUpdate=(bSameInv && bSameSlot);
@@ -164,8 +136,8 @@ function ITEM:ToInventory(inv,slot,pl,bNoMerge,bPredict)
 		end
 	else
 		--We don't stop insertion clientside if the item has an entity or another container already, but we bitch about it so the scripter knows something isn't right
-		if slot==nil then ErrorNoHalt("Itemforge Items: Could not add "..tostring(self).." to "..tostring(inv).." clientside! slot was not given!\n"); return false end
-		if oldinv && oldinv!=inv then ErrorNoHalt("Itemforge Items: Warning! "..tostring(self).." is already in "..tostring(oldinv).." clientside, but is being inserted into "..tostring(inv).." anyway! Not supposed to happen!\n"); end
+		if slot==nil				then return self:Error("Could not add item to "..tostring(inv).." clientside! slot was not given!\n") end
+		if oldinv && oldinv!=inv	then self:Error("Warning! This item is already in "..tostring(oldinv).." clientside, but is being inserted into "..tostring(inv).." anyway! Not supposed to happen!\n") end
 	end
 	
 	local slotid=inv:InsertItem(self,slot,nil,bPredict);
@@ -275,7 +247,7 @@ function ITEM:ToWorld(vPos,aAng,eEnt,bPredict)
 	local bTeleport=(ent!=nil);
 	
 	if SERVER || bPredict then
-		if vPos==nil then ErrorNoHalt("Itemforge Items: Could not create an entity for "..tostring(self)..", position to create item at was not given.\n"); return false end
+		if vPos==nil then return self:Error("Could not create an entity, position to create item at was not given.\n") end
 		aAng=aAng or Angle(0,0,0);
 		
 		--Give events a chance to stop the item from moving to the world there
@@ -300,7 +272,7 @@ function ITEM:ToWorld(vPos,aAng,eEnt,bPredict)
 				return true;
 			else
 				ent=ents.Create("itemforge_item");
-				if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Items: Tried to create itemforge_item entity for "..tostring(self).." but failed.\n"); return false end
+				if !ent || !ent:IsValid() then return self:Error("Tried to create itemforge_item entity but failed.\n") end
 				
 				ent:SetItem(self);
 				ent:SetPos(vPos);
@@ -309,10 +281,10 @@ function ITEM:ToWorld(vPos,aAng,eEnt,bPredict)
 			end
 		end
 	else
-		if !eEnt || !eEnt:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't set entity for "..tostring(self).." clientside... no valid entity was given.\n"); return false end
+		if !eEnt || !eEnt:IsValid() then return self:Error("Couldn't set entity clientside... no valid entity was given.\n") end
 		
 		--Ideally, this item should never already have an entity when a new one is given to it clientside. However, it happens - sometimes an item acquires a new entity before an old one can be removed, so I'm making it ignore this check.
-		--if bTeleport then ErrorNoHalt("Itemforge Items: Warning! Setting entity of "..tostring(self).." to "..tostring(eEnt).." even though it already has an entity ("..tostring(ent)..")!\n"); end
+		--if bTeleport then self:Error("Warning! Setting entity to "..tostring(eEnt).." even though it already has an entity ("..tostring(ent)..")!\n") end
 		
 		ent=eEnt;
 		self:SetEntity(ent);
@@ -350,9 +322,9 @@ function ITEM:Hold(pl,bNoMerge,wep,bPredict)
 	local ent;
 	
 	if SERVER || bPredict then
-		if !pl || !pl:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't hold "..tostring(self).." as weapon. Player given is not valid!\n"); return false
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Items: Couldn't hold "..tostring(self).." as weapon. The player given is not a player.\n"); return false
-		elseif !pl:Alive() then return false end
+		if !pl || !pl:IsValid()	then return self:Error("Couldn't hold item as weapon. Player given is not valid!\n")
+		elseif !pl:IsPlayer()	then return self:Error("Couldn't hold item as weapon. The player given is not a player.\n")
+		elseif !pl:Alive()		then return false end
 		
 		--We can allow the events a chance to stop the item from being held
 		if !self:Event("CanHold",true,pl) then return false end
@@ -379,7 +351,7 @@ function ITEM:Hold(pl,bNoMerge,wep,bPredict)
 		
 		--Can't hold an item if the player is holding the max number of items already
 		if iEmptySlot==0 then
-			--ErrorNoHalt("Itemforge Items: Could not hold "..tostring(self).." as weapon. Player "..pl:Name().." is already holding an item. Release that item first.\n");
+			--return self:Error("Could not hold item as weapon. Player "..pl:Name().." is already holding an item. Release that item first.\n");
 			return false;
 		end
 		
@@ -398,7 +370,7 @@ function ITEM:Hold(pl,bNoMerge,wep,bPredict)
 			--local ent=ents.Create("itemforge_item_held_"..iEmptySlot);
 			--ent:SetPos(pl:GetPos()+Vector(0,0,64));
 		
-			if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Items: Tried to create itemforge_item_held_"..iEmptySlot.." entity for "..tostring(self).." but failed.\n"); return false end
+			if !ent || !ent:IsValid() then return self:Error("Tried to create itemforge_item_held_"..iEmptySlot.." entity but failed.\n") end
 		
 			--This function triggers the item's OnSWEPInit hook.
 			ent:SetItem(self);
@@ -441,7 +413,7 @@ true is returned if the item was successfully moved to the same location as extI
 TODO sometimes the items fall through the world, could probably fix by taking the bounding box size of this item into consideration when picking a scatter location
 ]]--
 function ITEM:ToSameLocationAs(extItem,scatter,bNoMerge,bPredict)
-	if !extItem or !extItem:IsValid() then ErrorNoHalt("Itemforge Items: Tried to move "..tostring(self).." to same location as another item, but the other item wasn't given / was invalid!\n"); return nil end
+	if !extItem or !extItem:IsValid() then return self:Error("Tried to move item to same location as another item, but the other item wasn't given / was invalid!\n") end
 	
 	if scatter==nil then scatter=false end
 	if bNoMerge==nil then bNoMerge=false end
@@ -487,8 +459,9 @@ function ITEM:ToSameLocationAs(extItem,scatter,bNoMerge,bPredict)
 		return true;
 	elseif extItem:IsHeld() then
 		local pl=extItem:GetWOwner();
-		if !pl then ErrorNoHalt("Itemforge Items: ERROR! Trying to move "..tostring(self).." failed. The item given, "..tostring(extItem).." is being held, but player holding it could not be determined.\n"); return nil end
+		if !pl then return self:Error("ERROR! Trying to move item failed. The item given, "..tostring(extItem).." is being held, but player holding it could not be determined.\n") end
 		
+		--The :IsValid() check is here because Hold() could return false to indicate that this item was merged into an existing stack the player was holding
 		if self:Hold(pl,bNoMerge,nil,bPredict) || !self:IsValid() || self:ToWorld(pl:GetShootPos(),pl:GetAimVector(),nil,bPredict)	then return true end
 		
 		return false;
@@ -578,28 +551,6 @@ end
 IF.Items:ProtectKey("ToVoid");
 
 --[[
-This function can determine if this item is based off of the given type in any way.
-	For example, lets say we have three item types: base_weapon, base_melee, and item_sword.
-	item_sword inherits from base_melee. base_melee inherits from base_weapon.
-	Lets say we have a weapons salesman who will only buy weapons.
-	We could check that the item we're trying to sell him is a weapon by doing mySword:InheritsFrom("base_weapon").
-	It would return true, because a sword is a melee weapon, and a melee weapon is a weapon.
-This includes if the item _IS_ what you're checking to see if it's based off of.
-	Example: Checking to see if an item_egg is based off of an item_egg.
-sType is the name of the itemtype ("item", "base_container", etc.)
-This function returns true if the item inherits from this item type, or false if it doesn't.
-]]--
-function ITEM:InheritsFrom(sType)
-	if self:GetType()==string.lower(sType) then
-		return true;
-	elseif self.BaseClass then
-		return self.BaseClass:InheritsFrom(sType);
-	end
-	return false;
-end
-IF.Items:ProtectKey("InheritsFrom");
-
---[[
 Sets the size of every item in the stack.
 Size has nothing to do with weight or how big the item looks.
 The only thing size determines is if an item can be placed inside of an inventory that has a size limit.
@@ -634,10 +585,10 @@ IF.Items:ProtectKey("SetOverrideMaterial");
 
 --[[
 Returns the itemtype of this item
-For example "item", "item_crowbar", etc...
+For example "base_item", "item_crowbar", etc...
 ]]--
 function ITEM:GetType()
-	return self.Type;
+	return self.ClassName;
 end
 IF.Items:ProtectKey("GetType");
 
@@ -801,7 +752,7 @@ function ITEM:GetPos()
 		return ent:GetPos();
 	elseif self:IsHeld() then
 		local p=self:GetWOwner();
-		if !p then ErrorNoHalt("Itemforge Items: ERROR! GetPos failed on "..tostring(self)..". This item is being held, but player holding this item is no longer valid.\n"); return nil end
+		if !p then self:Error("ERROR! GetPos failed. This item is being held, but player holding this item is no longer valid.\n"); return nil end
 		return p:GetShootPos();
 	elseif self:InInventory() then
 		local container=self:GetContainer();
@@ -831,7 +782,7 @@ function ITEM:InInventory(inv,slot)
 		if !inv then					--and inv wasn't given
 			bInv=true;
 		elseif !inv:IsValid() then		--and inv was given, check to see if this inventory is legit
-			ErrorNoHalt("Itemforge Items: ERROR! InInventory() failed on "..tostring(self)..". Inventory given is non-existent or has been removed. Check to see if the inventory is valid before passing it.\n");
+			self:Error("ERROR! InInventory() failed. Inventory given is non-existent or has been removed. Check to see if the inventory is valid before passing it.\n");
 		elseif inv==container then		--then check if we're in this inventory
 			bInv=true;
 		end
@@ -867,12 +818,12 @@ function ITEM:IsHeld(byPlayer)
 	if ent then
 		if byPlayer!=nil then
 			--Validate given player
-			if !byPlayer:IsValid() then ErrorNoHalt("Itemforge Items: ERROR! IsHeld failed on "..tostring(self)..". Given player is non-existent or has been removed.\n"); return false end
-			if !byPlayer:IsPlayer() then ErrorNoHalt("Itemforge Items: ERROR! IsHeld failed on "..tostring(self)..". Given player is not a player!\n"); return false end
+			if !byPlayer:IsValid()		then return self:Error("IsHeld failed. Given player is non-existent or has been removed.\n") end
+			if !byPlayer:IsPlayer()		then return self:Error("ERROR! IsHeld failed. Given player is not a player!\n") end
 			
 			--Check to see if the player holding this is still valid
 			local p=self:GetWOwner();
-			if !p then ErrorNoHalt("Itemforge Items: ERROR! IsHeld failed on "..tostring(self)..". This item is held, but the player holding this item cannot be determined.\n"); return false end
+			if !p then return self:Error("ERROR! IsHeld failed. This item is held, but the player holding this item cannot be determined.\n") end
 			
 			--If this item isn't being held by the given player return false. (if it is being held by this player, true is returned beneath this check)
 			if p!=byPlayer then return false end
@@ -964,8 +915,8 @@ ent must be a valid "itemforge_item" entity, or this function will fail. If for 
 This function is called internally by Itemforge. There should be no reason for a scripter to call this.
 ]]--
 function ITEM:SetEntity(ent)
-	if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't set entity on "..tostring(self).."! Given entity was not valid!\n"); return false end
-	if ent:GetClass()!="itemforge_item" then ErrorNoHalt("Itemforge Items: Couldn't set entity on "..tostring(self).."! Given entity was not an itemforge_item!\n"); return false end
+	if !ent || !ent:IsValid()			then return self:Error("Couldn't set entity! Given entity was not valid!\n") end
+	if ent:GetClass()!="itemforge_item"	then return self:Error("Couldn't set entity! Given entity was not an itemforge_item!\n") end
 	
 	self.Entity=ent;
 	return true;
@@ -990,8 +941,8 @@ ent must be a valid itemforge_item_held_* entity, or this function will fail. If
 This function is called internally by Itemforge. There should be no reason for a scripter to call this.
 ]]--
 function ITEM:SetWeapon(ent)
-	if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't set weapon on "..tostring(self).."! Given entity was not valid!\n"); return false end
-	if !IF.Items:IsWeaponItem(ent) then ErrorNoHalt("Itemforge Items: Couldn't set weapon on "..tostring(self).."! Given entity was not an itemforge_item_held!\n"); return false end
+	if !ent || !ent:IsValid()		then return self:Error("Couldn't set weapon! Given entity was not valid!\n") end
+	if !IF.Items:IsWeaponItem(ent)	then return self:Error("Couldn't set weapon! Given entity was not an itemforge_item_held!\n") end
 	
 	self.Weapon=ent;
 	return true;
@@ -1006,8 +957,8 @@ pl must be a valid player or this function will fail.
 This function is called internally by Itemforge. There should be no reason for a scripter to call this.
 ]]--
 function ITEM:SetWOwner(pl)
-	if !pl || !pl:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't set weapon owner on "..tostring(self).."! Given player was not valid!\n"); return false end
-	if !pl:IsPlayer() then ErrorNoHalt("Itemforge Items: Couldn't set weapon owner on "..tostring(self).."! Given player was not a player!\n"); return false end
+	if !pl || !pl:IsValid()	then return self:Error("Couldn't set weapon owner! Given player was not valid!\n") end
+	if !pl:IsPlayer()		then return self:Error("Couldn't set weapon owner! Given player was not a player!\n") end
 
 	self.Owner=pl;
 	return true;
@@ -1016,9 +967,6 @@ IF.Items:ProtectKey("SetWOwner")
 
 --[[
 Clears this item's weapon and weapon owner.
-If ent is given, ent must match this item's set weapon.
-	This is just in case the wrong weapon is cleared because of some strange happening.
-If ent isn't given, then we'll just clear the weapon regardless of what is it.
 
 This function is called internally by Itemforge. There should be no reason for a scripter to call this.
 ]]--
@@ -1062,8 +1010,8 @@ true is returned if successful, false otherwise
 This function is called internally by Itemforge. There should be no reason for a scripter to call this.
 ]]--
 function ITEM:ConnectInventory(inv,conslot)
-	if !inv || !inv:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't connect "..tostring(self).." to given inventory. The inventory given was invalid.\n"); return false end
-	if !conslot then ErrorNoHalt("Itemforge Items: Couldn't connect "..tostring(self).." to given inventory. conslot wasn't given.\n"); return false end
+	if !inv || !inv:IsValid()	then return self:Error("Couldn't connect item to given inventory. The inventory given was invalid.\n") end
+	if !conslot					then return self:Error("Couldn't connect item to given inventory. conslot wasn't given.\n") end
 	
 	--Create inventories collection if we haven't yet
 	if !self.Inventories then self.Inventories={}; end
@@ -1088,10 +1036,11 @@ Sever an inventory with inv:SeverItem(item), not this function
 This function is called internally by Itemforge. There should be no reason for a scripter to call this.
 ]]--
 function ITEM:SeverInventory(inv)
-	if !inv || !inv:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't sever "..tostring(self).." from given inventory. The inventory given was invalid.\n"); return false end
+	if !inv || !inv:IsValid() then return self:Error("Couldn't sever item from given inventory. The inventory given was invalid.\n") end
 
-	if !self.Inventories || !self.Inventories[inv:GetID()] then ErrorNoHalt("Itemforge Items: Couldn't sever "..tostring(self).." from inventory "..inv:GetID()..". The inventory is not listed as connected on the item.\n"); return false end
-	self.Inventories[inv:GetID()]=nil;
+	local invid=inv:GetID();
+	if !self.Inventories || !self.Inventories[invid] then return self:Error("Couldn't sever item from "..tostring(inv)..". The inventory is not listed as connected on the item.\n") end
+	self.Inventories[invid]=nil;
 	
 	--We have events that detect severing of inventories both serverside and clientside
 	self:Event("OnSeverInventory",nil,inv);
@@ -1101,17 +1050,21 @@ end
 IF.Items:ProtectKey("SeverInventory");
 
 function ITEM:GetInventoryConnectionSlot(invid)
-	if !invid then ErrorNoHalt("Itemforge Items: Couldn't grab connection slot that item "..tostring(self).." is occupying on an inventory. The inventory ID wasn't given.\n"); return false end
-	if !self.Inventories || !self.Inventories[invid] then ErrorNoHalt("Itemforge Items: Couldn't grab connection slot that item "..tostring(self).." is occupying on an inventory. This inventory isn't connected to this item.\n"); return false end
+	if !invid											then return self:Error("Couldn't grab connection slot that this item is occupying on an inventory. The inventory ID wasn't given.\n") end
+	if !self.Inventories || !self.Inventories[invid]	then return self:Error("Couldn't grab connection slot that this item is occupying on an inventory. This inventory isn't connected to this item.\n") end
 	return self.Inventories[invid].ConnectionSlot;
 end
 IF.Items:ProtectKey("GetInventoryConnectionSlot");
 
 --[[
-Returns a string when tostring() is performed upon a reference to this item
+When tostring() is performed on an item reference, it returns a string containing some information about the item.
+Format: "Item ID [ITEM_TYPE]xAMT"
+Ex:		"Item 5 [item_crowbar]" (Item 5, a single crowbar)
+Ex:		"Item 3 [item_rock]x53" (Item 3, a stack of 53 item_rocks)
+Ex:		"Object [invalid]" (used to be some kind of object, invalid/has been removed/no longer exists)
+Ex:		"Inventory 2" (Is inventory 2)
 ]]--
 function ITEM:ToString()
 	if self:GetMaxAmount()!=1 then	return "Item "..self:GetID().." ["..self:GetType().." x "..self:GetAmount().."]";
 	else							return "Item "..self:GetID().." ["..self:GetType().."]"; end
 end
-IF.Items:ProtectKey("ToString");

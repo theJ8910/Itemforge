@@ -23,10 +23,10 @@ MODULE.FullUpInventoriesUpdated={};							--Every time an inventory is created w
 end
 
 --These are local on purpose. I'd like people to use the Get function, and not grab the inventories directly from the table.
-local Templates={};											--Inventory templates. Templates are like item-types for inventories.
-local Inventories={};										--Inventory collection - all inventories are stored here
+local BaseType="base_inv";									--This is the undisputed absolute base inventory-type. All inventories inherit from this type of inventory.
+local InvTypes={};											--Registered inventory types are stored here.
 local InventoryRefs={};										--Inventory references. One for every inventory. Allows us to pass this instead of the actual inventory. We can garbage collect removed inventories, giving some memory back to the game, while at the same time alerting scripters of careless mistakes (referencing an item after it's been removed)
-local InventoryCount=0;										--Inventory count - there are this many inventories created so far. Used to assign IDs.
+local NextInventory=1;										--This is a pointer of types, that records where the next inventory will be made. IDs are assigned based on this number. This only serves as a starting point to search for a free ID. If this slot is taken then it will search through the entire inventory array once to look for a free slot.
 
 --Itemforge Inventory (IFINV) Message (-128 to 127. Uses char in usermessage)
 IFINV_MSG_CREATE			=	-128;	--(Server > Client) Sync create inventory clientside
@@ -58,90 +58,13 @@ IFINV_RMVACT_SAMELOCATION	=	3;		--Sent to the same location as the item/entity t
 --Methods and default values for all inventories are stored here.
 local _INV={};
 
-
---TODO I want to make these more like items
---An inventory's metatable is set to this. This allows an inventory to use any inventory methods and default values defined here. It also allows it to use stuff from an inventory template.
-local invmt={};
-function invmt:__index(k)
-	if k=="Template" then return _INV.Template end
-	
-	return self.Template[k] or _INV[k];
-end
-
-
-
-
---[[
-Inventory references indirectly reference an inventory.
-By doing this, we can garbage collect any removed inventory properly (unless somebody hacks around it on purpose).
-This function binds a newly created reference to a newly created inventory.
-References have an internal inventory, "i", that can only be accessed from internal functions here.
-References have internal functions "IsValid", and "Invalidate".
-	Call inv:IsValid() on a reference to see if a reference is still good (inventory hasn't been deleted).
-		This will return true if the inventory hasn't been removed, and false otherwise.
-	Don't bother calling inv:Invalidate(). This is called by Itemforge after the inventory is removed.
-		This will clear the internal inventory, "i". This makes any further reads/writes to the inventory (except for IsValid and Invalidate) fail.
-]]--
-local function BindReference(invref,inv,id)
-	local i=inv;
-	local id=id;
-	
-	local function invrefIsValid() return (i!=nil); end
-	local function invrefInvalidate() i=nil; end
-	local invrefmt={};
-	
-	--We want to forward reads to the inventory, so long as it's valid
-	function invrefmt:__index(k)
-		if k=="IsValid" then
-			return invrefIsValid;
-		elseif k=="Invalidate" then
-			return invrefInvalidate;
-		elseif i!=nil then
-			return i[k];
-		else
-			ErrorNoHalt("Itemforge Inventories: Couldn't reference \""..tostring(k).."\" on removed inventory (used to be Inventory "..id..")\n");
-		end
-	end
-	
-	--We want to forward writes to the inventory, so long as it's valid
-	function invrefmt:__newindex(k,v)
-		if i!=nil then
-			i[k]=v;
-		else
-			ErrorNoHalt("Itemforge Inventories: Couldn't set \""..tostring(k).."\" to \""..tostring(v).."\" on removed inventory (used to be Inventory "..id..")\n");
-			return false;
-		end
-	end
-	
-	--[[
-	When tostring() is performed on an inventory reference, returns a string containing some information about the inventory.
-	Format: "Inventory ID [COUNT items]" 
-	Ex:     "Inventory 12 [20 items]" (Inventory 12, storing 20 items)
-	Ex:		"Inventory 9 [invalid]" (used to be Inventory 9, invalid/has been removed/no longer exists)
-	]]--
-	function invrefmt:__tostring()
-		if i!=nil then
-			return "Inventory "..self:GetID().." ["..self:GetCount().." items]";
-		else
-			return "Inventory "..id.." [invalid]";
-		end
-	end
-	
-	setmetatable(invref,invrefmt);
-end
-
 --Initilize Inventory module
 function MODULE:Initialize()
+	self:RegisterType(_INV,BaseType);
 end
 
 --Clean up the inventory module. Currently I have this done prior to a refresh. It will remove any inventories.
 function MODULE:Cleanup()
-	--[[
-	for k,v in pairs(Inventories) do
-		v:Remove();
-	end
-	]]--
-	
 	Templates=nil;
 	Inventories=nil;
 	InventoryRefs=nil;
@@ -149,70 +72,129 @@ function MODULE:Cleanup()
 end
 
 --[[
-This function registers a template for inventories to use.
-strName is a name to identify the template by, such as "BucketInventory"
-template should be a table defining the template.
-true is returned if the template is registered, and false otherwise.
+This function registers an inventory type. This should be done at initialization.
+
+tClass should be a table defining the inventory type.
+	TODO better description here
+	See _INV towards the bottom of this file for an idea of what a table like this would look like.
+
+sName is a name to identify the inventory type by, such as "inv_bucket". This name will be used for two things:
+	When creating an inventory, the name of an inventory type can be given to make an inventory.
+	Allowing one class to inherit from another.
+
+true is returned if the type is registered, and false otherwise.
 ]]--
-function MODULE:RegisterTemplate(strName,template)
-	if !strName then ErrorNoHalt("Itemforge Inventories: Couldn't register inventory template - name to register under wasn't given!\n"); return false end
-	if !template then ErrorNoHalt("Itemforge Inventories: Couldn't register inventory template \""..strName.."\" - template wasn't given!\n"); return false end
-	if Templates[strName] then ErrorNoHalt("Itemforge Inventories: Couldn't register inventory \""..strName.."\" - there's already a template registered with this name!\n"); return false end
+function MODULE:RegisterType(tClass,sName)
+	if !sName then ErrorNoHalt("Itemforge Inventory: Couldn't register inventory type - name to register under wasn't given!\n"); return false end
+	if !tClass then ErrorNoHalt("Itemforge Inventory: Couldn't register inventory type \""..sName.."\" - name of type wasn't given!\n"); return false end
 	
-	Templates[strName]=template;
-	template.Name=strName;
+	sName=string.lower(sName);
+	if tClass.Base==nil then tClass.Base=BaseType; end
+	
+	if !IF.Base:RegisterClass(tClass,sName) then return false end
+	
+	--TODO What if inventory types are reloaded
+	InvTypes[sName]=tClass;
+	
 	return true;
 end
 
 --[[
-Returns a registered template.
-strName should be the name of the template to get.
-Returns nil if no template by this name exists.
+Returns a registered inventory type.
+sName should be the name of the inventory type to get.
+Returns nil if no inventory type by this name exists.
 ]]--
-function MODULE:GetTemplate(strName)
-	if !strName then ErrorNoHalt("Itemforge Inventories: Couldn't grab inventory template - name of template wasn't given!\n"); return false end
-	return Templates[strName];
+function MODULE:GetType(sName)
+	if !sName then ErrorNoHalt("Itemforge Inventory: Couldn't grab inventory type - name of type wasn't given!\n"); return false end
+	
+	return InvTypes[string.lower(strName)];
+end
+
+--TODO I'm not satisfied with the way this function works; consider reworking it sometime
+--[[
+Searches the Inventories[] table for an empty slot.
+iFrom is an optional number describing where to start searching in the table.
+	If this number is not given, is over the max number of inventories, or is under 1, it will be set to 1.
+This function will keep searching until:
+	It finds an open slot.
+	It has gone through the entire table once.
+The index of an empty slot is returned if one is found, or nil is returned if one couldn't be found.
+]]--
+function MODULE:FindEmptySlot(iFrom)
+	--Wrap around to 1 if iFrom wasn't given or was under zero or was over the inventory limit
+	if !iFrom || iFrom>self.MaxInventories || iFrom<1 then iFrom=1; end
+	
+	local count=0;
+	while count<self.MaxInventories do
+		if InventoryRefs[iFrom]==nil then return iFrom end
+		count=count+1;
+		iFrom=iFrom+1;
+		if iFrom>self.MaxInventories then iFrom=1 end
+	end
+	return nil;
 end
 
 --[[
 Create a new inventory.
-template is an optional argument which the name of a template registered with IF.Inv:RegisterTemplate() to set for the inventory.
-	The template is similiar to an item-type for an inventory.
-	An inventory can use everything contained in a template including everything inside of _INV.
-	Anything in the template will override _INV (allowing you to set events for the inventory, for example) - see the default template _INV towards the bottom of this file.
-owner is an optional argument only used serverside that can be used to instruct that this inventory and any updates regarding it are only sent to the given player
-	This is useful if you want to create an inventory for a player.
+sType is an optional string, the name of an inventory-type.
+	If this is given, the new inventory will be the given type (e.g. "inv_bucket"). Inventory types are registered with IF.Inv:RegisterType().
+	If no inventory type is given, the default inventory type is used.
+pOwner is an optional player that is only used serverside.
+	Giving a pOwner for an inventory tells Itemforge that this inventory and any updates regarding it should only sent to a given player.
+	This is useful if you want to create a private inventory for a player.
 	Keeping an inventory private means other players have no way of knowing what an inventory is carrying at any given time, clientside at least.
 	All inventories exist serverside.
+	If no pOwner is given (or pOwner is nil) then the inventory is public.
 id is only necessary clientside. Serverside, an ID will be picked automatically.
 fullUpd also only applies clientside - if this is true, it will indicate that the creation of the inventory is being performed as part of a full update.
-
-If everything goes fine, a reference to the newly created inventory is returned. Otherwise, nil is returned.
+bPredict is an optional true/false that defaults to false on the server, and true on the client. If bPredict is:
+	false, then if successful we'll register and return a new inventory. nil will be returned if unsuccessful for any reason.
+	true, then if we determine the inventory can be created, a temporary inventory that can be used for further prediction tests will be returned. nil will be returned otherwise.
 ]]--
-function MODULE:Create(template,owner,id,fullUpd)
+function MODULE:Create(sType,pOwner,id,fullUpd,bPredict)
 	--If we're given an owner we need to validate it
-	if owner!=nil then
-		if !owner:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't create an inventory owned by the given player - the player given no longer exists.\n"); return nil
-		elseif !owner:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Couldn't create an inventory owned by the given player - the entity given isn't a player!\n"); return nil end
+	if pOwner!=nil then
+		if !pOwner:IsValid() then ErrorNoHalt("Itemforge Inventory: Couldn't create an inventory owned by the given player - the player given no longer exists.\n"); return nil
+		elseif !pOwner:IsPlayer() then ErrorNoHalt("Itemforge Inventory: Couldn't create an inventory owned by the given player - the entity given isn't a player!\n"); return nil end
 	end
 	
-	local templateToUse;
-	if template then
-		templateToUse=self:GetTemplate(template);
-		if !templateToUse then ErrorNoHalt("Itemforge Inventories: Couldn't create inventory with given template. There is no registered template by the name \""..template.."\".\n"); return nil end
-	else
-		templateToUse=nil;
-	end 
+	if !sType then sType=BaseType;
+	else sType=string.lower(sType); end
 	
+	if !IF.Base:ClassExists(sType) then
+		ErrorNoHalt("Itemforge Inventory: Couldn't create inventory. \""..sType.."\" is not a registered.");
+		return nil;
+	elseif InvTypes[sType]==nil then
+		ErrorNoHalt("Itemforge Inventory: Couldn't create inventory. \""..sType.."\" is a registered class, but is not an inventory-type. Naming conflicts can cause this error.");
+		return nil;
+	end
 	
-	--We need to give an ID to the newly created inventory - we'll either use a unique ID based off of the number of inventories created so far or the ID sent from the server
-	local n=0;
-	if SERVER then
-		n=InventoryCount+1;
-		if n>=self.MaxInventories then ErrorNoHalt("Itemforge Inventories: Couldn't create inventory - max inventories reached ("..self.MaxInventories..")!\n"); return nil end
-		InventoryCount=n;
+	if bPredict==nil then bPredict=CLIENT end
+	
+	--[[
+	We need to find an ID for the soon-to-be created inventory.
+	We'll either use an ID that is not in use at the moment, which is usually influenced by the number of inventories created so far
+	or a requested ID likely sent from the server
+	]]--
+	local n;
+	if SERVER || (bPredict && !id) then
+		n=NextInventory;
+		
+		if InventoryRefs[n]!=nil then
+			n=self:FindEmptySlot(n+1);
+			
+			if n==nil then
+				if !bPredict then ErrorNoHalt("Itemforge Inventory: Couldn't create inventory - no free slots (all "..self.MaxInventories.." slots occupied)!\n"); end
+				return nil;
+			end
+		end
+		
+		if !bPredict then
+			NextInventory=n+1;
+			if NextInventory>self.MaxInventories then NextInventory=1 end
+		end
 	else
-		if id==nil then ErrorNoHalt("Itemforge Inventories: Could not create inventory clientside, the ID of the inventory to be created wasn't given!\n"); return nil end
+		if id==nil then ErrorNoHalt("Itemforge Inventory: Could not create inventory clientside, the ID of the inventory to be created wasn't given!\n"); return nil end
 		n=id;
 	end
 	
@@ -221,44 +203,39 @@ function MODULE:Create(template,owner,id,fullUpd)
 	That way if the inventory doesn't exist it's created in time for the update.
 	We only need to keep track of the number of inventories updated when all inventories are being updated.
 	]]--
-	if CLIENT && fullUpd==true && self.FullUpInProgress==true then
+	if CLIENT && fullUpd==true && self.FullUpInProgress==true && !bPredict then
 		self.FullUpCount=self.FullUpCount+1;
 		self.FullUpInventoriesUpdated[n]=true;
 	end
 	
 	--Does the inventory exist already? No need to recreate it.
-	if Inventories[n] then
+	--TODO possible bug here; what if a dead item clientside blocks new items with the same ID from being created?
+	if InventoryRefs[n] then
 		--We only need to bitch about this on the server. Full updates of an inventory clientside will tell the inventory to be created regardless of whether it exists or not. If it exists clientside we'll just ignore it.
-		if SERVER then
-			ErrorNoHalt("Itemforge Inventories: Could not create inventory with id "..n..". An inventory with this ID already exists!\n");
+		if SERVER && !bPredict then
+			ErrorNoHalt("Itemforge Inventory: Could not create inventory with id "..n..". An inventory with this ID already exists!\n");
 		end
 		return nil;
 	end
 	
-	--Creating the new inventory after validating everything else
-	local newInv={};
-	newInv.Template=templateToUse;
+	if bPredict then n=0 end
+	
+	local newInv=IF.Base:CreateObject(sType);
+	if !newInv then return nil end
+	
 	newInv.ID=n;
-	if SERVER then newInv.Owner=owner; end
-	setmetatable(newInv,invmt);		--This new inventory inherits default inventory functions and values
+	if SERVER then newInv.Owner=pOwner; end
+	if !bPredict then
+		InventoryRefs[n]=newInv;
+		
+		--TODO predicted inventories need to initialize too but not do any networking shit
+		newInv:Initialize(owner);
+		
+		--We'll tell the clients to create and initialize the inventory too. If a pOwner was given to send inventory updates to exclusively, the inventory will only be created clientside on that player.
+		if SERVER then self:CreateClientside(newInv,pOwner) end
+	end
 	
-	--Register the new inventory
-	Inventories[n]=newInv;
-	
-	--Create an inventory reference
-	local newref={};
-	BindReference(newref,newInv,n);
-	
-	--Register the inventory reference too
-	InventoryRefs[n]=newref;
-	
-	--Inventories will be initialized right after being created
-	newref:Initialize();
-	
-	--Tell clients to create the inventory too. If an owner was given to send inventory updates to exclusively, the inventory will only be created clientside on that player.
-	if SERVER then self:CreateClientside(newref,owner) end
-	
-	return newref;
+	return newInv;
 end
 
 --[[
@@ -272,7 +249,7 @@ This function calls the inventory's OnRemove event.
 True is returned if the item is removed successfully. False is returned if the item couldn't be removed, or if the item is already being removed.
 ]]--
 function MODULE:Remove(inv,lastConnection)
-	if !inv || !inv:IsValid() then ErrorNoHalt("Itemforge Inventories: Could not remove inventory - inventory doesn't exist!\n"); return false end
+	if !inv || !inv:IsValid() then ErrorNoHalt("Itemforge Inventory: Could not remove inventory - inventory doesn't exist!\n"); return false end
 	if inv.BeingRemoved then return false;
 	else inv.BeingRemoved=true;
 	end
@@ -317,33 +294,8 @@ function MODULE:Remove(inv,lastConnection)
 	]]--
 	if SERVER then self:RemoveClientside(id,nil); end
 	
-	Inventories[id]=nil;
 	InventoryRefs[id]=nil;
 end
-
-
-
---[[
---Get an existing inventory by ID. Will return nil if this inventory doesn't exist.
---Will produce errors in the console if an inventory is missing.
-function MODULE:GetInventory(id)
-	if id==nil then ErrorNoHalt("Itemforge Inventories: Tried to get inventory, but ID is nil!\n"); return nil end
-	local inventory=Inventories[id];
-	if inventory==nil then ErrorNoHalt("Itemforge Inventories: Inventory with ID "..id.." doesn't exist.\n"); return nil end
-	return inventory;
-end
-
---Get an existing inventory by ID. Will return nil if this inventory doesn't exist.
---Will not produce errors in the console if an inventory is missing.
-function MODULE:GetInventoryNoComplaints(id)
-	if id==nil then return nil end
-	local inventory=Inventories[id];
-	if inventory==nil then return nil end
-	return inventory;
-end
-]]--
-
-
 
 --[[
 This returns a reference to an inventory with the given ID.
@@ -352,11 +304,11 @@ except it doesn't hinder garbage collection,
 and helps by warning the scripter of careless mistakes (still referencing an inventory after it's been deleted).
 ]]--
 function MODULE:Get(id)
-	return InventoryRefs[id] or InventoryRefs[0];
+	return InventoryRefs[id];
 end
 
 --[[
-This returns a list of all inventories
+This returns a table containing references to all inventories
 ]]--
 function MODULE:GetAll()
 	local t={};
@@ -428,12 +380,6 @@ function MODULE:DoWeightCapsBreak(i1,a1,i2,a2)
 	return false;
 end
 
-
---TEMPORARY
-function MODULE:DumpInventories()
-	dumpTable(Inventories);
-end
-
 --TEMPORARY
 function MODULE:DumpInventoryRefs()
 	dumpTable(InventoryRefs);
@@ -441,8 +387,12 @@ end
 
 --TEMPORARY
 function MODULE:DumpInventory(id)
-	dumpTable(Inventories[id]);
+	dumpTable(InventoryRefs[id]:GetTable());
 end
+
+
+
+
 --Serverside
 if SERVER then
 
@@ -457,13 +407,13 @@ If the inventory is private, pl can only be the owner. It will fail otherwise.
 We'll send the owner of the inventory to the client as well. Even though private inventories are only sent to their owners, this is so the client can identify if the inventory is public or private.
 ]]--
 function MODULE:CreateClientside(inv,pl,fullUpd)
-	if !inv or !inv:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't CreateClientside - Inventory given isn't valid!\n"); return false end
+	if !inv or !inv:IsValid() then ErrorNoHalt("Itemforge Inventory: Couldn't CreateClientside - Inventory given isn't valid!\n"); return false end
 	
 	--Validate player
 	if pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't CreateClientside - The player to send inventory "..inv:GetID().." to isn't valid!\n"); return false;
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Couldn't CreateClientside - The player to send inventory "..inv:GetID().." to isn't a player!\n"); return false;
-		elseif !inv:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Inventories: Couldn't CreateClientside - Was asked to create inventory "..inv:GetID().." on a player other than the owner!\n"); return false; end
+		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventory: Couldn't CreateClientside - The player to send inventory "..inv:GetID().." to isn't valid!\n"); return false;
+		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventory: Couldn't CreateClientside - The player to send inventory "..inv:GetID().." to isn't a player!\n"); return false;
+		elseif !inv:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Inventory: Couldn't CreateClientside - Was asked to create inventory "..inv:GetID().." on a player other than the owner!\n"); return false; end
 	else
 		local allSuccess=true;
 		for k,v in pairs(player.GetAll()) do
@@ -478,7 +428,7 @@ function MODULE:CreateClientside(inv,pl,fullUpd)
 	umsg.Start("ifinv",pl);
 	umsg.Char(IFINV_MSG_CREATE);
 	umsg.Short(inv:GetID()-32768);
-	umsg.String(inv:GetTemplateName());
+	umsg.String(inv:GetType());
 	umsg.Bool(fullUpd==true);
 	umsg.End();
 	
@@ -492,12 +442,12 @@ We use invid here instead of inv because the inventory has probably already been
 pl is optional - it can be used to ask a certain player to remove an inventory. If this is nil, all players will be asked to remove the inventory.
 ]]--
 function MODULE:RemoveClientside(invid,pl)
-	if invid==nil then ErrorNoHalt("Itemforge Inventories: Couldn't RemoveClientside... the inventory ID to remove wasn't given.\n"); return false end
+	if invid==nil then ErrorNoHalt("Itemforge Inventory: Couldn't RemoveClientside... the inventory ID to remove wasn't given.\n"); return false end
 	
 	--Validate player
 	if pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't RemoveClientside - The player to remove the inventory from isn't valid!\n"); return false;
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Couldn't RemoveClientside - The player to remove the inventory from isn't a player!\n"); return false; end
+		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventory: Couldn't RemoveClientside - The player to remove the inventory from isn't valid!\n"); return false;
+		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventory: Couldn't RemoveClientside - The player to remove the inventory from isn't a player!\n"); return false; end
 	end
 	
 	--DEBUG
@@ -520,12 +470,12 @@ pl is the player to send the update of the inventory to.
 This returns true if successful, or false if not.
 ]]--
 function MODULE:SendFullUpdate(invid,pl)
-	if !invid then ErrorNoHalt("Itemforge Inventories: Couldn't SendFullUpdate... the inventory ID wasn't given.\n"); return false end
+	if !invid then ErrorNoHalt("Itemforge Inventory: Couldn't SendFullUpdate... the inventory ID wasn't given.\n"); return false end
 	
 	--Validate player
 	if pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't SendFullUpdate - The player to send inventory "..inv:GetID().." to isn't valid!\n"); return false;
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Couldn't SendFullUpdate - The player to send inventory "..inv:GetID().." to isn't a player!\n"); return false; end
+		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventory: Couldn't SendFullUpdate - The player to send inventory "..inv:GetID().." to isn't valid!\n"); return false;
+		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventory: Couldn't SendFullUpdate - The player to send inventory "..inv:GetID().." to isn't a player!\n"); return false; end
 	end
 	
 	local inv=self:Get(invid);
@@ -554,8 +504,8 @@ If the given player was nil, this returns false if one of the players couldn't h
 function MODULE:StartFullUpdateAll(pl)
 	--Validate player
 	if pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't start full update - The player to send inventories to isn't valid!\n"); return false;
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Couldn't start full update - The player to send inventories to isn't a player!\n"); return false; end
+		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventory: Couldn't start full update - The player to send inventories to isn't valid!\n"); return false;
+		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventory: Couldn't start full update - The player to send inventories to isn't a player!\n"); return false; end
 	
 	--pl is nil so we'll create the inventories clientside on each player individually
 	else
@@ -595,8 +545,8 @@ end
 function MODULE:EndFullUpdateAll(pl)
 	--Validate player
 	if pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't EndFullUpdate - The player to send inventory "..inv:GetID().." to isn't valid!\n"); return false;
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Couldn't EndFullUpdate - The player to send inventory "..inv:GetID().." to isn't a player!\n"); return false; end
+		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventory: Couldn't EndFullUpdate - The player to send inventory "..inv:GetID().." to isn't valid!\n"); return false;
+		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventory: Couldn't EndFullUpdate - The player to send inventory "..inv:GetID().." to isn't a player!\n"); return false; end
 	
 	--pl is nil so we'll send full updates of the inventories clientside on each player individually
 	else
@@ -646,9 +596,9 @@ end
 
 --Handles incoming "ifinv" messages from client
 function MODULE:HandleIFINVMessages(pl,command,args)
-	if !pl || !pl:IsValid() || !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Couldn't handle incoming message from client - Player given doesn't exist or wasn't player!\n"); return false end
-	if !args[1] then ErrorNoHalt("Itemforge Inventories: Couldn't handle incoming message from client - message type wasn't received.\n"); return false end
-	if !args[2] then ErrorNoHalt("Itemforge Inventories: Couldn't handle incoming message from client - item ID wasn't received.\n"); return false end
+	if !pl || !pl:IsValid() || !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventory: Couldn't handle incoming message from client - Player given doesn't exist or wasn't player!\n"); return false end
+	if !args[1] then ErrorNoHalt("Itemforge Inventory: Couldn't handle incoming message from client - message type wasn't received.\n"); return false end
+	if !args[2] then ErrorNoHalt("Itemforge Inventory: Couldn't handle incoming message from client - item ID wasn't received.\n"); return false end
 	
 	local msgType=tonumber(args[1]);
 	local id=tonumber(args[2])+32768;
@@ -663,7 +613,7 @@ function MODULE:HandleIFINVMessages(pl,command,args)
 		self:StartFullUpdateAll(pl);
 		self:EndFullUpdateAll(pl);
 	else
-		ErrorNoHalt("Itemforge Inventories: Unhandled IFINV message \""..msgType.."\"\n");
+		ErrorNoHalt("Itemforge Inventory: Unhandled IFINV message \""..msgType.."\"\n");
 		return false;
 	end
 	return true;
@@ -689,7 +639,7 @@ end
 --Called when a full update has ended. Did we get them all?
 function MODULE:OnEndFullUpdateAll()
 	if self.FullUpCount<self.FullUpTarget then
-		Msg("Itemforge Inventories: Full inventory update only updated "..self.FullUpCount.." out of expected "..self.FullUpTarget.." inventories!\n");
+		Msg("Itemforge Inventory: Full inventory update only updated "..self.FullUpCount.." out of expected "..self.FullUpTarget.." inventories!\n");
 	end
 	
 	--Remove non-updated inventories
@@ -697,7 +647,7 @@ function MODULE:OnEndFullUpdateAll()
 		if k!=0 then
 			if self.FullUpInventoriesUpdated[k]!=true then
 				--DEBUG
-				Msg("Itemforge Inventories: Removing inventory "..k.." - only exists clientside\n");
+				Msg("Itemforge Inventory: Removing inventory "..k.." - only exists clientside\n");
 				
 				v:Remove();
 			end
@@ -716,15 +666,14 @@ function MODULE:HandleIFINVMessages(msg)
 	local id=msg:ReadShort()+32768;
 	
 	if msgType==IFINV_MSG_CREATE then
-		local template=msg:ReadString();
-		if template=="" then template=nil end
+		local type=msg:ReadString();
 		local fullUpd=msg:ReadBool();
 		
-		--Create the inventory clientside too. Use the ID and player provided by the server.
-		self:Create(template,nil,id,fullUpd);
+		--Create the inventory clientside too. Use the ID provided by the server.
+		self:Create(type,nil,id,fullUpd,false);
 	elseif msgType==IFINV_MSG_REMOVE then
 		local inv=self:Get(id);
-		if !inv:IsValid() then return false end
+		if !inv then return false end
 		
 		--Remove the item clientside since it has been removed serverside. TODO, last connected object should be passed
 		self:Remove(inv);
@@ -734,7 +683,7 @@ function MODULE:HandleIFINVMessages(msg)
 		self:OnEndFullUpdateAll();
 	elseif msgType==IFINV_MSG_INVFULLUP then
 		local inv=self:Get(id);
-		if !inv:IsValid() then return false end
+		if !inv then return false end
 		
 		local weightCap=msg:ReadLong()+2147483648;
 		local sizeLimit=msg:ReadLong()+2147483648;
@@ -743,40 +692,40 @@ function MODULE:HandleIFINVMessages(msg)
 		inv:RecvFullUpdate(weightCap,sizeLimit,maxSlots);
 	elseif msgType==IFINV_MSG_WEIGHTCAP then
 		local inv=self:Get(id);
-		if !inv:IsValid() then return false end
+		if !inv then return false end
 		
 		local weightCap=msg:ReadLong()+2147483648;
 		
 		inv:SetWeightCapacity(weightCap);
 	elseif msgType==IFINV_MSG_SIZELIMIT then
 		local inv=self:Get(id);
-		if !inv:IsValid() then return false end
+		if !inv then return false end
 		
 		local sizeLimit=msg:ReadLong()+2147483648;
 		
 		inv:SetSizeLimit(sizeLimit);
 	elseif msgType==IFINV_MSG_MAXSLOTS then
 		local inv=self:Get(id);
-		if !inv:IsValid() then return false end
+		if !inv then return false end
 		
 		local maxSlots=msg:ReadLong()+2147483648;
 		
 		inv:SetMaxSlots(maxSlots);
 	elseif msgType==IFINV_MSG_CONNECTITEM then
 		local inv=self:Get(id);
-		if !inv:IsValid() then return false end
+		if !inv then return false end
 		
 		local itemid=msg:ReadShort()+32768;
 		local item=IF.Items:Get(itemid);
 		
-		if !item || !item:IsValid() then ErrorNoHalt("Itemforge Inventories: Tried to connect a non-existent item with ID "..itemid.." to inventory "..id..".\n"); return false end
+		if !item || !item:IsValid() then ErrorNoHalt("Itemforge Inventory: Tried to connect a non-existent item with ID "..itemid.." to inventory "..id..".\n"); return false end
 		
 		local slot=msg:ReadShort()+32768;
 
 		inv:ConnectItem(item,slot);
 	elseif msgType==IFINV_MSG_CONNECTENTITY then
 		local inv=self:Get(id);
-		if !inv:IsValid() then return false end
+		if !inv then return false end
 		
 		local ent=msg:ReadEntity();
 		local slot=msg:ReadShort()+32768;
@@ -784,28 +733,28 @@ function MODULE:HandleIFINVMessages(msg)
 		inv:ConnectEntity(ent,slot);
 	elseif msgType==IFINV_MSG_SEVERITEM then
 		local inv=self:Get(id);
-		if !inv:IsValid() then return false end
+		if !inv then return false end
 		
 		local slot=msg:ReadShort()+32768;
 		inv:SeverItem(slot);
 	elseif msgType==IFINV_MSG_SEVERENTITY then
 		local inv=self:Get(id);
-		if !inv:IsValid() then return false end
+		if !inv then return false end
 		
 		local slot=msg:ReadShort()+32768;
 		inv:SeverEntity(slot);
 	elseif msgType==IFINV_MSG_LOCK then
 		local inv=self:Get(id);
-		if !inv:IsValid() then return false end
+		if !inv then return false end
 		
 		inv:Lock();
 	elseif msgType==IFINV_MSG_UNLOCK then
 		local inv=self:Get(id);
-		if !inv:IsValid() then return false end
+		if !inv then return false end
 		
 		inv:Unlock();
 	else
-		ErrorNoHalt("Itemforge Inventories: Unhandled IFINV message \""..msgType.."\"\n");
+		ErrorNoHalt("Itemforge Inventory: Unhandled IFINV message \""..msgType.."\"\n");
 	end
 end
 
@@ -828,20 +777,19 @@ end
 
 
 --[[
-Inventory Template
+Base Inventory
 SHARED
 
-The inventory template contains functions and default values available to all inventories.
+The Base Inventory contains functions and default values available to all inventories.
 ]]--
 
 --[[
 Variables
 This is a listing of vars that are stored on the server, client, or both.
-Whatever these variables are set to are defaults, which can be overridden by a template or an inventory.
+Whatever these variables are set to are defaults, which can be overridden by a derived inventory class or by individual inventories themself.
 ]]--
 
-_INV.Template={};								--Template is a table that contains events and values dealing with the inventory. Take a look at _INV - it's the default template for an inventory. The inventory will have access to any functions or events in the template. Using a template can be good if your inventory is connected with a specific type of item and has specific rules that need to be followed (for example, a bucket might hold water, but a cloth bag can't)
-_INV.Template.Name="";
+_INV.Base="base_nw"								--Inventories are based off of base_nw, just like items
 _INV.ID=0;										--This is the ID of the inventory. It's assigned automatically.
 _INV.Items=nil;									--Collection of item references stored by this inventory. This can be sorted however you like. The index determines what position items are in in the GUI.
 _INV.ItemsByID=nil;								--This collection can be used to convert item IDs into the slot the item is stored in on this table. In this table, keys (also known as the indexes) are the Item's ID, and the values are the index the items are stored at in inventory.Items.
@@ -882,8 +830,8 @@ TODO need to check all network data to make sure it's respecting inventory owner
 ]]--
 function _INV:SetOwner(pl)
 	if pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Cannot set owner on "..tostring(self)..". Given player was invalid.\n"); return false
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Cannot set owner on "..tostring(self)..". Given player wasn't a player!\n"); return false end
+		if !pl:IsValid()		then return self:Error("Cannot set owner. Given player was invalid.\n");
+		elseif !pl:IsPlayer()	then return self:Error("Cannot set owner. Given player wasn't a player!\n") end
 	end
 	
 	local oldOwner=self:GetOwner();
@@ -917,19 +865,19 @@ function _INV:SetOwner(pl)
 end
 
 --[[
-Set weight capacity for this inventory in kg. If called serverside, the clients are instructed to set the weight capacity as well.
-Note: If the weight capacity changes to something smaller than the current total weight, (ex: there are 2000kg in the inventory, but the weight capacity is set to 1000kg)
+Set weight capacity for this inventory in grams. If called serverside, the clients are instructed to set the weight capacity as well.
+Note: If the weight capacity changes to something smaller than the current total weight, (e.g. there are 2000000 grams in the inventory, but the weight capacity is set to 1000000 grams)
 items will not be removed to compensate for the weight capacity changing.
 Set to 0 to allow limitless weight to be stored.
 ]]--
 function _INV:SetWeightCapacity(cap,pl)
-	if cap==nil then ErrorNoHalt("Itemforge Inventories: Couldn't set weight capacity on inventory "..self:GetID().."... amount to set wasn't given.\n"); return false end
-	if cap<0 then ErrorNoHalt("Itemforge Inventories: Can't set weight capacity on inventory "..self:GetID().." to negative values! (Set to 0 if you want the inventory to store an infinite amount of weight)\n"); return false end
+	if cap==nil		then return self:Error("Couldn't set weight capacity... amount to set wasn't given.\n") end
+	if cap<0		then return self:Error("Can't set weight capacity to negative values! (Set to 0 if you want the inventory to store an infinite amount of weight)\n") end
 	
 	if SERVER && pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Cannot set weight capacity. Given player was invalid.\n"); return false
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Cannot set weight capacity. Given player wasn't a player!\n"); return false
-		elseif SERVER && !self:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Inventories: Cannot set weight capacity on inventory "..self:GetID()..". Given player wasn't the owner of the inventory!\n"); return false end
+		if !pl:IsValid()								then return self:Error("Cannot set weight capacity. Given player was invalid.\n");
+		elseif !pl:IsPlayer()							then return self:Error("Cannot set weight capacity. Given player wasn't a player!\n");
+		elseif SERVER && !self:CanSendInventoryData(pl) then return self:Error("Cannot set weight capacity. Given player wasn't the owner of the inventory!\n") end
 	end
 	
 	self.WeightCapacity=cap;
@@ -958,13 +906,13 @@ Note: If the size limit changes, items will not be removed to compensate for the
 Example: Item with size 506 is in inventory, but size limit changes to 500. The item is not taken out because the size limit changed.
 ]]--
 function _INV:SetSizeLimit(sizelimit,pl)
-	if sizelimit==nil then ErrorNoHalt("Itemforge Inventories: Couldn't set size limit on inventory "..self:GetID().."... sizelimit wasn't given.\n"); return false end
-	if sizelimit<0 then ErrorNoHalt("Itemforge Inventories: Can't set size limit on inventory "..self:GetID().." to negative values! (Set to 0 to allow items of any size to be inserted)\n"); return false end
+	if sizelimit==nil	then return self:Error("Couldn't set size limit... sizelimit wasn't given.\n") end
+	if sizelimit<0		then return self:Error("Can't set size limit to negative values! (Set to 0 to allow items of any size to be inserted)\n") end
 	
 	if SERVER && pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Cannot set size limit on inventory "..self:GetID()..". Given player was invalid.\n"); return false
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Cannot set size limit on inventory "..self:GetID()..". Given player wasn't a player!\n"); return false
-		elseif !self:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Inventories: Cannot set size limit on inventory "..self:GetID()..". Given player wasn't the owner of the inventory!\n"); return false end
+		if !pl:IsValid()						then return self:Error("Cannot set size limit. Given player was invalid.\n");
+		elseif !pl:IsPlayer()					then return self:Error("Cannot set size limit. Given player wasn't a player!\n");
+		elseif !self:CanSendInventoryData(pl)	then return self:Error("Cannot set size limit. Given player wasn't the owner of the inventory!\n") end
 	end
 	
 	self.SizeLimit=sizelimit;
@@ -993,13 +941,13 @@ NOTE: If the max slots changes, items will not be removed to compensate for the 
 WARNING: If an item is in, say, slot 7, and max slots is changed to 5, you'll open up the inventory and see a closed slot where item 7 is supposed to be.
 ]]--
 function _INV:SetMaxSlots(max,pl)
-	if max==nil then ErrorNoHalt("Itemforge Inventories: Couldn't set max number of slots on inventory "..self:GetID().."... max wasn't given.\n"); return false end
-	if max<0 then ErrorNoHalt("Itemforge Inventories: Can't set max number of slots on inventory "..self:GetID().." to negative values! (Set to 0 for infinite slots)\n"); return false end
+	if max==nil		then return self:Error("Couldn't set max number of slots... max wasn't given.\n") end
+	if max<0		then return self:Error("Can't set max number of slots to negative values! (Set to 0 for infinite slots)\n") end
 	
 	if SERVER && pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Cannot set max number of slots on inventory "..self:GetID()..". Given player was invalid.\n"); return false
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Cannot set max number of slots on inventory "..self:GetID()..". Given player wasn't a player!\n"); return false
-		elseif !self:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Inventories: Cannot set max number of slots on inventory "..self:GetID()..". Given player wasn't the owner of the inventory!\n"); return false end
+		if !pl:IsValid()						then return self:Error("Cannot set max number of slots. Given player was invalid.\n");
+		elseif !pl:IsPlayer()					then return self:Error("Cannot set max number of slots. Given player wasn't a player!\n");
+		elseif !self:CanSendInventoryData(pl)	then return self:Error("Cannot set max number of slots. Given player wasn't the owner of the inventory!\n") end
 	end
 	
 	self.MaxSlots=max;
@@ -1026,12 +974,9 @@ function _INV:GetID()
 	return self.ID;
 end
 
---Returns the name this template is using. Will return "" if no template is set.
-function _INV:GetTemplateName()
-	if self.Template then
-		return self.Template.Name;
-	end
-	return "";
+--Returns the name of the inventory-type this inventory uses.
+function _INV:GetType()
+	return self.ClassName;
 end
 
 --[[
@@ -1098,9 +1043,9 @@ If pl is given only locks for that player
 ]]--
 function _INV:Lock(pl)
 	if SERVER && pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Cannot lock "..tostring(self)..". Given player was invalid.\n"); return false
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Cannot lock "..tostring(self)..". Given player wasn't a player!\n"); return false
-		elseif !self:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Inventories: Cannot lock "..tostring(self)..". Given player wasn't the owner of the inventory!\n"); return false end
+		if !pl:IsValid()						then return self:Error("Cannot lock. Given player was invalid.\n");
+		elseif !pl:IsPlayer()					then return self:Error("Cannot lock. Given player wasn't a player!\n");
+		elseif !self:CanSendInventoryData(pl)	then return self:Error("Cannot lock. Given player wasn't the owner of the inventory!\n") end
 	end
 	
 	local bWasLocked=false;
@@ -1128,9 +1073,9 @@ If pl is given only unlocks for that player
 function _INV:Unlock(pl)
 	
 	if SERVER && pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Cannot unlock "..tostring(self)..". Given player was invalid.\n"); return false
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Cannot unlock "..tostring(self)..". Given player wasn't a player!\n"); return false
-		elseif !self:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Inventories: Cannot unlock "..tostring(self)..". Given player wasn't the owner of the inventory!\n"); return false end
+		if !pl:IsValid()						then return self:Error("Cannot unlock. Given player was invalid.\n");
+		elseif !pl:IsPlayer()					then return self:Error("Cannot unlock. Given player wasn't a player!\n");
+		elseif !self:CanSendInventoryData(pl)	then return self:Error("Cannot unlock. Given player wasn't the owner of the inventory!\n") end
 	end
 	
 	local bWasUnlocked=false;
@@ -1260,7 +1205,7 @@ If there's no item with this type in the inventory (or there are errors), nil is
 If there are several items of this type in the inventory, then the first item found with this type is returned.
 ]]--
 function _INV:GetItemByType(sItemtype)
-	if !sItemtype then ErrorNoHalt("Itemforge Inventories: Can't find a specific item-type in inventory "..self:GetID().." - the type of item to find wasn't given!\n"); return nil end
+	if !sItemtype then self:Error("Can't find a specific item-type - the type of item to find wasn't given!\n"); return nil end
 	sItemtype=string.lower(sItemtype);
 	
 	for k,v in pairs(self.Items) do
@@ -1268,7 +1213,7 @@ function _INV:GetItemByType(sItemtype)
 			if v:GetType()==sItemtype then return v end
 		else
 			--INVALID - Item was removed but not taken out of inventory for some reason
-			ErrorNoHalt("Itemforge Inventories: Found an item in inventory "..self:GetID().." (slot "..k..") that no longer exists but is still recorded as being in this inventory.\n");
+			self:Error("Found an item (slot "..k..") that no longer exists but is still recorded as being in this inventory.\n");
 		end
 	end
 	return nil;
@@ -1279,7 +1224,7 @@ Returns a table of items with the given type in this inventory.
 Returns nil if there are errors.
 ]]--
 function _INV:GetItemsByType(sItemtype)
-	if !sItemtype then ErrorNoHalt("Itemforge Inventories: Can't find items of a specific item-type in inventory "..self:GetID().." - the type of item to find wasn't given!\n"); return nil end
+	if !sItemtype then self:Error("Can't find items of a specific item-type - the type of item to find wasn't given!\n"); return nil end
 	local sItemtype=string.lower(sItemtype);
 	
 	local items={};
@@ -1289,7 +1234,7 @@ function _INV:GetItemsByType(sItemtype)
 		else
 			--INVALID - Item was removed but not taken out of inventory for some reason
 			self:RemoveItem(k,true,false);
-			ErrorNoHalt("Itemforge Inventories: Found an item in inventory "..self:GetID().." (slot "..k..") that no longer exists but is still listed as being in this inventory\n");
+			self:Error("Found an item (slot "..k..") that no longer exists but is still listed as being in this inventory\n");
 		end
 	end
 	
@@ -1329,6 +1274,65 @@ function _INV:GetConnectedEntities()
 	return t;
 end
 
+--[[
+Returns a string describing the connections the inventory has.
+]]--
+function _INV:GetConnectionString()
+	local count=#self.ConnectedObjects;
+	local connectedTo="nothing";
+	--Only one connection
+	if count==1 then
+		if self.ConnectedObjects[1].Type==IFINV_CONTYPE_ITEM then
+			connectedTo=tostring(self.ConnectedObjects[1].Obj);
+		elseif self.ConnectedObjects[1].Type==IFINV_CONTYPE_ENT then
+			connectedTo=tostring(self.ConnectedObjects[1].Obj);
+		end
+	
+	--Several connections
+	elseif count>1 then
+		local itemCount=#self:GetConnectedItems();
+		local entCount=#self:GetConnectedEntities();
+		
+		--Several items, no entities
+		if itemCount>1 && entCount==0 then
+			if itemCount < 5 then
+				local items=self:GetConnectedItems();
+				connectedTo=tostring(items[1]);
+				for i=2,itemCount do connectedTo=connectedTo..", "..tostring(items[i]); end
+			else
+				connectedTo=itemCount.." items";
+			end
+		--Several entities, no items
+		elseif itemCount==0 && entCount>1 then
+			if entCount < 5 then
+				local entities=self:GetConnectedEntities();
+				connectedTo=tostring(entities[1]);
+				for i=2,entCount do connectedTo=connectedTo..", "..tostring(entities[i]); end
+			else
+				connectedTo=itemCount.." entities";
+			end
+		
+		--Both entities and items, but only a few
+		elseif count < 5 then
+			connectedTo=tostring(self.ConnectedObjects[1].Obj);
+			for i=2,count do connectedTo=connectedTo..", "..tostring(self.ConnectedObjects[i].Obj); end
+		
+		--Many entities and items
+		else
+			connectedTo=itemCount.." items, "..entCount.." entities";
+		end
+	end
+	return connectedTo;
+end
+
+--[[
+When tostring() is used on this inventory, this function returns a string describing the inventory.
+Format: "Inventory ID [COUNT items @ LOCATION]" 
+Ex:     "Inventory 12 [20 items @ Player [1][theJ89] ]" (Inventory 12, storing 20 items, attached to Player 1: theJ89)
+]]--
+function _INV:ToString()
+	return "Inventory "..self:GetID().." ["..self:GetCount().." items @ "..self:GetConnectionString().."]";
+end
 
 --[[
 Clears the record of all items currently in this inventory. This will not manually remove each item. You shouldn't need to call this function.
@@ -1377,18 +1381,18 @@ pl is an optional player to connect the item on. If no player is given, it will 
 TODO: Allow items/ents to connect serverside even if they can't connect clientside
 ]]--
 function _INV:ConnectItem(item,pl)
-	if !item || !item:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't connect item to inventory "..self:GetID().."... item given was invalid.\n"); return false end
+	if !item || !item:IsValid() then return self:Error("Couldn't connect item... item given was invalid.\n") end
 	
 	--Validate player if one was given
 	if pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't connect "..tostring(item).." to inventory "..self:GetID().." - The player to connect this to clientside wasn't a player!\n"); return false;
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Couldn't connect "..tostring(item).." to inventory "..self:GetID().." - The player to connect this to clientside wasn't a player!\n"); return false; end
+		if !pl:IsValid()		then return self:Error("Couldn't connect "..tostring(item).." - The player to connect this to clientside was invalid!\n");
+		elseif !pl:IsPlayer()	then return self:Error("Couldn't connect "..tostring(item).." - The player to connect this to clientside wasn't a player!\n") end
 	end
 	
 	--We'll connect the item on either the given player or the inventory owner.
 	local who=pl or self:GetOwner();
 	
-	if !self:CanSendInventoryData(who) then ErrorNoHalt("Itemforge Inventories: Couldn't connect "..tostring(item).." to inventory "..self:GetID().." clientside - player(s) given were not the owners!\n"); return false end
+	if !self:CanSendInventoryData(pl) then return self:Error("Couldn't connect "..tostring(item).." - player(s) given were not the owners of this inventory!\n") end
 	
 	--Check to see if this item is connected already... if it is, grab the connection slot it's in.
 	local i=0;
@@ -1436,18 +1440,18 @@ TODO: Nil recursively connects on every connected player
 TODO: Allow items/ents to connect serverside even if they can't connect clientside
 ]]--
 function _INV:ConnectEntity(ent,pl)
-	if !ent || !ent:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't connect entity to inventory "..self:GetID().."... entity given was invalid.\n"); return false end
+	if !ent || !ent:IsValid() then return self:Error("Couldn't connect entity... entity given was invalid.\n") end
 	
 	--Validate player
 	if pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't connect entity "..ent:EntIndex().." to inventory "..self:GetID().." - The player to connect this to clientside wasn't a player!\n"); return false;
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Couldn't connect entity "..ent:EntIndex().." to inventory "..self:GetID().." - The player to connect this to clientside wasn't a player!\n"); return false; end
+		if !pl:IsValid()		then return self:Error("Couldn't connect "..tostring(ent).." - The player to connect this to clientside wasn't a player!\n");
+		elseif !pl:IsPlayer()	then return self:Error("Couldn't connect "..tostring(ent).." - The player to connect this to clientside wasn't a player!\n"); end
 	end
 	
 	--We'll connect the item on either the given player or the inventory owner.
 	local who=pl or self:GetOwner();
 	
-	if !self:CanSendInventoryData(who) then ErrorNoHalt("Itemforge Inventories: Couldn't connect entity to inventory "..self:GetID().." clientside - player(s) given were not the owners!\n"); return false end
+	if !self:CanSendInventoryData(who) then return self:Error("Couldn't connect entity - player(s) given were not the owners of this inventory!\n") end
 	
 	--Check to see if this ent is connected already... if it is, grab the connection slot it's in.
 	local i=0;
@@ -1490,10 +1494,9 @@ slot is a slot to sever.
 bNotClient is an optional true/false that you can give. If this is true, we won't tell clients to sever the connection between the item and the inventory.
 ]]--
 function _INV:SeverItem(slot,bNotClient)
-	if !slot then ErrorNoHalt("Itemforge Inventories: Couldn't sever item from inventory "..self:GetID().." - slot to sever wasn't given.\n"); return false end
-	if !self.ConnectedObjects[slot] then ErrorNoHalt("Itemforge Inventories: Couldn't sever item from inventory "..self:GetID().."... there is no connected object on slot "..slot..".\n"); return false end
-	if self.ConnectedObjects[slot].Type!=IFINV_CONTYPE_ITEM then ErrorNoHalt("Itemforge Inventories: Couldn't sever item from inventory "..self:GetID().."... the connected object on slot "..slot.." is not an item.\n"); return false end
-	
+	if !slot												then return self:Error("Couldn't sever item - slot to sever wasn't given.\n") end
+	if !self.ConnectedObjects[slot]							then return self:Error("Couldn't sever item... there is no connected object on slot "..slot..".\n") end
+	if self.ConnectedObjects[slot].Type!=IFINV_CONTYPE_ITEM then return self:Error("Couldn't sever item... the connected object on slot "..slot.." is not an item.\n") end
 	
 	--Break one-way connection between item and inventory, if the item is still valid
 	local item=self.ConnectedObjects[slot].Obj;
@@ -1528,9 +1531,9 @@ ent is the ent to sever. This is only necessary serverside, to confirm that the 
 slot is an optional true/false that you can give. If this is true, we won't tell clients to sever the connection between the entity and the inventory.
 ]]--
 function _INV:SeverEntity(slot,bNotClient)
-	if !slot then ErrorNoHalt("Itemforge Inventories: Couldn't sever entity from inventory "..self:GetID().." - slot to sever wasn't given.\n"); return false end
-	if !self.ConnectedObjects[slot] then ErrorNoHalt("Itemforge Inventories: Couldn't sever entity from inventory "..self:GetID().."... there is no connected object on slot "..slot..".\n"); return false end
-	if self.ConnectedObjects[slot].Type!=IFINV_CONTYPE_ENT then ErrorNoHalt("Itemforge Inventories: Couldn't sever entity from inventory "..self:GetID().."... the connected object on slot "..slot.." is not an entity.\n"); return false end
+	if !slot												then return self:Error("Couldn't sever entity - slot to sever wasn't given.\n") end
+	if !self.ConnectedObjects[slot]							then return self:Error("Couldn't sever entity... there is no connected object on slot "..slot..".\n") end
+	if self.ConnectedObjects[slot].Type!=IFINV_CONTYPE_ENT	then return self:Error("Couldn't sever entity... the connected object on slot "..slot.." is not an entity.\n") end
 	
 	local ent=self.ConnectedObjects[slot].Obj;
 	if ent:IsValid() then ent:RemoveCallOnRemove("ifinv_"..self:GetID().."_connect"); ent.ConnectionSlot=nil; end
@@ -1579,7 +1582,7 @@ end
 
 --Bind a panel to this inventory. This will add it to this inventory's list of connected panels. Whenever the inventory :Update()s itself, the bound panel will be alerted.
 function _INV:BindPanel(panel)
-	if !panel || !panel:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't bind panel to inventory "..self:GetID().." - a valid panel was not given.\n"); return false end
+	if !panel || !panel:IsValid() then return self:Error("Itemforge Inventory: Couldn't bind panel - a valid panel was not given.\n") end
 	
 	--Make sure we're not binding an already bound panel
 	for k,v in pairs(self.BoundPanels) do
@@ -1865,11 +1868,11 @@ This function calls the OnSendFullUpdate event. You can
 function _INV:SendFullUpdate(pl)
 	--Validate player
 	if pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Inventories: Can't send full update of inventory "..self:GetID().." - player given wasn't valid.\n"); return false
-		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Inventories: Can't send full update of inventory "..self:GetID().." - player given wasn't a player!\n"); return false end
+		if !pl:IsValid()				then return self:Error("Can't send full update - player given wasn't valid.\n");
+		elseif !pl:IsPlayer()			then return self:Error("Can't send full update - player given wasn't a player!\n") end
 	end
 	
-	if !self:CanSendInventoryData(pl) then ErrorNoHalt("Itemforge Inventories: Can't send full update: Full update of inventory "..self:GetID().." was going to be sent to a player other than the owner!\n"); return false end
+	if !self:CanSendInventoryData(pl)	then return self:Error("Can't send full update: Given player(s) were not the owner!\n") end
 	
 	--DEBUG
 	Msg("OUT: Message Type: "..IFINV_MSG_INVFULLUP.." - Inventory: "..self:GetID().." - Player: "..tostring(pl).."\n");
@@ -1891,37 +1894,12 @@ function _INV:SendFullUpdate(pl)
 		end
 	end
 	
-	--If we're locked tell that player
-	if self.Locked then
-		self:Lock(pl);
-	else
-		self:Unlock(pl);
+	--If we're locked tell that to the player(s)
+	if self.Locked then	self:Lock(pl);
+	else				self:Unlock(pl);
 	end
 	
-	local s,r=pcall(self.OnSendFullUpdate,self,pl);
-	if !s then ErrorNoHalt(r.."\n") end
-end
-
---[[
-Calls an event on the inventory.
-If there is an error calling the event, a non-halting error message is generated and a default value is returned.
-
-sEventName is a string which should be the name of the event to call (EX: "CanRemoveItem", "OnInsertItem", etc)
-vDefaultReturn is what will be returned in case of errors calling the hook.
-... - You can pass arguments to the hook here
-
-This function returns two values: vReturn,bSuccess
-	vReturn will be what the event returned, or if there were errors, then it will be vDefaultReturn.
-	bSuccess will be true if the event was called successfully or false if there were errors.
-]]--
-function _INV:Event(sEventName,vDefaultReturn,...)
-	local f=self[sEventName];
-	if !f then ErrorNoHalt("Itemforge Inventories: "..sEventName.." ("..tostring(self)..") failed: This event does not exist.\n"); return vDefaultReturn,false end
-		
-	local s,r=pcall(f,self,...);
-	if !s then ErrorNoHalt("Itemforge Inventories: "..sEventName.." ("..tostring(self)..") failed: "..r.."\n"); return vDefaultReturn,false end
-	
-	return r,true;
+	self:Event("OnSendFullUpdate",nil,pl);
 end
 
 --[[
@@ -1948,7 +1926,7 @@ Use the item's ToInventory() function and pass this inventory's ID.
 False is returned if the item could not be inserted for any reason, otherwise the slot for the item to use in the inventory is returned.
 ]]--
 function _INV:InsertItem(item,slotnum,bNoSplit,bPredict)
-	if !item || !item:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't add item to inventory "..self:GetID().."... item given was invalid.\n"); return false end
+	if !item || !item:IsValid() then return self:Error("Couldn't add item... given item was invalid.\n") end
 	
 	if bPredict==nil then bPredict=CLIENT end
 	
@@ -2003,7 +1981,7 @@ function _INV:InsertItem(item,slotnum,bNoSplit,bPredict)
 			if !newStack then return false end
 		end
 	else
-		if slotnum==nil then ErrorNoHalt("Itemforge Inventories: Tried to add "..tostring(item).." clientside, but slotnum was nil!\n"); return false end
+		if slotnum==nil then return self:Error("Tried to add "..tostring(item).." clientside, but slotnum was nil!\n") end
 		i=slotnum;
 	end
 	
@@ -2041,8 +2019,8 @@ bPredict is an optional true/false that defaults to false on the server and true
 	true, then we are simply predicting whether or not we can move the item.
 ]]--
 function _INV:MoveItem(item,oldslot,newslot,bPredict)
-	if !item || !item:IsValid() then ErrorNoHalt("Itemforge Inventories: Couldn't move item in "..tostring(self).." from one slot to another - Item given was invalid!\n"); return false end
-	if !newslot then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." in "..tostring(self).." from one slot to another - new slot wasn't given!\n"); return false end
+	if !item || !item:IsValid() then return self:Error("Couldn't move item from one slot to another - item given was invalid!\n") end
+	if !newslot					then return self:Error("Couldn't move "..tostring(item).." from one slot to another - new slot wasn't given!\n") end
 	
 	if bPredict==nil then bPredict=CLIENT end
 	
@@ -2051,15 +2029,15 @@ function _INV:MoveItem(item,oldslot,newslot,bPredict)
 	--Make sure that the given item is occupying a slot in this inventory (and that clientside this matches the old slot given)
 	local s=self:GetItemSlotByID(itemid);
 	if SERVER || bPredict then
-		if !s then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." from one slot to another - Wasn't in "..tostring(self).."!\n"); return false end
+		if !s then return self:Error("Couldn't move "..tostring(item).." from one slot to another - Wasn't in this inventory!\n") end
 	else
-		if !oldslot then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." in "..tostring(self).." from one slot to another - old slot wasn't given!\n"); return false end
-		if s!=oldslot then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." in "..tostring(self).." from one slot to another - given item wasn't in given old slot! Netsync error?\n"); return false end
+		if !oldslot		then return self:Error("Couldn't move "..tostring(item).." from one slot to another - old slot wasn't given!\n") end
+		if s!=oldslot	then return self:Error("Couldn't move "..tostring(item).." from one slot to another - given item wasn't in given old slot! Netsync error?\n") end
 	end
 	
 	--Can't move to anything but an empty slot
 	if self:GetItemBySlot(newslot)!=nil then
-		if CLIENT && !bPredict then ErrorNoHalt("Itemforge Inventories: Couldn't move "..tostring(item).." in "..tostring(self).." from one slot to another - new slot has an item in it! Netsync error?\n") end
+		if CLIENT && !bPredict then return self:Error("Couldn't move "..tostring(item).." from one slot to another - new slot has an item in it! Netsync error?\n") end
 		return false;
 	end
 	
@@ -2126,7 +2104,7 @@ True is returned if the item was/can be removed successfully.
 False is returned if the item cannot be removed (either due to an event or it can't be found in the inventory)
 ]]--
 function _INV:RemoveItem(itemid,forced,bPredict)
-	if !itemid then ErrorNoHalt("Itemforge Inventories: Cannot remove item from "..tostring(self).."... itemid wasn't given!\n"); return false end
+	if !itemid then return self:Error("Cannot remove item... itemid wasn't given!\n") end
 	if forced==nil then forced=false end
 	if bPredict==nil then bPredict=CLIENT end
 	
@@ -2136,7 +2114,7 @@ function _INV:RemoveItem(itemid,forced,bPredict)
 	OnRemoveItem exists on both the client and server. It's called on both, but the event can only stop it on the server, given that it wasn't forced.
 	]]--	
 	local slot=self:GetItemSlotByID(itemid);
-	if slot==nil then ErrorNoHalt("Itemforge Inventories: Tried to remove item "..itemid.." from "..tostring(self)..", but it's not listed there.\n"); return false end
+	if slot==nil then return self:Error("Tried to remove item "..itemid..", but it's not listed in this inventory.\n") end
 	
 	local item=IF.Items:Get(itemid);
 	if !forced && (SERVER || bPredict) && item && item:IsValid() && !self:Event("CanRemoveItem",true,item,slot) then return false end
@@ -2231,9 +2209,9 @@ This command is used to untie this inventory from an item.
 slot is a required slot number that should be given automatically by the server.
 ]]--
 function _INV:SeverItem(slot)
-	if !slot then ErrorNoHalt("Itemforge Inventories: Couldn't sever item from inventory "..self:GetID().." - slot to sever wasn't given.\n"); return false end
-	if !self.ConnectedObjects[slot] then ErrorNoHalt("Itemforge Inventories: Couldn't sever item from inventory "..self:GetID().."... there is no connected object on slot "..slot..".\n"); return false end
-	if self.ConnectedObjects[slot].Type!=IFINV_CONTYPE_ITEM then ErrorNoHalt("Itemforge Inventories: Couldn't sever item from inventory "..self:GetID().."... the connected object on slot "..slot.." is not an item.\n"); return false end
+	if !slot												then return self:Error("Couldn't sever item - slot to sever wasn't given.\n") end
+	if !self.ConnectedObjects[slot]							then return self:Error("Couldn't sever item... there is no connected object on slot "..slot..".\n") end
+	if self.ConnectedObjects[slot].Type!=IFINV_CONTYPE_ITEM then return self:Error("Couldn't sever item... the connected object on slot "..slot.." is not an item.\n") end
 	
 	--Break one-way connection between item and inventory
 	local item=self.ConnectedObjects[slot].Obj;
@@ -2249,9 +2227,9 @@ This command is used to untie this inventory from an entity.
 slot is a required slot number that should be given automatically by the server.
 ]]--
 function _INV:SeverEntity(slot)
-	if !slot then ErrorNoHalt("Itemforge Inventories: Couldn't sever entity from inventory "..self:GetID().." - slot to sever wasn't given.\n"); return false end
-	if !self.ConnectedObjects[slot] then ErrorNoHalt("Itemforge Inventories: Couldn't sever entity from inventory "..self:GetID().."... there is no connected object on slot "..slot..".\n"); return false end
-	if self.ConnectedObjects[slot].Type!=IFINV_CONTYPE_ENT then ErrorNoHalt("Itemforge Inventories: Couldn't sever entity from inventory "..self:GetID().."... the connected object on slot "..slot.." is not an entity.\n"); return false end
+	if !slot												then return self:Error("Couldn't sever entity - slot to sever wasn't given.\n") end
+	if !self.ConnectedObjects[slot]							then return self:Error("Couldn't sever entity... there is no connected object on slot "..slot..".\n") end
+	if self.ConnectedObjects[slot].Type!=IFINV_CONTYPE_ENT	then return self:Error("Couldn't sever entity... the connected object on slot "..slot.." is not an entity.\n") end
 	
 	local ent=self.ConnectedObjects[slot].Obj;
 	if ent:IsValid() then ent:RemoveCallOnRemove("ifinv_"..self:GetID().."_connect") end

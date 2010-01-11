@@ -1,9 +1,9 @@
 --[[
-item
+base_item
 SERVER
 
-item is the default item. All items except item inherit from this item-type.
-NOTE: The item type is the name of the folder it is in (this is item/init.lua, so this item's type is "item")
+base_item is the default item. All items except base_item inherit from this item-type.
+NOTE: The item type is the name of the folder it is in (this is base_item/init.lua, so this item's type is "base_item")
 ]]--
 AddCSLuaFile("shared.lua");
 AddCSLuaFile("cl_init.lua");
@@ -117,7 +117,7 @@ Changes the item's world model.
 False is returned if this cannot be done for some reason. True is returned if the model was changed.
 ]]--
 function ITEM:SetWorldModel(sModel)
-	if !sModel then ErrorNoHalt("Itemforge Items: Couldn't change world model. No model was given.\n"); return false end
+	if !sModel then return self:Error("Couldn't change world model. No model was given.\n") end
 	
 	local sOldModel=self:GetWorldModel();
 	if sModel==sOldModel then return true end
@@ -142,7 +142,7 @@ Changes this item's view model.
 TODO actually change visible viewmodel.
 ]]--
 function ITEM:SetViewModel(sModel)
-	if !sModel then ErrorNoHalt("Itemforge Items: Couldn't change view model. No model was given.\n"); return false end
+	if !sModel then return self:Error("Couldn't change view model. No model was given.\n") end
 	self:SetNWString("ViewModel",sModel);
 	
 	return true;
@@ -156,7 +156,7 @@ function ITEM:SendFullUpdate(pl)
 	if self.NWVars then
 		for k,v in pairs(self.NWVars) do
 			--This shouldn't happen, but just in case.
-			if !self.NWVarsByName[k] then ErrorNoHalt("Itemforge Items: Couldn't send networked var \""..k.."\" via full update on "..tostring(self)..". This networked var has not been defined in the itemtype with IF.Items:CreateNWVar. This shouldn't be happening.\n"); end
+			if !self.NWVarsByName[k] then self:Error("Couldn't send networked var \""..k.."\" via full update. This networked var has not been defined in the itemtype with IF.Items:CreateNWVar. This shouldn't be happening.\n"); end
 			
 			if !self.NWVarsByName[k].HoldFromUpdate then self:SendNWVar(k,pl); end
 		end
@@ -178,7 +178,7 @@ function ITEM:Tick()
 	--Send predicted network vars.
 	for k,v in pairs(self.NWVars) do
 		--This shouldn't happen, but just in case.
-		if !self.NWVarsByName[k] then ErrorNoHalt("Itemforge Items: Couldn't send networked var \""..k.."\" via tick on "..tostring(self)..". This networked var has not been defined in the itemtype with IF.Items:CreateNWVar. This shouldn't be happening.\n"); return false end
+		if !self.NWVarsByName[k] then return self:Error("Couldn't send networked var \""..k.."\" via tick. This networked var has not been defined in the itemtype with IF.Items:CreateNWVar. This shouldn't be happening.\n") end
 		
 		if self.NWVarsByName[k].Predicted then
 			--Create the "Last Tick" table if it hasn't been created yet
@@ -229,12 +229,12 @@ pl can be a player, a recipient filter, or 'nil' to send to all players (clients
 ]]--
 function ITEM:SendNWCommand(sName,pl,...)
 	local command=self.NWCommandsByName[sName];
-	if command==nil then ErrorNoHalt("Itemforge Items: Couldn't send command '"..sName.."' on "..tostring(self)..", there is no NWCommand by this name! \n"); return false end
-	if command.Hook!=nil then ErrorNoHalt("Itemforge Items: Command '"..command.Name.."' on "..tostring(self).." can't be sent serverside. It has a hook, meaning this command is recieved serverside, not sent.\n"); return false end
+	if command==nil			then return self:Error("Couldn't send command \""..sName.."\", there is no NWCommand by this name!\n") end
+	if command.Hook!=nil	then return self:Error("Command \""..command.Name.."\" can't be sent serverside. It has a hook, meaning this command is recieved serverside, not sent.\n") end
 	
 	if pl!=nil then
-		if !pl:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't send networked command - The player to send "..tostring(self).." to isn't valid!\n"); return false; end
-		if !pl:IsPlayer() then ErrorNoHalt("Itemforge Items: Couldn't send networked command - The player to send "..tostring(self).." to isn't a player!\n"); return false; end
+		if !pl:IsValid()	then return self:Error("Couldn't send networked command - The player to send \""..command.Name.."\" to isn't valid!\n"); end
+		if !pl:IsPlayer()	then return self:Error("Couldn't send networked command - The player to send \""..command.Name.."\" to isn't a player!\n"); end
 	else
 		local allSuccess=true;
 		for k,v in pairs(player.GetAll()) do
@@ -301,6 +301,8 @@ function ITEM:SendNWCommand(sName,pl,...)
 end
 IF.Items:ProtectKey("SendNWCommand");
 
+local NIL="%%00";		--If a command isn't given, this is substituted. It means we received nil (nothing).
+
 --[[
 This function is called automatically, whenever a networked command from a client is received. fromPl will always be a player.
 commandid is the ID of the command recieved from the server
@@ -310,13 +312,12 @@ There's no need to override this, we'll call the hook the command is associated 
 function ITEM:ReceiveNWCommand(fromPl,commandid,args)
 	local command=self.NWCommandsByID[commandid];
 	
-	if command==nil then ErrorNoHalt("Itemforge Items: Couldn't find a NWCommand with ID '"..commandid.."' on "..tostring(self)..". Make sure commands are created in the same order BOTH serverside and clientside. \n"); return false end
-	if command.Hook==nil then ErrorNoHalt("Itemforge Items: Command '"..command.Name.."' was received on "..tostring(self)..", but there is no Hook to run!\n"); return false end
+	if command==nil			then return self:Error("Couldn't find a NWCommand with ID "..commandid..". Make sure commands are created in the same order BOTH serverside and clientside. \n") end
+	if command.Hook==nil	then return self:Error("Command \""..command.Name.."\" was received, but there is no Hook to run!\n") end
 	
 	--If our command sends data, then we need to receive the appropriate type of data.
 	--We'll pass this onto the hook function.
 	local hookArgs={};
-	local NIL="%%00";		--If a command isn't given, this is substituted. It means we received nil (nothing).
 	
 	for i=1,table.maxn(command.Datatypes) do
 		local v=command.Datatypes[i];
@@ -358,8 +359,8 @@ IF.Items:ProtectKey("ReceiveNWCommand");
 --Runs when a client requests to send this item to an inventory
 function ITEM:PlayerSendToInventory(pl,inv,invSlot)
 	if !self:Event("CanPlayerInteract",false,pl) then return false end
-	if !inv || !inv:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't move "..tostring(self).." to inventory as requested by player "..tostring(pl)..", inventory given was not valid!\n"); return false end
-	if invSlot==nil then ErrorNoHalt("Itemforge Items: Couldn't move "..tostring(self).." to inventory "..inv:GetID().." as requested by player "..tostring(pl)..", no slot was given!\n"); return false end
+	if !inv || !inv:IsValid()	then return self:Error("Couldn't move to inventory as requested by "..tostring(pl)..", inventory given was not valid!\n") end
+	if invSlot==nil				then return self:Error("Couldn't move to "..tostring(inv).." as requested by "..tostring(pl)..", no slot was given!\n") end
 	
 	if invSlot==0 then invSlot=nil end
 	

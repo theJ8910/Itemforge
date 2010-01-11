@@ -67,7 +67,7 @@ function ITEM:OnUse(pl)
 		self:Unstick();
 		return true;
 	end
-	return self["item"].OnUse(self,pl);
+	return self["base_item"].OnUse(self,pl);
 end
 
 --Unstick without sounds when we leave the world

@@ -11,7 +11,6 @@ if SERVER then AddCSLuaFile("shared.lua") end
 
 ITEM.Name="Item Magnet";
 ITEM.Description="An object of mysterious origin, it attracts any items to it when turned on.";
-ITEM.Base="item";
 ITEM.Size=8;
 ITEM.WorldModel="models/Items/combine_rifle_ammo01.mdl";
 ITEM.MaxHealth=300;
@@ -129,19 +128,9 @@ function ITEM:DrawGlow(ent)
 	end
 end
 
---Draw SWEP world model
-function ITEM:OnSWEPDraw(eEntity,SWEP,bTranslucent)
-	self["item"].OnSWEPDraw(self,eEntity,SWEP,bTranslucent);
-	
-	--TODO need to GetWorldModel() or something
-	if SWEP.WM!=nil then
-		self:DrawGlow(SWEP.WM.ent);
-	end
-end
-
 --Called when a model associated with this item needs to be drawn
 function ITEM:OnDraw3D(eEntity,bTranslucent)
-	self["item"].OnDraw3D(self,eEntity,bTranslucent);
+	self["base_item"].OnDraw3D(self,eEntity,bTranslucent);
 	self:DrawGlow(eEntity);
 end
 
@@ -158,7 +147,7 @@ function ITEM:OnPopulateMenu(pMenu)
 			return x,y;
 		end
 	pMenu:AddPanel(Slider);
-	self["item"].OnPopulateMenu(self,pMenu);
+	self["base_item"].OnPopulateMenu(self,pMenu);
 end
 
 IF.Items:CreateNWCommand(ITEM,"PlayerSetStrength",nil,{"int"});
