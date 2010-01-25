@@ -100,7 +100,12 @@ IF.Items:CreateNWVar(ITEM,"Amount","int",function(self) return self.StartAmount 
 IF.Items:CreateNWVar(ITEM,"MaxAmount","int",function(self)
 													return self.MaxAmount
 												end);
---Set a networked angle on this item
+--[[
+* SHARED
+* Protected
+
+Set a networked angle on this item
+]]--
 function ITEM:SetNWAngle(sName,aAng,bSuppress)
 	if sName==nil							then return self:Error("Couldn't set networked angle. sName wasn't given!\n") end
 	if self.NWVarsByName[sName]==nil		then return self:Error("There is no networked var by the name "..sName..".\n") end
@@ -117,7 +122,12 @@ function ITEM:SetNWAngle(sName,aAng,bSuppress)
 end
 IF.Items:ProtectKey("SetNWAngle");
 
---Set a networked bool on this item
+--[[
+* SHARED
+* Protected
+
+Set a networked bool on this item
+]]--
 function ITEM:SetNWBool(sName,bBool,bSuppress)
 	if sName==nil								then return self:Error("Couldn't set networked bool. sName wasn't given!\n") end
 	if self.NWVarsByName[sName]==nil			then return self:Error("There is no networked var by the name "..sName..".\n") end
@@ -134,7 +144,12 @@ function ITEM:SetNWBool(sName,bBool,bSuppress)
 end
 IF.Items:ProtectKey("SetNWBool");
 
---Set a networked entity on this item
+--[[
+* SHARED
+* Protected
+
+Set a networked entity on this item
+]]--
 function ITEM:SetNWEntity(sName,cEnt,bSuppress)
 	if sName==nil							then return self:Error("Couldn't set networked entity. sName wasn't given!\n") end
 	if self.NWVarsByName[sName]==nil		then return self:Error("There is no networked var by the name "..sName..".\n") end
@@ -151,7 +166,12 @@ function ITEM:SetNWEntity(sName,cEnt,bSuppress)
 end
 IF.Items:ProtectKey("SetNWEntity");
 
---Set a networked float on this item
+--[[
+* SHARED
+* Protected
+
+Set a networked float on this item
+]]--
 function ITEM:SetNWFloat(sName,fFloat,bSuppress)
 	if sName==nil								then return self:Error("Couldn't set networked float. sName wasn't given!\n") end
 	if self.NWVarsByName[sName]==nil			then return self:Error("There is no networked var by the name "..sName..".\n") end
@@ -169,6 +189,9 @@ end
 IF.Items:ProtectKey("SetNWFloat");
 
 --[[
+* SHARED
+* Protected
+
 Set a networked integer on this item. The right type of data to send (char, uchar, short, ushort, long, or ulong) is determined automatically.
 We opt to use the smallest datatypes possible.
 If run on the server, and the number given is too large to be sent (even larger than an unsigned int) the number will be set to 0, both serverside and clientside.
@@ -195,7 +218,12 @@ function ITEM:SetNWInt(sName,iInt,bSuppress)
 end
 IF.Items:ProtectKey("SetNWInt");
 
---Set a networked string on this item
+--[[
+* SHARED
+* Protected
+
+Set a networked string on this item
+]]--
 function ITEM:SetNWString(sName,sString,bSuppress)
 	if sName==nil								then return self:Error("Couldn't set networked string. sName wasn't given!\n") end
 	if self.NWVarsByName[sName]==nil			then return self:Error("There is no networked var by the name "..sName..".\n") end
@@ -212,7 +240,12 @@ function ITEM:SetNWString(sName,sString,bSuppress)
 end
 IF.Items:ProtectKey("SetNWString");
 
---Set a networked vector on this item
+--[[
+* SHARED
+* Protected
+
+Set a networked vector on this item
+]]--
 function ITEM:SetNWVector(sName,vVec,bSuppress)
 	if sName==nil							then return self:Error("Couldn't set networked vector. sName wasn't given!\n") end
 	if self.NWVarsByName[sName]==nil		then return self:Error("There is no networked var by the name "..sName..".\n") end
@@ -229,7 +262,12 @@ function ITEM:SetNWVector(sName,vVec,bSuppress)
 end
 IF.Items:ProtectKey("SetNWVector");
 
---Set a networked item on this item
+--[[
+* SHARED
+* Protected
+
+Set a networked item on this item
+]]--
 function ITEM:SetNWItem(sName,cItem,bSuppress)
 	if sName==nil							then return self:Error("Couldn't set networked item. sName wasn't given!\n") end
 	if self.NWVarsByName[sName]==nil		then return self:Error("There is no networked var by the name \""..sName.."\".\n") end
@@ -252,7 +290,12 @@ function ITEM:SetNWItem(sName,cItem,bSuppress)
 end
 IF.Items:ProtectKey("SetNWItem");
 
---Set a networked inventory on this item
+--[[
+* SHARED
+* Protected
+
+Set a networked inventory on this item
+]]--
 function ITEM:SetNWInventory(sName,cInv,bSuppress)
 	if sName==nil							then return self:Error("Couldn't set networked inventory. sName wasn't given!\n") end
 	if self.NWVarsByName[sName]==nil		then return self:Error("There is no networked var by the name "..sName..".\n") end
@@ -275,7 +318,12 @@ function ITEM:SetNWInventory(sName,cInv,bSuppress)
 end
 IF.Items:ProtectKey("SetNWInventory");
 
---Set a networked color on this item
+--[[
+* SHARED
+* Protected
+
+Set a networked color on this item
+]]--
 function ITEM:SetNWColor(sName,cColor,bSuppress)
 	if sName==nil							then return self:Error("Couldn't set networked color. sName wasn't given!\n") end
 	if self.NWVarsByName[sName]==nil		then return self:Error("There is no networked var by the name \""..sName.."\".\n") end
@@ -306,6 +354,9 @@ end
 IF.Items:ProtectKey("SetNWColor");
 
 --[[
+* SHARED
+* Protected
+
 Don't call this directly, it's called by the other SetNW* functions
 This actually sets the networked var to the given value serverside/clientside.
 This returns true if the networked value changed from what it was, or false if it didn't.
@@ -330,6 +381,9 @@ end
 IF.Items:ProtectKey("SetNWVar");
 
 --[[
+* SHARED
+* Protected
+
 Returns a networked entity with the given name.
 If the networked entity is no longer valid it's set to nil.
 ]]--
@@ -344,6 +398,9 @@ end
 IF.Items:ProtectKey("GetNWEntity");
 
 --[[
+* SHARED
+* Protected
+
 Returns a networked item with the given name.
 If the networked item is no longer valid it's set to nil.
 ]]--
@@ -358,6 +415,9 @@ end
 IF.Items:ProtectKey("GetNWItem");
 
 --[[
+* SHARED
+* Protected
+
 Returns a networked entity with the given name.
 If the networked entity is no longer valid it's set to nil.
 ]]--
@@ -372,6 +432,9 @@ end
 IF.Items:ProtectKey("GetNWInventory");
 
 --[[
+* SHARED
+* Protected
+
 Returns a networked var.
 ]]--
 function ITEM:GetNWVar(sName)
@@ -445,6 +508,9 @@ if SERVER then
 
 
 --[[
+* SERVER
+* Protected
+
 Sends a networked var to the given player.
 We'll tell the clients to set the var to nil if the networked var:
 	Hasn't been set
@@ -585,6 +651,9 @@ else
 
 
 --[[
+* CLIENT
+* Protected
+
 Whenever a networked var is received from the server, this function is called.
 ]]--
 function ITEM:ReceiveNWVar(sName,vVal)

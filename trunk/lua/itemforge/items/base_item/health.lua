@@ -8,6 +8,9 @@ This file contains functions related to the health of items.
 ITEM.MaxHealth=100;									--How much health does a single item in the stack have when at full health (by default - this can be changed with SetMaxHealth())?
 
 --[[
+* SHARED
+* Protected
+
 Get HP of the top item in stack (the items beneath it are assumed to be at full health)
 ]]--
 function ITEM:GetHealth()
@@ -16,6 +19,9 @@ end
 IF.Items:ProtectKey("GetHealth");
 
 --[[
+* SHARED
+* Protected
+
 Get the max HP of an item in the stack (they all have the same Max HP)
 If the max HP is 0, the item(s) are invincible
 ]]--
@@ -25,6 +31,9 @@ end
 IF.Items:ProtectKey("GetMaxHealth");
 
 --[[
+* SHARED
+* Protected
+
 Returns whether or not the item is invincible (does not take damage, doesn't use HP).
 ]]--
 function ITEM:IsInvincible()
@@ -33,6 +42,9 @@ end
 IF.Items:ProtectKey("IsInvincible")
 
 --[[
+* SHARED
+* Protected
+
 Hurt the top item on the stack however many points you want.
 Serverside, this will actually damage the item (reduce it's health), but it can be used clientside for prediction if you want.
 who is an optional entity that will be credited with causing damage to this item.
@@ -49,6 +61,9 @@ ITEM.Damage=ITEM.Hurt;
 IF.Items:ProtectKey("Damage");
 
 --[[
+* SHARED
+* Protected
+
 Heals the top item on the stack however many points you want.
 Serverside, this will actually heal the item, but clientside it can be used for prediction.
 who is an optional entity that will be credited with healing the item.
@@ -68,6 +83,9 @@ if SERVER then
 
 
 --[[
+* SHARED
+* Protected
+
 Set HP of top item in stack
 hp is the health to set the item to. If this value exceeds the max HP, it is clamped down to the max HP.
 	A value of -maxhp*i will subtract i+1 items, where i is a number from 0 to infinity.
@@ -141,6 +159,9 @@ end
 IF.Items:ProtectKey("SetHealth");
 
 --[[
+* SHARED
+* Protected
+
 Set max health of all items in the stack.
 
 maxhp is the amount to set the HP to. If maxhp is 0, the item becomes invincible.
@@ -166,7 +187,12 @@ else
 
 
 
---Set HP of top item in stack
+--[[
+* SHARED
+* Protected
+
+Set HP of top item in stack
+]]--
 function ITEM:SetHealth(hp)
 	if hp<0 then		--Keep health in range clientside
 		hp=0;

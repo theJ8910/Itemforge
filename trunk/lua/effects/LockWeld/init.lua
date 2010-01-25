@@ -23,6 +23,7 @@ EFFECT.Mat = Material("effects/tool_tracer");
 
 function EFFECT:Init(data)
 	self.LockEnt		=	data:GetEntity();
+	if !self.LockEnt then return false end
 	
 	local a=self.LockEnt:GetAngles();
 	local b=data:GetAngle();
@@ -45,11 +46,11 @@ function EFFECT:Init(data)
 	
 end
 
-function EFFECT:Think( )
+function EFFECT:Think()
 	local timeleft=self.EndsAt-CurTime();
 
 	--Kill the effect if it expires or we lose the entity OR if if the weld completed
-	if timeleft<0 || !self.LockEnt || !self.LockEnt:IsValid() || self.LockEnt:GetParent()!=nil then return false; end
+	if !self.LockEnt || !self.LockEnt:IsValid() || timeleft<0 || self.LockEnt:GetParent()!=nil then return false; end
 	
 	local f=timeleft*2;	--(timeleft will at most be .5; 2 * .5 = 1)
 	

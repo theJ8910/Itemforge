@@ -65,6 +65,9 @@ OR OTHER SCRIPTS
 
 
 --[[
+* SHARED
+* Protected
+
 Removes the item.
 ]]--
 function ITEM:Remove()
@@ -73,6 +76,9 @@ end
 IF.Items:ProtectKey("Remove");
 
 --[[
+* SHARED
+* Protected
+
 This function puts an item inside of an inventory.
 inv is the inventory to add the item to.
 slot is an optional number that requests a certain slot to insert the item into. This should be the slot number you want to place the item in (starting at 1), or nil if any slot will do.
@@ -220,6 +226,9 @@ ITEM.ToInv=ITEM.ToInventory;
 IF.Items:ProtectKey("ToInv");
 
 --[[
+* SHARED
+* Protected
+
 Serverside, this function places the item in the world (as an entity).
 Clientside, this function is called when the item binds with it's world entity.
 vPos is a Vector() describing the position in the world the entity should be created at.
@@ -297,6 +306,9 @@ end
 IF.Items:ProtectKey("ToWorld");
 
 --[[
+* SHARED
+* Protected
+
 This function makes the given player hold this item as a weapon. 
 pl should be a player entity.
 bNoMerge is an optional true/false. If the player given is already holding a stack of items of this type (ex: player is holding a handful of pebbles, and is trying to :Hold() more pebbles), and bNoMerge is:
@@ -390,6 +402,9 @@ end
 IF.Items:ProtectKey("Hold");
 
 --[[
+* SHARED
+* Protected
+
 Moves this item to the same location as another item
 extItem should be an existing item. If extItem is:
 	In the world, this item is moved to the world at the exact same position and angles. Additionally, this item will be travelling at the same velocity as extItem when it is created.
@@ -473,6 +488,9 @@ end
 IF.Items:ProtectKey("ToSameLocationAs");
 
 --[[
+* SHARED
+* Protected
+
 ToVoid releases a held item, removes the item from the world, or takes an item out of an inventory. Or in other words, it places the item in the void.
 It isn't necessary to send an item to the void after it's created - the item is already in the void.
 
@@ -551,6 +569,9 @@ end
 IF.Items:ProtectKey("ToVoid");
 
 --[[
+* SHARED
+* Protected
+
 Sets the size of every item in the stack.
 Size has nothing to do with weight or how big the item looks.
 The only thing size determines is if an item can be placed inside of an inventory that has a size limit.
@@ -561,6 +582,9 @@ end
 IF.Items:ProtectKey("SetSize");
 
 --[[
+* SHARED
+* Protected
+
 This sets the model color/icon color of this item.
 ]]--
 function ITEM:SetColor(cCol)
@@ -569,6 +593,9 @@ end
 IF.Items:ProtectKey("SetColor");
 
 --[[
+* SHARED
+* Protected
+
 This sets the override material this item uses for it's model.
 ]]--
 function ITEM:SetOverrideMaterial(sMat)
@@ -584,6 +611,9 @@ IF.Items:ProtectKey("SetOverrideMaterial");
 
 
 --[[
+* SHARED
+* Protected
+
 Returns the itemtype of this item
 For example "base_item", "item_crowbar", etc...
 ]]--
@@ -592,13 +622,21 @@ function ITEM:GetType()
 end
 IF.Items:ProtectKey("GetType");
 
---Returns the item/stack's ID.
+--[[
+* SHARED
+* Protected
+
+Returns the item/stack's ID.
+]]--
 function ITEM:GetID()
 	return self.ID;
 end
 IF.Items:ProtectKey("GetID");
 
 --[[
+* SHARED
+* Protected
+
 Returns this item's random number. Generates a random number for the item if it doesn't have one yet.
 ]]--
 function ITEM:GetRand()
@@ -607,13 +645,21 @@ function ITEM:GetRand()
 end
 IF.Items:ProtectKey("GetRand");
 
---Get the size of an item in the stack (they all are the same size).
+--[[
+* SHARED
+* Protected
+
+Get the size of an item in the stack (they all are the same size).
+]]--
 function ITEM:GetSize()
 	return self:GetNWInt("Size");
 end
 IF.Items:ProtectKey("GetSize");
 
 --[[
+* SHARED
+* Protected
+
 Returns the world model.
 ]]--
 function ITEM:GetWorldModel()
@@ -622,6 +668,9 @@ end
 IF.Items:ProtectKey("GetWorldModel");
 
 --[[
+* SHARED
+* Protected
+
 Returns the view model.
 ]]--
 function ITEM:GetViewModel()
@@ -630,6 +679,9 @@ end
 IF.Items:ProtectKey("GetViewModel");
 
 --[[
+* SHARED
+* Protected
+
 This returns the current model color/icon color of this item.
 ]]--
 function ITEM:GetColor()
@@ -638,6 +690,9 @@ end
 IF.Items:ProtectKey("GetColor");
 
 --[[
+* SHARED
+* Protected
+
 This returns the override material this item uses for it's model.
 ]]--
 function ITEM:GetOverrideMaterial()
@@ -646,6 +701,9 @@ end
 IF.Items:ProtectKey("GetOverrideMaterial");
 
 --[[
+* SHARED
+* Protected
+
 Returns the player who is NetOwner of this item.
 The NetOwner is the player who receives networked data about this item.
 If the NetOwner is nil, everybody receives networked data about this item.
@@ -666,6 +724,9 @@ end
 IF.Items:ProtectKey("GetOwner");
 
 --[[
+* SHARED
+* Protected
+
 If the item is in the world, returns the item's world entity.
 If the item is held by a player, in an inventory, or in the void, this function returns nil.
 Doing :IsValid() on an entity returned from here is not necessary; if this function returns an entity, it is always valid.
@@ -679,6 +740,9 @@ end
 IF.Items:ProtectKey("GetEntity");
 
 --[[
+* SHARED
+* Protected
+
 If the item is being held, returns it's weapon.
 If the item is in the world, in an inventory, or in the void, this function returns nil.
 Doing :IsValid() on a weapon returned from here is not necessary; if this function returns a weapon, it is always valid.
@@ -692,6 +756,9 @@ end
 IF.Items:ProtectKey("GetWeapon");
 
 --[[
+* SHARED
+* Protected
+
 Returns the player who is holding this item as a weapon (the Weapon Owner; this is equivilent to self.Owner in an SWEP).
 If the item has been put into an SWEP, but no player is holding it yet, nil is returned (this occasionally happens).
 If the item isn't being held as a weapon, this returns nil.
@@ -705,6 +772,9 @@ end
 IF.Items:ProtectKey("GetWOwner");
 
 --[[
+* SHARED
+* Protected
+
 Returns two values: The inventory the item is in, and the slot that it's occupying in this inventory.
 If the item isn't in an inventory, it returns nil,0.
 If the inventory isn't valid any longer (or if the item isn't in the inventory any longer) it's set to nil and nil,0 is returned
@@ -727,6 +797,9 @@ end
 IF.Items:ProtectKey("GetContainer");
 
 --[[
+* SHARED
+* Protected
+
 Returns the item's position in the world.
 What is returned depends on the state the item is in.
 If the item is in the world as an entity, the entity's position is returned.
@@ -764,6 +837,9 @@ end
 IF.Items:ProtectKey("GetPos");
 
 --[[
+* SHARED
+* Protected
+
 Is this item in an inventory? (a specific inventory?) (a specific slot?)
 inv is an optional argument.
 slot is an optional argument.
@@ -798,7 +874,12 @@ IF.Items:ProtectKey("InInventory");
 ITEM.InInv=ITEM.InInventory;
 IF.Items:ProtectKey("InInv");
 
---Returns true if the item is in the world
+--[[
+* SHARED
+* Protected
+
+Returns true if the item is in the world
+]]--
 function ITEM:InWorld()
 	local ent=self:GetEntity();
 	if ent then return true; end
@@ -807,6 +888,9 @@ end
 IF.Items:ProtectKey("InWorld");
 
 --[[
+* SHARED
+* Protected
+
 Returns true if the item is being held as a weapon
 byPlayer is an optional argument.
 	If byPlayer isn't given, then true will be returned if the item is held by any player at all.
@@ -835,7 +919,12 @@ function ITEM:IsHeld(byPlayer)
 end
 IF.Items:ProtectKey("IsHeld");
 
---Returns true if the item is not held, in the world, or in an inventory
+--[[
+* SHARED
+* Protected
+
+Returns true if the item is not held, in the world, or in an inventory
+]]--
 function ITEM:InVoid()
 	if !self:GetEntity() && !self:GetWeapon() && !self:GetContainer() then
 		return true;
@@ -845,6 +934,9 @@ end
 IF.Items:ProtectKey("InVoid");
 
 --[[
+* SHARED
+* Protected
+
 Protected OnExitWorld event.
 Stops all looping sounds and then runs the overridable OnExitWorld event.
 ]]--
@@ -856,13 +948,21 @@ function ITEM:OnExitWorldSafe(forced)
 end
 IF.Items:ProtectKey("OnExitWorldSafe");
 
---Run this to start the item's Think event. Think is off by default.
+--[[
+* SHARED
+* Protected
+
+Run this to start the item's Think event. Think is off by default.
+]]--
 function ITEM:StartThink()
 	timer.Create("if_itemthink_"..self:GetID(),self.ThinkRate,0,self.OnThink,self);
 end
 IF.Items:ProtectKey("StartThink");
 
 --[[
+* SHARED
+* Protected
+
 Set the think rate. Set this to 0 to trigger the think every frame.
 Note that if the item is currently thinking (after StartThink()), calling this function cancels the think timer and restarts it at the new speed
 ]]--
@@ -875,7 +975,12 @@ function ITEM:SetThinkRate(rate)
 end
 IF.Items:ProtectKey("SetThinkRate");
 
---Run this to stop the item's Think event. Think is off by default.
+--[[
+* SHARED
+* Protected
+
+Run this to stop the item's Think event. Think is off by default.
+]]--
 function ITEM:StopThink()
 	local n="if_itemthink_"..self:GetID();
 	if timer.IsTimer(n) then timer.Remove(n) end
@@ -895,6 +1000,9 @@ These functions are called internally by Itemforge. There should be no reason fo
 
 
 --[[
+* SHARED
+* Protected
+
 This is called when the item is created. This is NOT called when the item is placed into the world.
 This function will call the item's OnInit event.
 
@@ -908,6 +1016,9 @@ end
 IF.Items:ProtectKey("Initialize");
 
 --[[
+* SHARED
+* Protected
+
 Sets the item's entity. Whenever an item is in the world, a SENT is created.
 We need to link this SENT with the item, so the item can refer to it later.
 ent must be a valid "itemforge_item" entity, or this function will fail. If for some reason a different SENT needs to be used, I'll consider allowing different SENTS to be used.
@@ -924,6 +1035,9 @@ end
 IF.Items:ProtectKey("SetEntity");
 
 --[[
+* SHARED
+* Protected
+
 Clears the item's entity.
 
 This function is called internally by Itemforge. There should be no reason for a scripter to call this.
@@ -934,6 +1048,9 @@ end
 IF.Items:ProtectKey("ClearEntity");
 
 --[[
+* SHARED
+* Protected
+
 Sets this item's weapon. Whenever an item is held, an SWEP is created.
 We need to link this SWEP with the item, so the item can refer to it later.
 ent must be a valid itemforge_item_held_* entity, or this function will fail. If for some reason a different SWEP needs to be used, I'll consider allowing different SWEPs to be used.
@@ -950,6 +1067,9 @@ end
 IF.Items:ProtectKey("SetWeapon")
 
 --[[
+* SHARED
+* Protected
+
 Sets this item's owner. Whenever an item is held, an SWEP is created.
 We need to record what player is holding this SWEP so the item can refer to him later.
 pl must be a valid player or this function will fail.
@@ -966,6 +1086,9 @@ end
 IF.Items:ProtectKey("SetWOwner")
 
 --[[
+* SHARED
+* Protected
+
 Clears this item's weapon and weapon owner.
 
 This function is called internally by Itemforge. There should be no reason for a scripter to call this.
@@ -978,6 +1101,9 @@ end
 IF.Items:ProtectKey("ClearWeapon");
 
 --[[
+* SHARED
+* Protected
+
 Sets the item's container (inventory that this item is inside of).
 
 This function is called internally by Itemforge. There should be no reason for a scripter to call this.
@@ -989,6 +1115,9 @@ end
 IF.Items:ProtectKey("SetContainer");
 
 --[[
+* SHARED
+* Protected
+
 Clears this item's container (inventory that this item is inside of).
 If inv is given, inv must match this item's set container.
 	This is just in case we're expecting a certain inventory to be cleared and something goes wrong because of something like netsync.
@@ -1003,6 +1132,9 @@ end
 IF.Items:ProtectKey("ClearContainer");
 
 --[[
+* SHARED
+* Protected
+
 Adds an inventory to this item's list of connected inventories.
 Connect an inventory with inv:ConnectItem(item), not this function
 true is returned if successful, false otherwise
@@ -1030,6 +1162,9 @@ end
 IF.Items:ProtectKey("ConnectInventory");
 
 --[[
+* SHARED
+* Protected
+
 Removes a connected inventory from this item's list of connected inventories.
 Sever an inventory with inv:SeverItem(item), not this function
 
@@ -1049,22 +1184,15 @@ function ITEM:SeverInventory(inv)
 end
 IF.Items:ProtectKey("SeverInventory");
 
+--[[
+* SHARED
+* Protected
+
+If the given inventory is connected to this item, returns the index of the connection on this item.
+]]--
 function ITEM:GetInventoryConnectionSlot(invid)
 	if !invid											then return self:Error("Couldn't grab connection slot that this item is occupying on an inventory. The inventory ID wasn't given.\n") end
 	if !self.Inventories || !self.Inventories[invid]	then return self:Error("Couldn't grab connection slot that this item is occupying on an inventory. This inventory isn't connected to this item.\n") end
 	return self.Inventories[invid].ConnectionSlot;
 end
 IF.Items:ProtectKey("GetInventoryConnectionSlot");
-
---[[
-When tostring() is performed on an item reference, it returns a string containing some information about the item.
-Format: "Item ID [ITEM_TYPE]xAMT"
-Ex:		"Item 5 [item_crowbar]" (Item 5, a single crowbar)
-Ex:		"Item 3 [item_rock]x53" (Item 3, a stack of 53 item_rocks)
-Ex:		"Object [invalid]" (used to be some kind of object, invalid/has been removed/no longer exists)
-Ex:		"Inventory 2" (Is inventory 2)
-]]--
-function ITEM:ToString()
-	if self:GetMaxAmount()!=1 then	return "Item "..self:GetID().." ["..self:GetType().." x "..self:GetAmount().."]";
-	else							return "Item "..self:GetID().." ["..self:GetType().."]"; end
-end

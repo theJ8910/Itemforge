@@ -6,6 +6,9 @@ This SWEP is an 'avatar' of an item. When an item is held, this weapon represent
 ]]--
 include("makecopy.lua");
 
+--HACK
+local RegWeapons={};
+
 SWEP.Author			= "theJ89"
 SWEP.Contact		= "theJ89@charter.net"
 SWEP.Purpose		= "This SWEP is a part of Itemforge. When an item is held, this weapon turns into the item you're holding."
@@ -33,6 +36,41 @@ SWEP.ViewModelFlip	= false;
 
 SWEP.BeingRemoved=false;
 
+--HACK
+SWEP.RegWeaponID		= nil;
+SWEP.DeployedLastFrame	= false;
+function SWEP:Initialize()
+	self:Register()
+end
+
+--HACK
+function SWEP:Register()
+	RegWeapons[self:EntIndex()]=self;
+end
+
+--HACK
+function SWEP:Unregister()
+	RegWeapons[self:EntIndex()]=nil;
+end
+
+--Weapon is being put away
+function SWEP:IFHolster(wep)
+	local item=self:GetItem();
+	if !item then return true end
+		
+	return item:Event("OnHolster",true);
+end
+
+--Weapon is being swapped to
+function SWEP:IFDeploy()
+	self:UpdateViewmodel();
+	
+	local item=self:GetItem();
+	if !item then return true end
+	
+	return item:Event("OnDeploy",true);
+end
+
 --Set item this is associated with
 function SWEP:SetItem(item)
 	if self.BeingRemoved || !item then return false end
@@ -49,6 +87,7 @@ function SWEP:SetItem(item)
 		self.Weapon:Spawn();
 	else
 		item:Hold(self.Owner,nil,self.Weapon,false);
+		self:UpdateViewmodel();
 	end
 	return true;
 end
@@ -58,6 +97,18 @@ function SWEP:IsBeingRemoved()
 	return self.BeingRemoved;
 end
 
+function SWEP:UpdateViewmodel()
+	local pl=self.Owner;
+	if !pl || self.Weapon!=pl:GetActiveWeapon() then return false end
+	
+	if SERVER || pl==LocalPlayer() then
+		local vm=pl:GetViewModel();
+		vm:SetModel(self.ViewModel);
+		vm:ResetSequenceInfo();
+	end
+	
+	return true;
+end
 
 --[[
 Returns the item that is piloting this SWEP.
@@ -81,10 +132,6 @@ function SWEP:HasOwner()
 	if self.Owner && self.Owner:IsValid() then return true; end
 	return false;
 end
-
-function SWEP:Initialize()
-end
-
 
 --Do we need to precache anything?
 function SWEP:Precache()
@@ -143,3 +190,22 @@ end
 function ENT:IsBeingRemoved()
 	return self.BeingRemoved;
 end
+
+--HACK - I hate hate HATE having to do this!
+hook.Add("Think","itemforge_holster_deploy_think",function()
+	for k,v in pairs(RegWeapons) do
+		--Acquire ASAP
+		if CLIENT then v:GetItem(); end
+		
+		--HACK until garry fixes his shit
+		if v.Owner then
+			local isDeployed=(v.Owner:GetActiveWeapon()==v.Weapon);
+			if !v.DeployedLastFrame && isDeployed then
+				v:IFDeploy();
+			elseif v.DeployedLastFrame && !isDeployed then
+				v:IFHolster();
+			end
+			v.DeployedLastFrame=isDeployed;
+		end
+	end
+end);

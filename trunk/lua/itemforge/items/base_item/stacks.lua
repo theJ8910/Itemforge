@@ -9,6 +9,9 @@ ITEM.StartAmount=1;									--When we spawn this item, how many items will be in
 ITEM.MaxAmount=1;									--How many items of this type will fit in a stack (by default - this can be changed with SetMaxAmount())? Set this to 0 to allow an unlimited amount of items of this type to be stored in a stack. EX: Should 1000 shuriken be able to occupy a single slot in an inventory, or should 30 shuriken occupy one slot?
 
 --[[
+* SHARED
+* Protected
+
 Returns true if the item is stackable (It's MaxAmount isn't 1)
 ]]--
 function ITEM:IsStack()
@@ -17,6 +20,9 @@ end
 IF.Items:ProtectKey("IsStack");
 
 --[[
+* SHARED
+* Protected
+
 Get the number of items in the stack.
 ]]--
 function ITEM:GetAmount()
@@ -25,6 +31,9 @@ end
 IF.Items:ProtectKey("GetAmount");
 
 --[[
+* SHARED
+* Protected
+
 Get the max number of items of the same type that can be in this stack.
 ]]--
 function ITEM:GetMaxAmount()
@@ -33,6 +42,20 @@ end
 IF.Items:ProtectKey("GetMaxAmount");
 
 --[[
+* SHARED
+* Protected
+ 
+ Returns the starting amount (the default number of items in a stack of this type).
+]]--
+function ITEM:GetStartAmount()
+	return self.StartAmount;
+end
+IF.Items:ProtectKey("GetStartAmount");
+
+--[[
+* SHARED
+* Protected
+
 This function sets the number of items in the stack.
 If a new amount is set on the server, the clients are updated with the new amount as well.
 If this item is in an inventory with a weight cap, we'll check to see if the new stack weight breaks the weight cap. If it does, false is returned.
@@ -75,6 +98,9 @@ end
 IF.Items:ProtectKey("SetAmount");
 
 --[[
+* SHARED
+* Protected
+
 Adds onto the number of items in this stack.
 bPredict is an optional true/false. If this is true, we won't change the amount, we'll just return true if it can be changed.
 Returns true if the given number of items were subtracted, and false otherwise.
@@ -85,6 +111,9 @@ end
 IF.Items:ProtectKey("AddAmount");
 
 --[[
+* SHARED
+* Protected
+
 Subtracts from the number of items in this stack.
 bPredict is an optional true/false. If this is true, we won't change the amount, we'll just return true if it can be changed.
 Returns true if the given number of items were subtracted, and false otherwise.
@@ -95,6 +124,9 @@ end
 IF.Items:ProtectKey("SubAmount");
 
 --[[
+* SHARED
+* Protected
+
 This function moves items from this stack to another stack.
 amt is the number of items to transfer to the stack.
 	This should be between 1 and the number of items in this stack (you can get that with self:GetAmount())
@@ -122,6 +154,9 @@ end
 IF.Items:ProtectKey("Transfer");
 
 --[[
+* SHARED
+* Protected
+
 Merge this stack of items with another/several stacks of items.
 
 The stacks given will be removed and their amounts added to this stack's amount.
@@ -293,6 +328,9 @@ end
 IF.Items:ProtectKey("Merge");
 
 --[[
+* SHARED
+* Protected
+
 Split this pile of items into two or more piles.
 
 The arguments for this function are like so:
@@ -426,6 +464,9 @@ if SERVER then
 
 
 --[[
+* SERVER
+* Protected
+
 Set max number of items in the stack.
 Give 0 for maxamount to allow an unlimited number of items in the stack.
 Give 1 for maxamount to indicate that this item is not a stack

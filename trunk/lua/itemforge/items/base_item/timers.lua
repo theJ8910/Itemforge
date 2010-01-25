@@ -12,6 +12,9 @@ ITEM.Timers=nil;			--Timers started on this item are recorded here. When the ite
 ITEM.LastSimpleTimer=1;		--Last simple timer (recorded here so we don't search from the beginning every time)
 
 --[[
+* SHARED
+* Protected
+
 Starts a timer connected to this item.
 See AdjustTimer below for an explanation of the arguments
 ]]--
@@ -35,6 +38,9 @@ end
 IF.Items:ProtectKey("CreateTimer");
 
 --[[
+* SHARED
+* Protected
+
 Starts a timer connected to this item.
 Simple timers only runs once, and are assigned an unused unique ID (that is, this function will ALWAYS start a new timer).
 fCallback should be the function that will be called when the timer ends. This function will be given this item as it's first argument.
@@ -66,10 +72,17 @@ end
 IF.Items:ProtectKey("SimpleTimer");
 
 --[[
+* SHARED
+* Protected
+
 Creates a timer without starting it, or changes an existing timer.
 vID should be a unique string or int that is used to identify this timer. Example: "ThrowTimer", "ExplodeTimer", "TickTimer", etc
-delay should be the time (in seconds) to wait before calling the given function. This can be a fraction too like 2.5 seconds for 2 and a half seconds.
-reps is an optional number of times this timer repeats before being removed. If this is nil or not given, this defaults to 1.
+delay should be the time (in seconds) to wait before calling the given function.
+	This can be a fraction too like 2.5 seconds for 2 and a half seconds.
+	A value of 0 does NOT trigger the timer right after calling this function. Instead, the timer will be triggered the next frame.
+reps is an optional number of times this timer repeats before being removed.
+	If this is nil or not given, this defaults to 1.
+	A value of 0 will make the timer repeat indefinitely until it is removed/destroyed.
 fCallback should be the function that will be called when the timer ends. This function will be given this item as it's first argument.
 Any other arguments given to StartTimer will be given to fCallback whenever it runs. So if you did:
 	function ITEM:WatchAlarm(player)
@@ -100,6 +113,9 @@ end
 IF.Items:ProtectKey("AdjustTimer");
 
 --[[
+* SHARED
+* Protected
+
 Starts (or restarts) a timer on this item
 Returns true if the timer is [re]started, or false if not.
 ]]--
@@ -110,6 +126,9 @@ end
 IF.Items:ProtectKey("StartTimer");
 
 --[[
+* SHARED
+* Protected
+
 Stops a timer on this item.
 NOTE: Stopping a timer is not the same as pausing it; a timer must start all over (with StartTimer) after it has been stopped.
 
@@ -122,6 +141,9 @@ end
 IF.Items:ProtectKey("StopTimer");
 
 --[[
+* SHARED
+* Protected
+
 Pauses a timer on this item.
 NOTE: Pausing a timer is not the same as stopping it; when a timer is unpaused, it will continue where it left off (ex: if a 5 second timer is paused at 4 seconds, then 1 second after being unpaused it will finish)
 
@@ -135,6 +157,9 @@ end
 IF.Items:ProtectKey("PauseTimer");
 
 --[[
+* SHARED
+* Protected
+
 Unpauses a timer on this item.
 NOTE: Unpausing a timer is not the same as starting it; when a timer is unpaused, it will continue where it was paused. If the timer is restarted, then it starts the timer from the beginning again.
 
@@ -150,6 +175,9 @@ ITEM.UnpauseTimer=ITEM.UnPauseTimer;
 IF.Items:ProtectKey("UnpauseTimer");
 
 --[[
+* SHARED
+* Protected
+
 Toggles the timer between paused and unpaused.
 
 Returns true if the timer was paused or unpaused.
@@ -162,6 +190,9 @@ end
 IF.Items:ProtectKey("ToggleTimer");
 
 --[[
+* SHARED
+* Protected
+
 Is there a timer with a certain ID on this item?
 vID can be a string or integer.
 Returns true if there's a timer with the given ID on this item, or false otherwise.
@@ -172,6 +203,9 @@ end
 IF.Items:ProtectKey("HasTimer");
 
 --[[
+* SHARED
+* Protected
+
 Permanantly stops an active timer.
 Returns false if the timer was not found or couldn't be stopped for some reason, and true if it was stopped successfully.
 ]]--
@@ -187,6 +221,9 @@ ITEM.RemoveTimer=ITEM.DestroyTimer;
 IF.Items:ProtectKey("RemoveTimer");
 
 --[[
+* SHARED
+* Protected
+
 Permanantly stops all active timers on this item.
 Returns true if all timers were removed successfully (or if there were no timers).
 ]]--

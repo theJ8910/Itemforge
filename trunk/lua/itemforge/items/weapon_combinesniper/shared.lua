@@ -10,7 +10,7 @@ Modified Episode 2 Sniper Rifle world model, view model, materials and sounds an
 if SERVER then
 	AddCSLuaFile("shared.lua");
 	
-	--These are some resources related to this weapon
+	--These are some resources related to this weapon that clients need to download
 	resource.AddFile("materials/jaanus/ep2snip_parascope.vmt");
 	resource.AddFile("materials/jaanus/ep2snip_parascope.vtf");
 	resource.AddFile("materials/jaanus/sniper_corner.vmt");
@@ -20,12 +20,15 @@ if SERVER then
 	resource.AddFile("materials/jaanus/w_sniper_new_n.vtf");
 	resource.AddFile("materials/jaanus/w_sniper_phong.vtf");
 	
+	--Download view model files
 	resource.AddFile("models/weapons/v_combinesniper_e2.mdl");
 	resource.AddFile("models/weapons/v_combinesniper_e2.dx80.vtx");
 	resource.AddFile("models/weapons/v_combinesniper_e2.dx90.vtx");
 	resource.AddFile("models/weapons/v_combinesniper_e2.sw.vtx");
 	resource.AddFile("models/weapons/v_combinesniper_e2.xbox.vtx");
 	resource.AddFile("models/weapons/v_combinesniper_e2.vvd");
+	
+	--Download world model files
 	resource.AddFile("models/weapons/w_combinesniper_e2.mdl");
 	resource.AddFile("models/weapons/w_combinesniper_e2.phy");
 	resource.AddFile("models/weapons/w_combinesniper_e2.dx80.vtx");
@@ -34,6 +37,7 @@ if SERVER then
 	resource.AddFile("models/weapons/w_combinesniper_e2.xbox.vtx");
 	resource.AddFile("models/weapons/w_combinesniper_e2.vvd");
 	
+	--Download sounds
 	resource.AddFile("sound/jaanus/ep2sniper_empty.wav");
 	resource.AddFile("sound/jaanus/ep2sniper_fire.wav");
 	resource.AddFile("sound/jaanus/ep2sniper_reload.wav");
@@ -56,7 +60,7 @@ if SERVER then ITEM.HoldType="shotgun"; end
 
 --Overridden Base Weapon stuff
 ITEM.PrimaryDelay=1.25;
-ITEM.SecondaryDelay=0.5;
+ITEM.SecondaryDelay=0.1;
 
 --Overridden Base Ranged Weapon stuff
 ITEM.Clips={};
@@ -98,18 +102,17 @@ When a player is holding it and tries to secondary attack
 ]]--
 function ITEM:OnSecondaryAttack()
 	if !self["base_weapon"].OnSecondaryAttack(self) then return false end
-	--Zoom in
 	
-	--Toggle laser sight for now
-	local isOn=self:GetNWBool("LaserSight");
-	if isOn then
+	--Zoom in
+	local iZL=self:GetNWInt("ZoomLevel");
+	if iZL==4 then
 		self:EmitSound(self.ZoomOutSound,true);
-		if CLIENT then self.CurrentZoom=0; end
+		self:SetNWInt("ZoomLevel",0);
 	else
-		self:EmitSound(self.ZoomInSound,true);
+		if iZL==0 then self:EmitSound(self.ZoomInSound,true); end
+		self:SetNWInt("ZoomLevel",iZL+1);
 	end
 	
-	self:SetNWBool("LaserSight",!isOn);
 	self:SetNextSecondary(CurTime()+0.1);
 	
 	return true;
@@ -125,9 +128,9 @@ if CLIENT then
 
 ITEM.ZoomTime=70;			--We zoom in/out these many degrees in one second
 ITEM.CurrentZoom=0;			--How many degrees are we currently zoomed in at
-ITEM.TargetZoom=50;			--What do we want to zoom in at
+ITEM.TargetZoom=0;			--What do we want to zoom in at
 ITEM.LastThinkAt=nil;		--What was the last time the item thought at
-
+ITEM.ZoomLevels={0,40,50,60,70};
 --Laser related
 ITEM.LaserMat=Material("sprites/bluelaser1");
 ITEM.LaserSize=2;
@@ -210,6 +213,10 @@ ITEM.ScopePolies={
 	}
 }
 
+function ITEM:IsOwnerThirdperson()
+	return GetViewEntity()!=LocalPlayer();
+end
+
 --[[
 Draws a laser beam from one point to another. Draws a hit sprite at to.
 ]]--
@@ -242,7 +249,7 @@ end
 
 function ITEM:OnDraw3D(eEntity,bTranslucent)
 	self["base_firearm"].OnDraw3D(self,eEntity,bTranslucent);
-	if !self:GetNWBool("LaserSight") then return end
+	if self:GetNWInt("ZoomLevel")<1 then return end
 	
 	local ap=self:GetLaserWorldAP(eEntity);
 	local muzzle=self:GetMuzzle(eEntity);
@@ -253,6 +260,7 @@ function ITEM:OnDraw3D(eEntity,bTranslucent)
 		tr.start=ap.Pos;
 		tr.endpos=ap.Pos+(muzzle.Ang:Forward()*16384);			--The model is messed up a bit. The laser attachment point is not facing the same direction as the muzzle.
 		tr.filter=eEntity;
+		tr.mask=MASK_SHOT;
 		
 		local traceRes=util.TraceLine(tr);
 		self:DrawBeam(eEntity,ap.Pos,traceRes.HitPos);
@@ -265,7 +273,8 @@ function ITEM:OnDraw3D(eEntity,bTranslucent)
 		local tr={};
 		tr.start=eyes;
 		tr.endpos=eyes+(pl:EyeAngles():Forward()*16384);
-		tr.filter=eEntity;
+		tr.filter={pl,eEntity};
+		tr.mask=MASK_SHOT;
 		
 		local traceRes=util.TraceLine(tr);
 		self:DrawBeam(eEntity,ap.Pos,traceRes.HitPos);
@@ -281,7 +290,7 @@ end
 
 function ITEM:OnThink()
 	self["base_firearm"].OnThink(self);
-	if !self:IsHeld() || !self:GetNWBool("LaserSight") then return false end
+	if !self:IsHeld() || self:GetNWInt("ZoomLevel")<2 then return false end
 	
 	if !self.LastThinkAt then self.LastThinkAt=CurTime() end
 	
@@ -296,7 +305,7 @@ function ITEM:OnThink()
 end
 
 function ITEM:OnSWEPDrawViewmodel()
-	if !self:GetNWBool("LaserSight") then return end
+	if self:GetNWInt("ZoomLevel")==0 then return end
 	
 	self["base_firearm"].OnSWEPDrawViewmodel(self);
 	local pl=LocalPlayer();
@@ -307,29 +316,29 @@ function ITEM:OnSWEPDrawViewmodel()
 	local tr={};
 	tr.start=eyes;
 	tr.endpos=eyes+(pl:EyeAngles():Forward()*16384);
-	tr.filter=vm;
+	tr.filter={pl,vm};
+	tr.mask=MASK_SHOT;
 	local traceRes=util.TraceLine(tr);
 	
 	self:DrawBeam(nil,ap.Pos,traceRes.HitPos);
 end
 
---This function is run when it comes time to draw something on the player's HUD. This will only happen while a player is holding an item and has the weapon out.
+--[[
+This will only happen while the local player is holding an item and has the weapon out.
+]]--
 function ITEM:OnSWEPDrawHUD()
-	if !self:GetNWBool("LaserSight") then return end
-		
-	
-	
+	if self:GetNWInt("ZoomLevel")<2 || self:IsOwnerThirdperson() then return end
 	
 	surface.SetDrawColor(0,0,0,255);
 	--Draw black bars to the left & right of scope if necessary
 	if sx>0 then
-		surface.DrawRect(0,0,sx,ScrH());
-		surface.DrawRect(sx+m,0,sx,ScrH());
+		surface.DrawRect(0,0,		sx+1,ScrH());
+		surface.DrawRect(sx+m-1,0,	sx+2,ScrH());
 	end
 	--Draw black bars above & below of scope if necessary
 	if sy>0 then
-		surface.DrawRect(sx,0,m,sy);
-		surface.DrawRect(sx,sy+m,m,sy);
+		surface.DrawRect(0,0,		ScrW(),sy+1);
+		surface.DrawRect(sx,sy+m-1,	ScrW(),sy+2);
 	end
 	
 	--Draw scope corner by corner
@@ -347,7 +356,8 @@ end
 
 --Performs the sniper rifle's zoom function if applicable
 function ITEM:OnSWEPTranslateFOV(current_fov)
-	return current_fov-self.CurrentZoom;
+	--We don't want to perform a zoom if the owner is thirdperson
+	return (self:IsOwnerThirdperson() && current_fov) || current_fov-self.CurrentZoom;
 end
 
 --Freezes the view when zooming in/out with the mouse
@@ -360,9 +370,17 @@ function ITEM:OnSWEPAdjustMouseSensitivity()
 	return nil;
 end
 
+function ITEM:OnSetNWVar(k,v)
+	self["base_ranged"].OnSetNWVar(self,k,v);
+	if k=="ZoomLevel" then
+		if v==0 then self.CurrentZoom=0; end
+		self:ZoomTo(self.ZoomLevels[v+1]);
+	end
+end
+
 
 
 
 end
 
-IF.Items:CreateNWVar(ITEM,"LaserSight","bool",false,true);
+IF.Items:CreateNWVar(ITEM,"ZoomLevel","int",0,true);

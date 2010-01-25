@@ -949,9 +949,7 @@ Returns nil otherwise.
 ]]--
 function MODULE:GetWeaponItem(eWep)
 	if !eWep || !eWep:IsValid() then return nil end
-	for i=1,self.MaxHeldItems do
-		if eWep:GetClass()=="itemforge_item_held_"..i then return eWep:GetItem() end
-	end
+	if string.find(eWep:GetClass(),"itemforge_item_held_[1-"..IF.Items.MaxHeldItems.."]") then return eWep:GetItem() end
 	return nil;
 end
 

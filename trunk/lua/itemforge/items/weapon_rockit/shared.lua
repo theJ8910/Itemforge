@@ -69,10 +69,7 @@ function ITEM:OnReload()
 	if !self:CanReload() then return false end
 
 	return self:FindAmmo(function(self,item)
-		if self:Load(item,i) then
-			return true;
-		end
-		return false;
+		return self:Load(item,i);
 	end);
 end
 
@@ -83,8 +80,10 @@ When this function is called we load items into the gun's inventory instead of t
 function ITEM:Load(item,clip,amt)
 	if !self:CanReload() then return false end
 	
+	local pl=item:GetWOwner();
+	
 	--TODO when clientside prediction comes the item==self check won't be necessary since the inv will deny it
-	if !item || !item:IsValid() || item==self then return false end
+	if !item || !item:IsValid() || (pl && pl==item:GetWOwner()) || item==self then return false end
 	
 	--Can't load items into a non-existent inventory
 	local inv=self:GetInventory();
@@ -92,7 +91,7 @@ function ITEM:Load(item,clip,amt)
 	
 	--If we don't insert the item successfully we fail.
 	if SERVER then
-		if !item:ToInv(inv) then return false end
+		if !item:ToInv(inv) && item:IsValid() then return false end
 		self:UpdateWireAmmoCount();
 	end
 	
@@ -135,6 +134,12 @@ function ITEM:Chuck(speed)
 	local item=self:GetAmmo(self.PrimaryClip);
 	if !item then return false end
 	
+	local clump=item:GetStartAmount();
+	if item:GetAmount()>clump then
+		item=item:Split(clump,false);
+		if !item then return false end
+	end
+	
 	if self:IsHeld() then
 		local pOwner=self:GetWOwner();
 		
@@ -172,6 +177,71 @@ function ITEM:Chuck(speed)
 		item:ToInv(inv);
 	end
 	return false;
+end
+
+--[[
+Applies suction force to objects in a funnel positioned at a given origin at given angles.
+
+vOrigin is the origin of the funnel. 
+vDir is a vector describing the direction the funnel is facing.
+
+When the funnel is facing Vector(1,0,0) the funnel opens to the right like so (where o s in origin):
+
+         :
+       _.
+    __`
+ ```
+o
+ ```--._
+        `
+         :
+]]--
+
+local aZero=Angle(0,0,0);
+local vZero=Vector(0,0,0);
+local fSuctionPower=300
+--The funnel begins at x=0, ends at x=fFunnelLength. At it's origin (x=0) it has a radius of fInnerRadius+1 units. At it's wide end, it has a radius of fFunnelWideRadius units.
+local fFunnelLength=1000;
+local fFunnelLengthInv=1/fFunnelLength;
+local fInnerRadius=10;
+local fFunnelWideRadius=3000;
+--The equation we use to generate the funnel: y=fInnerRadius + fA^x. "fA" must be this number if we want y=fFunnelWideRadius when x=fFunnelLength.
+local fA=math.pow(fFunnelWideRadius-fInnerRadius,fFunnelLengthInv);
+local BoxBounds=Vector(fFunnelWideRadius,fFunnelWideRadius,fFunnelWideRadius)
+
+function ITEM:Suction(vOrigin,vDir)
+	--[[
+	--We'll start by eliminating any entities that definitely aren't in the funnel by detecting entities in a box around the funnel
+	local vEnd=vOrigin+vDir*fFunnelLength;
+	
+	local ents=ents.FindInBox(vEnd-BoxBounds,vEnd+BoxBounds);
+	local aAng=vDir:Angle();
+	local p,e,r,m,phys;
+	
+		
+	for k,v in ipairs(ents) do
+		for i=0,v:GetPhysicsObjectCount()-1 do
+			phys=v:GetPhysicsObjectNum(i);
+			
+			
+			if phys && phys:IsValid() then
+				p=WorldToLocal(phys:GetPos(),aZero,vOrigin,aAng);
+				e=math.pow(fA,p.x);
+				r=math.sqrt(p.y*p.y+p.z*p.z);
+				
+				--The radius of the funnel, y, at a given x value from the start, is y=fInnerRadius + fA^x.
+				if p.x>=0 && p.x<=400 && r<=fInnerRadius+e then
+					if r > fInnerRadius then	m=e*math.log(fA)*(r/e);
+					else						m=0;
+					end
+					phys:ApplyForceCenter(LocalToWorld(Vector(-1,0,-m):Normalize()*fSuctionPower*((fFunnelLength-p.x)*fFunnelLengthInv),aZero,vZero,aAng));
+				end
+			end
+		end
+	end
+	
+	return true;
+	]]--
 end
 
 IF.Items:CreateNWVar(ITEM,"Unloading","bool",false);

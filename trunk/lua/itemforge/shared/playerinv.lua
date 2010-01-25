@@ -24,6 +24,22 @@ function MODULE:Cleanup()
 	end
 end
 
+--This is more or less the example function from base_ranged/findammo.lua used for locating items in player inventories
+list.Add("Itemforge_BaseRanged_FindAmmo",function(self,fCallback)
+	local pOwner=self:GetWOwner();
+	if !pOwner then return false end
+	local pInv=IF.PlayerInv:GetPlayerInventory(pOwner);
+	if !pInv then return false end
+	
+	for k,v in pairs(pInv:GetItems()) do
+		if fCallback(self,v) then
+			return true;
+		end
+	end
+	
+	return false;
+end)
+
 if SERVER then
 
 
@@ -42,6 +58,12 @@ function MODULE:GivePlayerInventory(pl)
 	return true;
 end
 
+function MODULE:GetPlayerInventory(pl)
+	if !pl || !pl:IsValid() then return nil end
+	if pl.Inventory && !pl.Inventory:IsValid() then pl.Inventory=nil; end
+	return pl.Inventory;
+end
+
 
 
 
@@ -50,15 +72,27 @@ else
 
 
 
+function MODULE:GetPlayerInventory(pl)
+	if !pl || !pl:IsValid() then return nil end
+	
+	if pl.Inventory && pl.Inventory:IsValid() then
+		return pl.Inventory;
+	else
+		local id=pl:GetNWInt("itemforge_inventory_id")
+		if id==0 then return nil end
+		
+		local inv=IF.Inv:Get(id);
+		if !inv || !inv:IsValid() then return nil end
+		
+		pl.Inventory=inv;
+	end
+	return inv;
+end
+
 function MODULE:ShowLocalPlayerInventory()
 	local pl=LocalPlayer();
-	if pl.InventoryPanel && pl.InventoryPanel:IsValid() then return false end
-	
-	local id=pl:GetNWInt("itemforge_inventory_id")
-	if id==0 then return false end
-	
-	local inv=IF.Inv:Get(id);
-	if !inv || !inv:IsValid() then return false end
+	local inv=self:GetPlayerInventory(pl);
+	if !inv then return false end
 	
 	pl.InventoryPanel=vgui.Create("ItemforgeInventory");
 	pl.InventoryPanel:SetInventory(inv);

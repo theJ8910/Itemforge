@@ -51,6 +51,9 @@ function SWEP:OnRemove()
 	--This weapon is being removed.
 	self.BeingRemoved=true;
 	
+	--HACK
+	self:Unregister();
+	
 	--Clear the weapon's connection to the item (this weapon "forgets" the item)
 	local item=self:GetItem();
 	if !item then return true end		--We didn't have an item set anyway. We can stop here.
@@ -78,34 +81,12 @@ function SWEP:OnRemove()
 	return true;
 end
 
---Weapon is being swapped to
-function SWEP:Deploy()
-	--Whenever the owner swaps to this weapon, we change his viewmodel to the item's viewmodel.
-	if self.Owner then self.Owner:GetViewModel():SetModel(self.ViewModel); end
-	
-	local item=self:GetItem();
-	if !item then return true end
-	
-	return item:Event("OnDeploy",true);
-end
-
---Weapon is being put away
-function SWEP:Holster(wep)
-	local item=self:GetItem();
-	if !item then return true end
-	
-	return item:Event("OnHolster",true);
-end
-
-
-
 --[[
 May allow items to take advantage of this later
 Use GetNetworked* functions (entity) to restore data from a save-game
 ]]--
 function SWEP:OnRestore()
 end
-
 
 --[[
 --We probably need to remove the SWEP and drop the item instead

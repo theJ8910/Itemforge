@@ -97,6 +97,9 @@ function MODULE:LoadFromString(sStr)
 	
 	local i=3;
 	while lines[i]!=nil do
+		local delimiter=string.find(lines[i],"/");
+		
+		--tDat.NWVars[string.sub(lines[i],0,delimiter-1)]=string.sub(lines[i],delimiter+1);
 		print("Would have loaded: ",lines[i]);
 		i=i+1;
 	end

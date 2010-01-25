@@ -15,6 +15,7 @@ ITEM.HoldType="physgun";
 --Rock-It Launcher
 ITEM.AutoUnloadDelay=0.3;
 ITEM.EjectFrom=Vector(9.2274,0.3052,5.4279);
+ITEM.Spindown=nil;
 
 --[[
 Create an inventory for our gun
@@ -42,6 +43,10 @@ We have an auto-unload feature.
 function ITEM:OnThink()
 	self["base_ranged"].OnThink(self);
 	if self:GetNWBool("Unloading") then self:UnloadLoop() end
+	local pl=self:GetWOwner();
+	if pl && pl:GetActiveWeapon()==self:GetWeapon() && pl:KeyDown(IN_RELOAD) then
+		self:Suction(pl:EyePos(),pl:EyeAngles():Forward());
+	end
 end
 
 --[[
@@ -49,6 +54,8 @@ Overridden from base_ranged.
 When this function is called, instead of instantly unloading the item in a clip, we turn on auto-unloading.
 ]]--
 function ITEM:Unload(clip)
+	if self:GetNWBool("Unloading")==true then return false end
+	
 	self:SetNWBool("Unloading",true);
 	self:LoopingSound(self.UnloadSound,"UnloadSound");
 	
@@ -60,6 +67,8 @@ This function is called every frame that we are auto-unloading.
 It will unload one item and cool the weapon down for a short time.
 It can't unload while the weapon is cooling down.
 When all items are unloaded, this function will turn off auto-unloading.
+
+TODO this is broke... try reloading while unloading and hilarity ensues.
 ]]--
 function ITEM:UnloadLoop()
 	if !self:CanPrimaryAttack() || !self:CanSecondaryAttack() then return false end
@@ -67,13 +76,27 @@ function ITEM:UnloadLoop()
 	--Unload an item from the inventory, or stop if the inventory is empty (or doesn't exist)
 	local inv=self:GetInventory();
 	if !inv || inv:IsEmpty() then
-		self:SetNWBool("Unloading",false);
-		self:StopLoopingSound("UnloadSound");
+		if self.Spindown==nil then
+			self.Spindown=CurTime()+5;
+		elseif CurTime()<self.Spindown then
+			self:SetLoopingSoundPitch("UnloadSound",(70+6*(self.Spindown-CurTime() )));
+		else
+			self.Spindown=nil;
+			self:SetNWBool("Unloading",false);
+			self:StopLoopingSound("UnloadSound");
+		end
 		return false;
 	elseif inv then
-		inv:GetLast():ToSameLocationAs(self,true);
-		self:EmitSound(self.ReloadSounds[math.random(1,#self.ReloadSounds)],true);
-		self:SetNextBoth(CurTime()+self.AutoUnloadDelay);
+		if self.Spindown==nil then
+			self.Spindown=CurTime()+2;
+		elseif CurTime()<self.Spindown then
+			self:SetLoopingSoundPitch("UnloadSound",(100-15*(self.Spindown-CurTime() )));
+		else
+			inv:GetLast():ToSameLocationAs(self,true);
+			self:EmitSound(self.ReloadSounds,true);
+			self:SetNextBoth(CurTime()+self.AutoUnloadDelay);
+			if inv:IsEmpty() then self.Spindown=nil; end
+		end
 	end
 	
 	return true;

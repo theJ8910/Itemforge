@@ -18,6 +18,9 @@ ITEM.WorldModelAttach=nil;							--When the item is held, this will be an attach
 ITEM.OverrideMaterialMat=nil;						--On the client this is a Material() whose path is the item's override material (item:GetOverrideMaterial()). Use item:GetOverrideMaterialMat() to get this.
 
 --[[
+* CLIENT
+* Protected
+
 Transfer from one inventory to another.
 This function is designed to save bandwidth.
 Instead of sending two NWCommands, one to remove from an inventory, another to add to an inventory, only one NWCommand is run.
@@ -35,6 +38,9 @@ end
 IF.Items:ProtectKey("TransInventory");
 
 --[[
+* CLIENT
+* Protected
+
 Transfer from one slot to another.
 This function is designed to save bandwidth.
 True is returned if the move was successful. False is returned otherwise.
@@ -46,6 +52,9 @@ end
 IF.Items:ProtectKey("TransSlot");
 
 --[[
+* CLIENT
+* Protected
+
 Run this function to use the item.
 It will trigger the OnUse event in the item.
 If this function is run on the client, the OnUse event can stop it clientside. If it isn't stopped, it requests to "PlayerUse" the item on the server.
@@ -65,6 +74,9 @@ end
 IF.Items:ProtectKey("Use");
 
 --[[
+* CLIENT
+* Protected
+
 Run this function to hold the item.
 It requests to "Hold" the item on the server.
 False is returned if the item is unable to be held for any reason.
@@ -79,6 +91,9 @@ end
 IF.Items:ProtectKey("PlayerHold");
 
 --[[
+* CLIENT
+* Protected
+
 This is run when the player chooses "Examine" from his menu.
 Prints some info about the item (name, amount, weight, health, and description) to the local player's chat.
 ]]--
@@ -107,12 +122,21 @@ function ITEM:PlayerExamine()
 end
 IF.Items:ProtectKey("PlayerExamine");
 
+--[[
+* CLIENT
+* Protected
+
+Returns this item's override material as a Material() (as opposed to GetOverrideMaterial() which returns the material as a string).
+]]--
 function ITEM:GetOverrideMaterialMat()
 	return self.OverrideMaterialMat;
 end
 IF.Items:ProtectKey("GetOverrideMaterialMat")
 
 --[[
+* CLIENT
+* Protected
+
 Returns this item's right click menu if one is currently open.
 ]]--
 function ITEM:GetMenu()
@@ -124,6 +148,9 @@ end
 IF.Items:ProtectKey("GetMenu");
 
 --[[
+* CLIENT
+* Protected
+
 Displays this item's right click menu, positioning one of the menu's corners at x,y.
 True is returned if the menu is opened successfully.
 False is returned if the menu could not be opened. One possible reason this may happen is if the item's OnPopulateMenu event fails.
@@ -150,6 +177,9 @@ end
 IF.Items:ProtectKey("ShowMenu");
 
 --[[
+* CLIENT
+* Protected
+
 Removes the menu if it is open.
 Returns true if the menu was open and was closed,
 or false if there wasn't a menu open.
@@ -164,6 +194,15 @@ function ITEM:KillMenu()
 end
 IF.Items:ProtectKey("KillMenu");
 
+--[[
+* CLIENT
+* Protected
+
+Opens a dialog window asking the player how evenly to split a stack of items.
+pl should be LocalPlayer().
+
+This function will return false if the player cannot interact with the item (or splitting this item is otherwise impossible).
+]]--
 function ITEM:PlayerSplit(pl)
 	if !self:Event("CanPlayerInteract",false,pl) || !self:Event("CanPlayerSplit",true,pl) then return false end
 	
@@ -272,6 +311,9 @@ end
 IF.Items:ProtectKey("PlayerSplit");
 
 --[[
+* CLIENT
+* Protected
+
 Runs every time the client ticks.
 ]]--
 function ITEM:Tick()
@@ -292,6 +334,9 @@ local NIL="%%00";		--If a command isn't given, this is substituted. It means we 
 local SPACE="%%20";		--If a space is given in a string, this is substituted. It means " ".
 	
 --[[
+* CLIENT
+* Protected
+
 Sends a networked command by name with the supplied arguments
 Clientside, this runs console commands (sending data to the server in the process)
 ]]--
@@ -370,6 +415,9 @@ end
 IF.Items:ProtectKey("SendNWCommand");
 
 --[[
+* CLIENT
+* Protected
+
 This function is called automatically, whenever a networked command from the server is received.
 Clientside, msg will be a bf_read (a usermessage received from the server).
 There's no need to override this, we'll call the hook the command is associated if there is one.

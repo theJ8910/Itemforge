@@ -27,6 +27,9 @@ ITEM.HoldType="pistol";								--How does a player hold this item when he is hol
 --Don't modify/override these. They're either set automatically or don't need to be changed.
 
 --[[
+* SERVER
+* Protected
+
 This doesn't actually set the NetOwner, but it will publicize or privitize the item.
 lastOwner should be the player who was NetOwner of this item previously. This can be a player, or nil. Doing item:GetNetOwner() or getting the NetOwner of the old container should suffice in most cases.
 newOwner should be the player who now owns this item. This can be a player, or nil. The NetOwner of an inventory the item is going in, or nil should work in most cases.
@@ -58,6 +61,9 @@ function ITEM:SetOwner(lastOwner,newOwner)
 end
 
 --[[
+* SERVER
+* Protected
+
 This function returns true if this item can send information about itself to a given player.
 It will return true in two case:
 	This item's NetOwner is nil (this item is public)
@@ -71,6 +77,9 @@ end
 IF.Items:ProtectKey("CanSendItemData");
 
 --[[
+* SERVER
+* Protected
+
 Run this function to use the item.
 It will trigger the OnUse event in the item.
 This function will only be run serverside if the item is used while on the ground (with the "e" key).
@@ -93,6 +102,9 @@ end
 IF.Items:ProtectKey("Use");
 
 --[[
+* SERVER
+* Protected
+
 Protected start touch event.
 World Merge attempts are triggered here.
 After an _unsuccessful_ world merge attempt, this calls the overridable OnStartTouch event.
@@ -113,6 +125,9 @@ end
 IF.Items:ProtectKey("OnStartTouchSafe");
 
 --[[
+* SERVER
+* Protected
+
 Changes the item's world model.
 False is returned if this cannot be done for some reason. True is returned if the model was changed.
 ]]--
@@ -138,6 +153,9 @@ function ITEM:SetWorldModel(sModel)
 end
 
 --[[
+* SERVER
+* Protected
+
 Changes this item's view model.
 TODO actually change visible viewmodel.
 ]]--
@@ -149,7 +167,12 @@ function ITEM:SetViewModel(sModel)
 end
 IF.Items:ProtectKey("SetViewModel");
 
---Sends all of the necessary item data to a player. Triggers "OnSendFullUpdate" event.
+--[[
+* SERVER
+* Protected
+
+Sends all of the necessary item data to a player. Triggers "OnSendFullUpdate" event.
+]]--
 function ITEM:SendFullUpdate(pl)
 	
 	--Send networked vars. We'll only send networked vars that have changed (NWVars that have been set to something other than the default value)
@@ -170,6 +193,9 @@ end
 IF.Items:ProtectKey("SendFullUpdate");
 
 --[[
+* SERVER
+* Protected
+
 Runs every time the server ticks.
 ]]--
 function ITEM:Tick()
@@ -197,6 +223,9 @@ end
 IF.Items:ProtectKey("Tick");
 
 --[[
+* SERVER
+* Protected
+
 Triggers a Wire output on this item. This will not work if Wiremod is not installed.
 Whenever a wire output is triggered, it will send the given value to anything that happened to be wired to that output.
 
@@ -223,6 +252,9 @@ end
 IF.Items:ProtectKey("WireOutput");
 
 --[[
+* SERVER
+* Protected
+
 Sends a networked command by name with the supplied arguments
 Serverside, this sends usermessages.
 pl can be a player, a recipient filter, or 'nil' to send to all players (clients). If nil is given for player, and the item is in a private inventory, then the command is sent to that player only. 
@@ -304,6 +336,9 @@ IF.Items:ProtectKey("SendNWCommand");
 local NIL="%%00";		--If a command isn't given, this is substituted. It means we received nil (nothing).
 
 --[[
+* SERVER
+* Protected
+
 This function is called automatically, whenever a networked command from a client is received. fromPl will always be a player.
 commandid is the ID of the command recieved from the server
 args will be a table of arguments (should be converted to the correct datatype as specified in CreateNWCommand).
@@ -356,7 +391,12 @@ function ITEM:ReceiveNWCommand(fromPl,commandid,args)
 end
 IF.Items:ProtectKey("ReceiveNWCommand");
 
---Runs when a client requests to send this item to an inventory
+--[[
+* SERVER
+* Protected
+
+Runs when a client requests to send this item to an inventory
+]]--
 function ITEM:PlayerSendToInventory(pl,inv,invSlot)
 	if !self:Event("CanPlayerInteract",false,pl) then return false end
 	if !inv || !inv:IsValid()	then return self:Error("Couldn't move to inventory as requested by "..tostring(pl)..", inventory given was not valid!\n") end
@@ -369,8 +409,12 @@ function ITEM:PlayerSendToInventory(pl,inv,invSlot)
 end
 IF.Items:ProtectKey("PlayerSendToInventory");
 
---Runs when a client requests to send this item to the world somewhere
---TODO range checking on "where"
+--[[
+* SERVER
+* Protected
+
+Runs when a client requests to send this item to the world somewhere
+]]--
 function ITEM:PlayerSendToWorld(pl,from,to)
 	if !self:Event("CanPlayerInteract",false,pl) then return false end
 	
@@ -382,25 +426,42 @@ function ITEM:PlayerSendToWorld(pl,from,to)
 	tr.filter		=	{pl,pl:GetViewEntity(),ent};
 	traceRes		=	util.TraceEntity(tr,ent);
 	
+	if traceRes.HitPos:Distance(pl:GetPos())>200 then return false end
+	
 	self:ToWorld(traceRes.HitPos);
 end
 IF.Items:ProtectKey("PlayerSendToWorld");
 
---Runs when a client requests to hold an item
+--[[
+* SERVER
+* Protected
+
+Runs when a client requests to hold an item
+]]--
 function ITEM:PlayerHold(pl)
 	if !self:Event("CanPlayerInteract",false,pl) then return false end
 	self:Hold(pl);
 end
 IF.Items:ProtectKey("PlayerHold");
 
---Runs when a client requests to merge this item and another item
+--[[
+* SERVER
+* Protected
+
+Runs when a client requests to merge this item and another item
+]]--
 function ITEM:PlayerMerge(pl,otherItem)
 	if !self:Event("CanPlayerInteract",false,pl) || !otherItem:Event("CanPlayerInteract",false,pl) then return false end
 	self:Merge(otherItem);
 end
 IF.Items:ProtectKey("PlayerMerge");
 
---Runs when a client requests to split this item
+--[[
+* SERVER
+* Protected
+
+Runs when a client requests to split this item
+]]--
 function ITEM:PlayerSplit(player,amt)
 	if !self:Event("CanPlayerInteract",false,player) || !self:Event("CanPlayerSplit",true,player) then return false end
 	return self:Split(amt);

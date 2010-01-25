@@ -37,7 +37,7 @@ ITEM.FleshyImpactSounds={
 
 if CLIENT then
 	ITEM.WorldModelNudge=Vector(0,0,7);
-	ITEM.WorldModelRotate=Angle(0,90,-90);
+	ITEM.WorldModelRotate=Angle(90,0,-90);
 end
 
 --Probably could add some wood-chopping function here
@@ -47,7 +47,7 @@ end
 --Play a fleshy hit sound if we chopped into flesh, or the standard sound if we didn't
 function ITEM:HitSound(traceRes)
 	if traceRes.MatType==MAT_FLESH || traceRes.MatType==MAT_BLOODYFLESH || traceRes.MatType==MAT_ALIENFLESH || traceRes.MatType==MAT_ANTLION then
-		return self:EmitSound(self.FleshyImpactSounds[math.random(1,#self.FleshyImpactSounds)],true);
+		return self:EmitSound(self.FleshyImpactSounds,true);
 	end
 	return self["base_melee"].HitSound(self);
 end

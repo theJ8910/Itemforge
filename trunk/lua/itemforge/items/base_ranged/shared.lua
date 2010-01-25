@@ -183,10 +183,7 @@ function ITEM:OnReload()
 		local curAmmo=self:GetAmmo(clip);
 		if clipsize==0 || !curAmmo || curAmmo:GetAmount()<clipsize then
 			local getNearbyAmmo=function(self,item)
-				if self:Load(item,i) then
-					return true;
-				end
-				return false;
+				return self:Load(item,i);
 			end
 			
 			if self:FindAmmo(getNearbyAmmo) then
@@ -308,7 +305,7 @@ Plays a random sound for the primary fire.
 Also plays the primary attack animation, both on the weapon and player himself
 ]]--
 function ITEM:PrimaryFireEffects()
-	if #self.PrimaryFireSounds>0 then self:EmitSound(self.PrimaryFireSounds[math.random(1,#self.PrimaryFireSounds)],true); end
+	if #self.PrimaryFireSounds>0 then self:EmitSound(self.PrimaryFireSounds,true); end
 	
 	if self:IsHeld() then
 		self:GetWOwner():SetAnimation(PLAYER_ATTACK1);
@@ -330,7 +327,7 @@ It plays the weapon's secondary fire sound.
 It plays the secondary attack animation on both the player and the viewmodel.
 ]]--
 function ITEM:SecondaryFireEffects()
-	if #self.SecondaryFireSounds>0 then self:EmitSound(self.SecondaryFireSounds[math.random(1,#self.SecondaryFireSounds)],true); end
+	if #self.SecondaryFireSounds>0 then self:EmitSound(self.SecondaryFireSounds,true); end
 	
 	if self:IsHeld() then
 		self:GetWOwner():SetAnimation(PLAYER_ATTACK2);
@@ -439,7 +436,7 @@ end
 Plays a reload sound and plays the reload animation (both on the weapon and player himself).
 ]]--
 function ITEM:ReloadEffects()
-	if #self.ReloadSounds>0 then self:EmitSound(self.ReloadSounds[math.random(1,#self.ReloadSounds)],true); end
+	if #self.ReloadSounds>0 then self:EmitSound(self.ReloadSounds,true); end
 	
 	if !self:IsHeld() then return false end
 	self:GetWeapon():SendWeaponAnim(ACT_VM_RELOAD);
@@ -464,7 +461,7 @@ It plays the weapon's dry-fire sound and plays the dry-fire viewmodel animation.
 It also cools the weapon down; the length of the cooldown is determined by the dry-fire delay.
 ]]--
 function ITEM:DryFire()
-	if #self.DryFireSounds>0 then self:EmitSound(self.DryFireSounds[math.random(1,#self.DryFireSounds)],true); end
+	if #self.DryFireSounds>0 then self:EmitSound(self.DryFireSounds,true); end
 	if self:IsHeld() then
 		self:GetWeapon():SendWeaponAnim(ACT_VM_DRYFIRE);
 	end
