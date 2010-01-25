@@ -76,7 +76,7 @@ HitPhysObj is the physics object belonging to this entity which collided.
 function ITEM:OnPhysicsCollide(entity,CollisionData,HitPhysObj)
 	if self:GetAmount()>=self.TurnsBoxAt then return false end
 	if (CollisionData.Speed > 20 && CollisionData.DeltaTime > 0.2 ) then
-		self:EmitSound(self.SingleShellImpactSounds[math.random(1,#self.SingleShellImpactSounds)]);
+		self:EmitSound(self.SingleShellImpactSounds);
 	end
 end
 

@@ -6,7 +6,7 @@ This file is the foundation of Itemforge. Version is stored here, and modules ar
 The module loading is carried out here. Modules are loaded, then initialized. After that, client and server initilizations are performed respectively.
 ]]--
 IF={};
-IF.Version=0.17;							--Itemforge Version. Your items can use this if you want.
+IF.Version=0.18;							--Itemforge Version. Your items can use this if you want.
 IF.Tag="itemforge_beta";					--Server Tag. Whenever a server is hosting Itemforge, this shows up next to the server's name in the "Tags" column of the Server Browser.
 IF.Modules={};
 

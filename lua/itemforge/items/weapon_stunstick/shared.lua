@@ -49,14 +49,16 @@ ITEM.DeploySounds={
 
 function ITEM:OnDeploy()
 	if !self["base_melee"].OnDeploy(self) then return false end
-	self:EmitSound(self.DeploySounds[math.random(1,#self.DeploySounds)],true);
+	self:EmitSound(self.DeploySounds,true);
 	
 	return true;
 end
 
 function ITEM:OnHolster()
 	if !self["base_melee"].OnHolster(self) then return false end
-	self:EmitSound(self.DeploySounds[math.random(1,#self.DeploySounds)],true);
+	
+	--This isn't a mistake. The holster sounds are the same as the deploy sounds.
+	self:EmitSound(self.DeploySounds,true);
 	
 	return true;
 end

@@ -1392,7 +1392,7 @@ function _INV:ConnectItem(item,pl)
 	--We'll connect the item on either the given player or the inventory owner.
 	local who=pl or self:GetOwner();
 	
-	if !self:CanSendInventoryData(pl) then return self:Error("Couldn't connect "..tostring(item).." - player(s) given were not the owners of this inventory!\n") end
+	if !self:CanSendInventoryData(who) then return self:Error("Couldn't connect "..tostring(item).." - player(s) given were not the owners of this inventory!\n") end
 	
 	--Check to see if this item is connected already... if it is, grab the connection slot it's in.
 	local i=0;

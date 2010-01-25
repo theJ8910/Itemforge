@@ -27,6 +27,21 @@ function ITEM:GetDescription()
 end
 
 --[[
+* SHARED
+
+When tostring() is performed on an item reference, it returns a string containing some information about the item.
+Format: "Item ID [ITEM_TYPE]xAMT"
+Ex:		"Item 5 [item_crowbar]" (Item 5, a single crowbar)
+Ex:		"Item 3 [item_rock]x53" (Item 3, a stack of 53 item_rocks)
+Ex:		"Object [invalid]" (used to be some kind of object, invalid/has been removed/no longer exists)
+Ex:		"Inventory 2" (Is inventory 2)
+]]--
+function ITEM:ToString()
+	if self:GetMaxAmount()!=1 then	return "Item "..self:GetID().." ["..self:GetType().." x "..self:GetAmount().."]";
+	else							return "Item "..self:GetID().." ["..self:GetType().."]"; end
+end
+
+--[[
 If an item is in the void, this hook can be used to return it's position in the world.
 This hook can return nil, a vector, or a table of vectors.
 ]]--

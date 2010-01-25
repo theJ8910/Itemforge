@@ -264,8 +264,9 @@ function MODULE:Create(parent,model)
 	setmetatable(newAttach,amt);
 	
 	local effectdata=EffectData();
+	effectdata:SetOrigin(parent:GetPos());
 	effectdata:SetEntity(parent);
-	effectdata:SetScale(newAttach.id)
+	effectdata:SetAttachment(newAttach.id);
 	util.Effect("Gear",effectdata);
 	
 	return newAttach;

@@ -6,16 +6,22 @@ When you attach gear to something with the GearAttach module, this effect is use
 This is automatically removed when the gear is :Remove() ed.
 ]]--
 EFFECT.Ent=nil;
+EFFECT.Max=Vector(0,0,0);
+EFFECT.Min=Vector(0,0,0);
 
 function EFFECT:Init(data)
-	self.GearID = data:GetScale();
+	self.GearID = data:GetAttachment();
 	self.Ent	= data:GetEntity();
+	if !self.Ent then return false end
+	
 	self.Max	= self.Ent:OBBMaxs();
 	self.Min	= self.Ent:OBBMins();
 end
 
 function EFFECT:Think()
-	if !IF.GearAttach.Attachments[self.GearID] then return false end
+	if !IF.GearAttach.Attachments[self.GearID] then return false;
+	elseif !self.Ent || !self.Ent:IsValid() then IF.GearAttach.Attachments[self.GearID]:Remove(); return false end
+	
 	self:SetRenderBoundsWS(self.Ent:LocalToWorld(self.Min),self.Ent:LocalToWorld(self.Max))
 	return true;
 end

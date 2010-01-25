@@ -171,6 +171,7 @@ end
 
 function ITEM:SwapToHand()
 	if self.WMAttach && self.WMAttach:ToAP("anim_attachment_RH") then
+		self.WMAttach:Show();
 		self.WMAttach:SetOffset(self.WorldModelNudge);
 		self.WMAttach:SetOffsetAngles(self.WorldModelRotate);		
 	end
@@ -178,6 +179,7 @@ end
 
 function ITEM:SwapToHip()
 	if self.WMAttach && self.WMAttach:ToBone("ValveBiped.Bip01_Pelvis") then
+		self.WMAttach:Show();
 		self.WMAttach:SetOffset(Vector(-10,0,0));
 		self.WMAttach:SetOffsetAngles(Angle(0,0,-45));
 	end

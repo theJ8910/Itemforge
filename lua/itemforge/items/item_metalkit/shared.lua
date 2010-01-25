@@ -40,8 +40,7 @@ function ITEM:ApplyTo(pl,otherItem)
 	if !self:Event("CanPlayerInteract",false,pl) then return false end
 	
 	if SERVER then
-		if self:StartApplying(otherItem) then IF.Vox:PlayRandomSuccess(pl);
-		else								  IF.Vox:PlayRandomFailure(pl); end
+		if !self:StartApplying(otherItem,pl) then IF.Vox:PlayRandomFailure(pl) end
 	else
 		self:SendNWCommand("ApplyTo",otherItem);
 	end
@@ -58,7 +57,7 @@ function ITEM:OnUse(pl)
 	return true;
 end
 
-function ITEM:StartApplying(otherItem)
+function ITEM:StartApplying(otherItem,pl)
 	--Don't apply if we're already applying to something.
 	--If the item we're applying to is invincible, forget about it.
 	--Also, don't apply if we're spreading out the reinforcement over too many items (in other words, 5 or less reinforcement per item really isn't much of a reinforcement, is it?)
@@ -71,17 +70,18 @@ function ITEM:StartApplying(otherItem)
 	self:SimpleTimer(0.2,self.EmitSound,self.Sounds[math.random(1,3)]);
 	self:SimpleTimer(0.4,self.EmitSound,self.Sounds[math.random(1,3)]);
 	self:SimpleTimer(0.6,self.EmitSound,self.Sounds[math.random(1,3)]);
-	self:SimpleTimer(1.0,self.FinishApplying,otherItem);
+	self:SimpleTimer(1.0,self.FinishApplying,otherItem,pl);
 	return true;
 end
 
-function ITEM:FinishApplying(otherItem)
+function ITEM:FinishApplying(otherItem,pl)
 	local newHealth=otherItem:GetMaxHealth()+self.ReinforceBy/otherItem:GetAmount();
 	
 	otherItem:EmitSound(self.Sounds[8]);
 	otherItem:SetMaxHealth(newHealth);
 	otherItem:SetHealth(newHealth);
 	otherItem:SetOverrideMaterial(self.GlossMat);
+	IF.Vox:PlayRandomSuccess(pl);
 	self:Remove();
 end
 

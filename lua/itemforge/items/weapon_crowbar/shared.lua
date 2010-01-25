@@ -75,8 +75,7 @@ HitPhysObj is the physics object belonging to this entity which collided.
 ]]--
 function ITEM:OnPhysicsCollide(entity,CollisionData,HitPhysObj)
 	if (CollisionData.Speed > 50 && CollisionData.DeltaTime > 0.05 ) then
-		print(CollisionData.Speed);
-		self:EmitSound(self.ImpactSounds[math.random(1,table.getn(self.ImpactSounds))],CollisionData.Speed,100+math.Rand(-20,20));
+		self:EmitSound(self.ImpactSounds,CollisionData.Speed,100+math.Rand(-20,20));
 	end
 end
 
