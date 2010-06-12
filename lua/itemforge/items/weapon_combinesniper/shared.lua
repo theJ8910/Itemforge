@@ -56,7 +56,7 @@ ITEM.AdminSpawnable=true;
 
 ITEM.SecondaryAuto=false;
 
-if SERVER then ITEM.HoldType="shotgun"; end
+ITEM.HoldType="shotgun";
 
 --Overridden Base Weapon stuff
 ITEM.PrimaryDelay=1.25;
@@ -100,8 +100,8 @@ ITEM.ZoomOutSound=Sound("weapons/sniper/sniper_zoomout.wav");
 --[[
 When a player is holding it and tries to secondary attack
 ]]--
-function ITEM:OnSecondaryAttack()
-	if !self["base_weapon"].OnSecondaryAttack(self) then return false end
+function ITEM:OnSWEPSecondaryAttack()
+	if !self["base_weapon"].OnSWEPSecondaryAttack(self) then return false end
 	
 	--Zoom in
 	local iZL=self:GetNWInt("ZoomLevel");

@@ -22,9 +22,9 @@ ITEM.ViewModel="models/weapons/v_pistol.mdl";
 ITEM.Spawnable=false;
 ITEM.AdminSpawnable=false;
 
-if SERVER then
-	ITEM.HoldType="pistol";
-end
+
+ITEM.HoldType="pistol";
+
 
 --Base Weapon
 --[[
@@ -45,16 +45,31 @@ ITEM.SecondaryDelayAuto=-1;
 ITEM.PrimaryAuto=true;
 ITEM.SecondaryAuto=true;
 
---This weapon doesn't do anything when you attack, except make you wait until you can attack again
-function ITEM:OnPrimaryAttack()
-	if !self:CanPrimaryAttack() || (self:IsHeld() && self:GetWOwner():KeyDownLast(IN_ATTACK) && !self:CanPrimaryAttackAuto()) then return false; end
+ITEM.NextPrimary = 0;
+ITEM.NextSecondary = 0;
+
+--The base weapon doesn't do anything when you attack, except make you wait until you can attack again
+--[[
+* SHARED
+
+Handles the primary attack.
+Call this as an inherited event if you want the base weapon to handle the cooldowns for you.
+]]--
+function ITEM:OnSWEPPrimaryAttack()
+	if !self:CanPrimaryAttack() || (self:IsHeld() && self:GetWOwner():KeyDownLast(IN_ATTACK) && !self:CanPrimaryAttackAuto()) then return false end
 	self:SetNextPrimary(CurTime()+self:GetPrimaryDelay(),CurTime()+self:GetPrimaryDelayAuto());
 	
 	return true;
 end
 
-function ITEM:OnSecondaryAttack()
-	if !self:CanSecondaryAttack() || (self:IsHeld() && self:GetWOwner():KeyDownLast(IN_ATTACK2) && !self:CanSecondaryAttackAuto()) then return false; end
+--[[
+* SHARED
+
+Handles the secondary attack.
+Call this as an inherited event if you want the base weapon to handle the cooldowns for you.
+]]--
+function ITEM:OnSWEPSecondaryAttack()
+	if !self:CanSecondaryAttack() || (self:IsHeld() && self:GetWOwner():KeyDownLast(IN_ATTACK2) && !self:CanSecondaryAttackAuto()) then return false end
 	self:SetNextSecondary(CurTime()+self:GetSecondaryDelay(),CurTime()+self:GetSecondaryDelayAuto());
 	
 	return true;
@@ -72,7 +87,13 @@ fNext is the next time the weapon's primary can attack, period.
 fNextAuto is optional (defaults to fNext). This is the next time the weapon's primary can auto-attack.
 ]]--
 function ITEM:SetNextPrimary(fNext,fNextAuto)
-	self:SetNWFloat("PrimaryNext",fNext);
+	self.NextPrimary = fNext;
+	
+	local wep = self:GetWeapon();
+	if wep then		wep:SetNextPrimaryFire(fNext)
+	else			self:SetNWFloat("PrimaryNext",fNext);
+	end
+	
 	self:SetNWFloat("LastPrimaryDelay",fNext-CurTime());
 	
 	if fNextAuto==nil || fNext==fNextAuto then	self:SetNWFloat("PrimaryNextAuto",nil);
@@ -81,10 +102,20 @@ function ITEM:SetNextPrimary(fNext,fNextAuto)
 end
 
 --[[
+Returns the next time this item is allowed to primary-fire
+]]--
+function ITEM:GetNextPrimary()
+	local wep = self:GetWeapon();
+	if wep then		return wep:GetNextPrimaryFire();
+	else			return self:GetNWFloat("PrimaryNext");
+	end
+end
+
+--[[
 Can we attack with primary, or is the weapon cooling down right now?
 ]]--
 function ITEM:CanPrimaryAttack()
-	return (CurTime()>=self:GetNWFloat("PrimaryNext"));
+	return CurTime()>=self:GetNextPrimary();
 end
 
 --[[
@@ -92,7 +123,7 @@ Can we auto-attack with primary yet?
 Returns false if we can't auto-attack with primary yet.
 ]]--
 function ITEM:CanPrimaryAttackAuto()
-	return (CurTime()>=self:GetNWFloat("PrimaryNextAuto"));
+	return CurTime()>=self:GetNWFloat("PrimaryNextAuto");
 end
 
 --[[
@@ -123,8 +154,12 @@ fNext is the next time the weapon's secondary can attack, period.
 fNextAuto is optional (defaults to fNext). This is the next time the weapon's secondary can auto-attack.
 ]]--
 function ITEM:SetNextSecondary(fNext,fNextAuto)
-	if bNet!=false then bNet=nil; end
-	self:SetNWFloat("SecondaryNext",fNext,bNet);
+	self.NextSecondary = fNext;
+	
+	local wep = self:GetWeapon();
+	if wep then		wep:SetNextSecondaryFire(fNext);
+	else			self:SetNWFloat("SecondaryNext",fNext,bNet);
+	end
 	
 	if fNextAuto==nil || fNext==fNextAuto then		self:SetNWFloat("SecondaryNextAuto",nil,bNet);
 	else											self:SetNWFloat("SecondaryNextAuto",fNextAuto,bNet);
@@ -132,10 +167,22 @@ function ITEM:SetNextSecondary(fNext,fNextAuto)
 end
 
 --[[
+Returns the next time this item is allowed to secondary-fire
+]]--
+function ITEM:GetNextSecondary()
+	local wep = self:GetWeapon();
+	if wep then
+		return wep:GetNextSecondaryFire();
+	else
+		return self:GetNWFloat("SecondaryNext");
+	end
+end
+
+--[[
 Can we attack with secondary, or is the weapon cooling down right now?
 ]]--
 function ITEM:CanSecondaryAttack()
-	return (CurTime()>=self:GetNWInt("SecondaryNext"));
+	return CurTime()>=self:GetNextSecondary();
 end
 
 --[[
@@ -143,7 +190,7 @@ Can we auto-attack with secondary yet?
 Returns false if we can't auto-attack with secondary yet.
 ]]--
 function ITEM:CanSecondaryAttackAuto()
-	return (CurTime()>=self:GetNWInt("SecondaryNextAuto"));
+	return CurTime()>=self:GetNWInt("SecondaryNextAuto");
 end
 
 --[[
@@ -169,14 +216,48 @@ function ITEM:SetNextBoth(fNext,fNextAuto)
 	self:SetNextSecondary(fNext,fNextAuto);
 end
 
+function ITEM:OnHold(pl,wep)
+	self:InheritedEvent("OnHold","base_item",nil,pl,wep);
+	
+	wep:SetNextPrimaryFire(self.NextPrimary);
+	wep:SetNextSecondaryFire(self.NextSecondary);
+end
+
+function ITEM:OnRelease(pl,forced)
+	self:InheritedEvent("OnRelease","base_item",nil,pl,forced);
+	
+	self:SetNWFloat("PrimaryNext",self.NextPrimary);
+	self:SetNWFloat("SecondaryNext",self.NextSecondary);
+end
+
+if CLIENT then
+
+
+end
+--[[
+* CLIENT
+
+Stranded 2 has this cool thing where after firing a weapon it shows the cooldown as
+a red border around the item slot that slowly fades as the weapon cools down. Then the border
+suddenly flashes green to indicate the cooldown has ended.
+
+This function implements this feature on Itemforge weapons, although it only works for
+the primary attack's colldown. I haven't quite figured out how to account both for the primary
+and secondary in a way that wasn't completely retarded.
+]]--
 function ITEM:OnDraw2D(width,height)
 	self["base_item"].OnDraw2D(self,width,height);
 	
-	local remaining=self:GetNWFloat("PrimaryNext")-CurTime();
+	local remaining=self:GetNextPrimary()-CurTime();
 	local delay=self:GetNWFloat("LastPrimaryDelay");
-	if remaining<=0 || delay==0 then return end	
+	if remaining <= -0.5 || delay==0 then
+		return nil;
+	elseif remaining <= 0 then
+		surface.SetDrawColor(0,255,0,((0.5+remaining)/0.5)*255);
+	else
+		surface.SetDrawColor(255,0,0,(remaining/delay)*255);
+	end
 	
-	surface.SetDrawColor(255,0,0,(remaining/delay)*255);
 	--Vertical lines
 	surface.DrawRect(2,2,		1,height-4);
 	surface.DrawRect(width-3,2,	1,height-4);
@@ -187,8 +268,8 @@ function ITEM:OnDraw2D(width,height)
 end
 
 IF.Items:CreateNWVar(ITEM,"PrimaryNext","float",0,true,true);
-IF.Items:CreateNWVar(ITEM,"PrimaryNextAuto","float",	function(self) return self:GetNWFloat("PrimaryNext") end,true,true);
+IF.Items:CreateNWVar(ITEM,"PrimaryNextAuto","float",	function(self) return self:GetNextPrimary() end,true,true);
 IF.Items:CreateNWVar(ITEM,"SecondaryNext","float",0,true,true);
-IF.Items:CreateNWVar(ITEM,"SecondaryNextAuto","float",	function(self) return self:GetNWFloat("SecondaryNext") end,true,true);
+IF.Items:CreateNWVar(ITEM,"SecondaryNextAuto","float",	function(self) return self:GetNextSecondary() end,true,true);
 
 IF.Items:CreateNWVar(ITEM,"LastPrimaryDelay","float",0,true,true);

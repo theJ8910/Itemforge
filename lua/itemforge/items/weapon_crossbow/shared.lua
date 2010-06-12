@@ -19,9 +19,7 @@ ITEM.AdminSpawnable=true;
 ITEM.WorldModel="models/weapons/W_crossbow.mdl";
 ITEM.ViewModel="models/weapons/v_crossbow.mdl";
 
-if SERVER then
-	ITEM.HoldType="crossbow";
-end
+ITEM.HoldType="crossbow";
 
 --Overridden Base Weapon stuff
 ITEM.PrimaryDelay=.1;
@@ -47,12 +45,12 @@ ITEM.ReloadSounds={
 	--weapons\crossbow\hitbod2.wav
 }
 
-function ITEM:OnPrimaryAttack()
-	if !self["base_ranged"].OnPrimaryAttack(self) then return false end
+function ITEM:OnSWEPPrimaryAttack()
+	if !self["base_ranged"].OnSWEPPrimaryAttack(self) then return false end
 	
 end
 
-function ITEM:OnSecondaryAttack()
+function ITEM:OnSWEPSecondaryAttack()
 	--Secondary attack toggles scope zoom
 end
 

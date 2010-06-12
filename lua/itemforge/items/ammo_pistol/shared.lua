@@ -16,11 +16,9 @@ ITEM.StartAmount=20;
 
 ITEM.WorldModel="models/Items/BoxSRounds.mdl";
 
-if SERVER then
-
 ITEM.HoldType="normal";
 
-else
+if CLIENT then
 
 ITEM.WorldModelNudge=Vector(13,0,0);
 ITEM.WorldModelRotate=Angle(90,0,90);

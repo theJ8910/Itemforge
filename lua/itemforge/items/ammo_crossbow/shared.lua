@@ -16,11 +16,9 @@ ITEM.StartAmount=6;
 
 ITEM.WorldModel="models/Items/CrossbowRounds.mdl";
 
-if SERVER then
-
 ITEM.HoldType="normal";
 
-else
+if CLIENT then
 
 ITEM.WorldModelNudge=Vector(0,0,0);
 ITEM.WorldModelRotate=Angle(0,0,0);

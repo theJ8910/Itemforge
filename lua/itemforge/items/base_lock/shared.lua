@@ -28,9 +28,7 @@ ITEM.MaxHealth=500;
 ITEM.Spawnable=false;
 ITEM.AdminSpawnable=false;
 
-if SERVER then
-	ITEM.HoldType="slam";
-end
+ITEM.HoldType="slam";
 
 --Base Lock
 ITEM.AttachRange=128;

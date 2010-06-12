@@ -24,9 +24,12 @@ ITEM.AdminSpawnable=false;
 --Base Melee Weapon
 ITEM.HitDamage=25;					--We do this much damage per hit
 ITEM.HitRange=75;					--We must be this close to attack with this weapon
-ITEM.HitForce=5;					--When a physics object is hit, it's hit with "x" times more power than it would if a bullet hit it.
+ITEM.HitForce=1;					--When a physics object is hit, it's hit with "x" times more power than it would if a bullet hit it.
 ITEM.ViewKickMin=Angle(0,0,0);
 ITEM.ViewKickMax=Angle(0,0,0);
+ITEM.SwingHullDims = 16;
+ITEM.SwingHullMax = Vector(ITEM.SwingHullDims,ITEM.SwingHullDims,ITEM.SwingHullDims);
+ITEM.SwingHullMin = Vector(-ITEM.SwingHullDims,-ITEM.SwingHullDims,-ITEM.SwingHullDims);
 
 ITEM.HitSounds={
 	Sound("physics/flesh/flesh_impact_bullet1.wav"),
@@ -40,13 +43,13 @@ ITEM.MissSounds={
 	Sound("weapons/iceaxe/iceaxe_swing1.wav")
 };
 
-if SERVER then
-	ITEM.HoldType="melee";
-end
+ITEM.HoldType="melee";
 
-function ITEM:OnPrimaryAttack()
+
+--TODO: Garry needs to add the TraceAttackToTriggers binding so I can make melee weapon swings break glass
+function ITEM:OnSWEPPrimaryAttack()
 	--We do base_weapon's primary attack (it handles the cooldown and tells us if we can attack or not)
-	if !self["base_weapon"].OnPrimaryAttack(self) then return false end
+	if !self["base_weapon"].OnSWEPPrimaryAttack(self) then return false end
 	
 	local eWeapon=self:GetWeapon();
 	local pOwner=self:GetWOwner();
@@ -55,12 +58,45 @@ function ITEM:OnPrimaryAttack()
 	pOwner:SetAnimation(PLAYER_ATTACK1);
 	
 	--We have to figure out if the player hit something before dealing damage.
+	--First we'll see if the player is looking directly at something.
+	local aim=pOwner:GetAimVector();
 	local tr={};
 	tr.start=pOwner:GetShootPos();
-	tr.endpos=tr.start+(pOwner:GetAimVector()*self:GetHitRange());
+	tr.endpos=tr.start+(aim*self:GetHitRange());
 	tr.filter=pOwner;
 	tr.mask=MASK_SHOT;
+	
 	local traceRes=util.TraceLine(tr);
+	local eHit = traceRes.Entity;
+	local hitEntPos = traceRes.HitPos;
+	
+	--[[
+	If he wasn't looking directly at something we'll try a hull trace instead.
+	This is a box trace basically. We'll run a 16x16 box along the same line and see if it
+	hits anything. It's not entirely clear if this trace is an OBB or AABB...
+	I'd assume an OBB, because an AABB would offer a wider hit range when swinging diagonal
+	to the world axes... but who knows?
+	]]--
+	if !traceRes.Hit then
+		local tr={};
+		tr.start=pOwner:GetShootPos();
+		tr.endpos = tr.start + aim * (self:GetHitRange()-1.732*self.SwingHullDims);
+		tr.filter=pOwner;
+		tr.mask=MASK_SHOT;
+		tr.mins = self.SwingHullMin;
+		tr.maxs = self.SwingHullMax;
+		
+		traceRes=util.TraceHull(tr);
+		eHit = traceRes.Entity;
+		if traceRes.HitNonWorld && IsValid(eHit) then
+			hitEntPos = eHit:LocalToWorld(eHit:OBBCenter());
+		end
+	end
+	
+	--Validate that the hit occured within a 90 degree cone from the player's view
+	if aim:Dot((hitEntPos-traceRes.StartPos):Normalize())<0.70721 then
+		traceRes.Hit = false;
+	end
 	
 	if traceRes.Hit then
 		--If he hit, we'll display his weapon hitting, play a hit sound, and then it's up to the weapon to decide what happens
@@ -68,62 +104,151 @@ function ITEM:OnPrimaryAttack()
 		self:HitSound(traceRes);
 		
 		if !self:OnHit(pOwner,traceRes.Entity,traceRes.HitPos,traceRes) then
-			hitbullet={};
-			hitbullet.Num    = 1;
-			hitbullet.Src    = tr.start;
-			hitbullet.Dir    = pOwner:GetAimVector();
-			hitbullet.Spread = Vector(0,0,0);
-			hitbullet.Tracer = 0;
-			hitbullet.Force  = self:GetHitForce(pOwner,traceRes.Entity);
-			hitbullet.Damage = self:GetHitDamage(pOwner,traceRes.Entity);
+			--Melee weapons apply damage with trace attack dispatches.
+			local dmg = DamageInfo();
+			dmg:SetDamagePosition(traceRes.StartPos);
+			dmg:SetDamageForce(aim*self:Event("GetHitForce",1,traceRes));
+			dmg:SetInflictor(pOwner);
+			dmg:SetAttacker(pOwner);
+			dmg:SetDamage(self:Event("GetHitDamage",0,traceRes));
+			dmg:SetDamageType(DMG_CLUB);
 			
-			pOwner:FireBullets(hitbullet);
+			eHit:DispatchTraceAttack(dmg,traceRes.StartPos,traceRes.HitPos);
 			
+			--We have to use bullets clientside for impact effects since garry doesn't
+			--have UTIL_ImpactEffect either...
+			if CLIENT then
+				local hitbullet={};
+				hitbullet.Num    = 1;
+				hitbullet.Src    = tr.start;
+				hitbullet.Dir    = (hitEntPos-tr.start):Normalize();
+				hitbullet.Spread = Vector(0,0,0);
+				hitbullet.Tracer = 0;
+				hitbullet.Force  = self:Event("GetHitForce",1,traceRes);
+				hitbullet.Damage = self:Event("GetHitDamage",1,traceRes);
+
+				pOwner:FireBullets(hitbullet);
+			end
 		end
 	else
 		--If he missed, we'll display him missing and play a miss sound
 		eWeapon:SendWeaponAnim(ACT_VM_MISSCENTER);
-		self:MissSound();
+		self:MissSound(traceRes);
 	end
+	
 	self:AddViewKick(self.ViewKickMin,self.ViewKickMax);
 	return true;
 end
 
+--[[
+* SHARED
+* Event
+
+This event should return how far your melee attack with this weapon reaches. Maybe a breakable
+sword would swing longer when whole, and shorter when broken?
+]]--
 function ITEM:GetHitRange()
 	return self.HitRange;
 end
 
-function ITEM:GetHitForce()
-	return self.HitForce;
+--[[
+* SHARED
+* Event
+
+This event should return the amount of force that is applied to the target.
+The default is based off of Source's model, where enough force to propel a
+75 kg man at 4 in / sec (75*4 = 300) per point of damage (and scaled by the hit force scalar)
+is applied.
+]]--
+function ITEM:GetHitForce(traceRes)
+	return 300 * self:Event("GetHitDamage",0,traceRes) * self.HitForce;
 end
 
-function ITEM:GetHitDamage()
+--[[
+* SHARED
+* Event
+
+This event should return the amount of damage that is applied to the target.
+You could potentially use it for damaging things differently depending on what was hit.
+]]--
+function ITEM:GetHitDamage(traceRes)
 	return self.HitDamage;
 end
 
+--[[
+* SHARED
+
+Punches the player's view around by a random amount.
+min and max are angles, representing the minimum and maximum angle
+]]--
 function ITEM:AddViewKick(min,max)
-	if !self:IsHeld() then return false end
-	self:GetWOwner():ViewPunch(Angle(math.Rand(min.p,max.p),math.Rand(min.y,max.y),math.Rand(min.r,max.r)));
+	local pl=self:GetWOwner();
+	if !pl then return false end
+	
+	pl:ViewPunch(Angle(math.Rand(min.p,max.p),math.Rand(min.y,max.y),math.Rand(min.r,max.r)));
 end
 
-function ITEM:MissSound()
-	return self:EmitSound(self.MissSounds,true);
-end
+--[[
+* SHARED
+* Event
 
+This function is called when the weapon needs a hit sound played.
+traceRes is a full trace results table, containing information regarding the shot.
+]]--
 function ITEM:HitSound(traceRes)
 	return self:EmitSound(self.HitSounds,true);
 end
 
 --[[
+* SHARED
+* Event
+
+This function is called when the weapon needs a miss sound played.
+traceRes is a full trace results table, containing information regarding the miss.
+	Even though a valid entity wasn't hit, the trace results table still has information
+	like where the attack missed.
+]]--
+function ITEM:MissSound(traceRes)
+	return self:EmitSound(self.MissSounds,true);
+end
+
+--[[
+* SHARED
+* Event
+
 When the melee weapon hits something, this is called. This is before damage is applied.
 You can use this hook to give a special function to your weapon, like healing other items or players, for example.
 hitent is the entity hit. This may be nil or invalid so make sure to check for that with IsValid.
-Hitpos is the position something was hit.
-traceRes is a full trace result table, it has everything that's normally in a trace result (FractionLeftSolid,HitNonWorld,Fraction,Entity,HitNoDraw,HitSky,HitPos,StartSolid,HitWorld,HitGroup,HitNormal,HitBox,Normal,Hit,MatType,StartPos,PhysicsBone)
+hitpos is the position something was hit.
+traceRes is a full trace result table, it has everything that's normally in a trace result:
+	FractionLeftSolid,HitNonWorld,Fraction,Entity,HitNoDraw,HitSky,HitPos,StartSolid,HitWorld,HitGroup,HitNormal,HitBox,Normal,Hit,MatType,StartPos,PhysicsBone
 
 Return false to do damage (fires an invisible bullet).
 Return true to not do damage (doesn't fire an invisible bullet).
 ]]--
 function ITEM:OnHit(pOwner,hitent,hitpos,traceRes)
 	return false;
+end
+
+if SERVER then
+
+
+
+
+--[[
+* SERVER
+* Event
+
+This event runs when an NPC weilds this item as a weapon. This function should tell the NPC
+how he's allowed to use the weapon.
+
+Since this is a melee weapon we return that he's allowed to use attack 1.
+]]--
+function ITEM:GetSWEPCapabilities()
+	return CAP_WEAPON_MELEE_ATTACK1;
+end
+
+
+
+
 end

@@ -117,7 +117,7 @@ end
 --[[
 When the player is holding it and tries to primary attack
 ]]--
-function ITEM:OnPrimaryAttack()
+function ITEM:OnSWEPPrimaryAttack()
 	if !self:CanPrimaryAttack() || (self:IsHeld() && self:GetWOwner():KeyDownLast(IN_ATTACK) && !self:CanPrimaryAttackAuto()) then return false end
 	
 	if !self.PrimaryFiresUnderwater && self:GetWaterLevel()==3 then
@@ -144,7 +144,7 @@ end
 --[[
 When the player is holding it and tries to secondary attack
 ]]--
-function ITEM:OnSecondaryAttack()
+function ITEM:OnSWEPSecondaryAttack()
 	if !self:CanSecondaryAttack() || (self:IsHeld() && self:GetWOwner():KeyDownLast(IN_ATTACK2) && !self:CanSecondaryAttackAuto()) then return false end
 	
 	if !self.SecondaryFiresUnderwater && self:GetWaterLevel()==3 then
@@ -174,7 +174,7 @@ This function is called when:
 	Wiremod triggers the "Reload" input
 It locates nearby ammo and tells the gun to load it.
 ]]--
-function ITEM:OnReload()
+function ITEM:OnSWEPReload()
 	if !self:CanReload() then return false end
 	if self.ReloadsSingly then return self:StartReload(); end
 	
@@ -183,7 +183,7 @@ function ITEM:OnReload()
 		local curAmmo=self:GetAmmo(clip);
 		if clipsize==0 || !curAmmo || curAmmo:GetAmount()<clipsize then
 			local getNearbyAmmo=function(self,item)
-				return self:Load(item,i);
+				return self:Load(item,i,nil,true);
 			end
 			
 			if self:FindAmmo(getNearbyAmmo) then
@@ -202,18 +202,24 @@ item is the stack of ammo to load.
 amt is an optional amount indicating how many items from the stack to transfer.
 	If this is nil/not given, we'll try to load the whole stack (or we'll try to transfer as many as possible).
 Returns false if it couldn't be loaded for some reason, and true if it could.
+If bPredicted is:
+	true, then the function is expected to be called on server and the client.
+		What this means is that the server will not tell the player holding the weapon to play the reload sound; that client is expected to play it itself.
+	false or not given, the server tells the client to play the reload sound.
 ]]--
-function ITEM:Load(item,clip,amt)
+function ITEM:Load(item,clip,amt,bPredicted)
 	if !self:CanReload() then return false end
 	
-	if !clip then
+	if clip==nil then
 		for i=1,table.getn(self.Clips) do
-			if self:Load(item,i,amt) then return true end
+			if self:Load(item,i,amt,bPredicted) then return true end
 		end
 		return false;
 	end
 	
 	if !self:CanLoadClipWith(item,clip) then return false end
+	
+	if bPredicted == nil then bPredicted = false end
 	
 	if SERVER then
 		--How much ammo are we loading
@@ -272,7 +278,7 @@ function ITEM:Load(item,clip,amt)
 		self:UpdateWireAmmoCount();
 	end
 	
-	self:ReloadEffects();
+	self:ReloadEffects(bPredicted);
 	self:SetNextBoth(CurTime()+self:GetReloadDelay());
 	
 	return true;
@@ -410,7 +416,7 @@ function ITEM:Reload()
 	end
 	
 	--TODO if ammo is unloadable (ex can't split a shell from the stack) it keeps trying to reload; fix this
-	if !self:Load(self.ReloadSource,self.ReloadClip,1) then return false end
+	if !self:Load(self.ReloadSource,self.ReloadClip,1,true) then return false end
 	
 	return true;
 end
@@ -435,11 +441,14 @@ end
 --[[
 Plays a reload sound and plays the reload animation (both on the weapon and player himself).
 ]]--
-function ITEM:ReloadEffects()
-	if #self.ReloadSounds>0 then self:EmitSound(self.ReloadSounds,true); end
+function ITEM:ReloadEffects(bPredicted)
+	if #self.ReloadSounds>0 then self:EmitSound(self.ReloadSounds,bPredicted); end
 	
-	if !self:IsHeld() then return false end
-	self:GetWeapon():SendWeaponAnim(ACT_VM_RELOAD);
+	local wep = self:GetWeapon();
+	if !wep then return false end
+	
+	if self.ReloadsSingly then wep:SendWeaponAnim(ACT_SHOTGUN_RELOAD_START) end
+	wep:SendWeaponAnim(ACT_VM_RELOAD);
 	self:GetWOwner():SetAnimation(PLAYER_RELOAD);
 end
 

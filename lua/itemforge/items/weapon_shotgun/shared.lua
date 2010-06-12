@@ -18,9 +18,8 @@ ITEM.WorldModel="models/weapons/w_shotgun.mdl";
 ITEM.ViewModel="models/weapons/v_shotgun.mdl";
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
-if SERVER then
-	ITEM.HoldType="shotgun";
-end
+
+ITEM.HoldType="shotgun";
 
 --Overridden Base Weapon stuff
 ITEM.PrimaryDelay=0.33333334326744;
@@ -73,7 +72,7 @@ ITEM.PumpSound=Sound("weapons/shotgun/shotgun_cock.wav");
 The shotgun's primary attack does everything the base_firearm does, but it's behavior is modified a little bit.
 Since it's a shotgun it needs to be pumped before it can be fired again.
 ]]--
-function ITEM:OnPrimaryAttack()
+function ITEM:OnSWEPPrimaryAttack()
 	local pAmmo=self:GetAmmo(self.PrimaryClip);
 	
 	--If we're reloading, we wait until we have enough ammo, then we stop the reload and attack
@@ -84,7 +83,7 @@ function ITEM:OnPrimaryAttack()
 	end
 	
 	--Can't attack if we need to pump the shotgun
-	if self:GetNWBool("NeedsPump") || !self["base_firearm"].OnPrimaryAttack(self) then return false end
+	if self:GetNWBool("NeedsPump") || !self["base_firearm"].OnSWEPPrimaryAttack(self) then return false end
 	
 	self:SetNWBool("NeedsPump",true);
 	return true;
@@ -93,7 +92,7 @@ end
 --[[
 The shotgun's secondary attack is pretty much the same thing as it's primary attack except it shoots more bullets and does more kick or whatever
 ]]--
-function ITEM:OnSecondaryAttack()
+function ITEM:OnSWEPSecondaryAttack()
 	local sAmmo=self:GetAmmo(self.SecondaryClip);
 	local notEnoughAmmo=(!sAmmo || sAmmo:GetAmount()<self.SecondaryTakes);
 	
@@ -107,11 +106,11 @@ function ITEM:OnSecondaryAttack()
 	--We're not reloading, that means we can attack immediately.
 	--If it turns out we don't have enough ammo for the secondary attack, we try to do a primary attack instead.
 	elseif notEnoughAmmo then
-		return self:OnPrimaryAttack();
+		return self:OnSWEPPrimaryAttack();
 	end
 	
 	--Can't attack if we need to pump the shotgun
-	if self:GetNWBool("NeedsPump") || !self["base_firearm"].OnSecondaryAttack(self) then return false end
+	if self:GetNWBool("NeedsPump") || !self["base_firearm"].OnSWEPSecondaryAttack(self) then return false end
 	
 	self:ShootBullets(self.BulletsPerShotSec,self.BulletDamage,1,self:GetBulletSpread());
 	self:MuzzleFlash();

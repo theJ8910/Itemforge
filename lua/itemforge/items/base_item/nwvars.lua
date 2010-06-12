@@ -78,6 +78,10 @@ IF.Items:CreateNWVar(ITEM,"WorldModel","string",function(self) return self.World
 --What is this item's view model? The player sees himself holding this while he is wielding the item as an SWEP in first person.
 IF.Items:CreateNWVar(ITEM,"ViewModel","string",function(self) return self.ViewModel end);
 
+--When the item is held, what slot # and position does it occupy in the weapon selection menu?
+IF.Items:CreateNWVar(ITEM,"SWEPSlot","int",function(self) return self.SWEPSlot end);
+IF.Items:CreateNWVar(ITEM,"SWEPSlotPos","int",function(self) return self.SWEPSlotPos end);
+
 --What color is the item? This affects model color and icon color by default.
 IF.Items:CreateNWVar(ITEM,"Color","color",function(self) return self.Color end);
 

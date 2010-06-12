@@ -45,9 +45,9 @@ ITEM.PenaltyMax=1.5;			--The max accuracy penality is 1.5 seconds
 --The max spread is how inaccurate the pistol will be when the accuracy penalty is maxed out (turns out it's worse than the SMG; that being said, fire carefully to avoid maxing out the penalty)
 ITEM.BulletSpreadMax=Vector(0.05234,0.05234,0.05234);			--Taken directly from modcode; this is 6 degrees deviation
 
-function ITEM:OnPrimaryAttack()
+function ITEM:OnSWEPPrimaryAttack()
 	--This does all the base ranged stuff - determine if we can fire, do cooldown, consume ammo, play sounds, etc
-	if !self["base_ranged"].OnPrimaryAttack(self) then return false end
+	if !self["base_ranged"].OnSWEPPrimaryAttack(self) then return false end
 	
 	local pAmmo=self:GetAmmo(self.PrimaryClip);
 	if !pAmmo then return false end
@@ -62,7 +62,7 @@ function ITEM:OnPrimaryAttack()
 	self:AddPenalty(self.PenaltyPerShot);
 end
 
-function ITEM:OnSecondaryAttack()
+function ITEM:OnSWEPSecondaryAttack()
 	--Secondary attack does NOTHING
 end
 

@@ -26,11 +26,10 @@ ITEM.Sounds={
 	Sound("physics/metal/metal_box_strain4.wav"),
 	Sound("physics/metal/metal_canister_impact_hard3.wav")
 }
-if SERVER then
 
 ITEM.HoldType="normal";
 
-else
+if CLIENT then
 
 ITEM.WorldModelNudge=Vector(0,0,8);
 

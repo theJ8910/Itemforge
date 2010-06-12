@@ -22,6 +22,19 @@ ENT.BeingRemoved=false;
 ENT.IsWire = false;
 ENT.BaseWireEntity=nil;
 
+--[[
+* SHARED
+
+Set up the first DT int to be the item ID.
+This is good because when the entity gets created the item ID goes with it!
+This pretty much allows us to link with the item ASAP, although it's still possible for late
+linking to occur (such as when the item is created in the world, or when the item is created out
+of the PVS of the player, and then the player discovers it).
+]]--
+function ENT:SetupDataTables()
+	self:DTVar("Int",0,"i");
+end
+
 function ENT:Initialize()
 	self:GiveWire();	--WIRE
 end
@@ -43,7 +56,7 @@ function ENT:SetItem(item)
 		end
 		
 		--Tell clients what item we use
-		self:SetNWInt("i",item:GetID());
+		self:SetDTInt("i",item:GetID());
 		
 		self:Spawn();
 	else
@@ -57,7 +70,7 @@ If the item has been removed, then nil is returned and self.Item is set to nil.
 ]]--
 function ENT:GetItem()
 	if !self.Item then
-		if CLIENT && !self:SetItem(IF.Items:Get(self.Entity:GetNWInt("i"))) then 
+		if CLIENT && !self:SetItem(IF.Items:Get(self.Entity:GetDTInt("i"))) then 
 			return nil;
 		end
 	elseif !self.Item:IsValid() then
@@ -76,7 +89,17 @@ function ENT:GiveWire()
 	--If we already have wire
 	if self.IsWire then return true end
 	
-	self.IsWire=(WireVersion&&WireVersion>=843);
+	local wvType = type(WireVersion);
+	
+	if wvType=="nil" then
+		self.IsWire = false;
+	elseif wvType=="number" then
+		self.IsWire = WireVersion>=843;
+	elseif wvType=="string" then
+		local wv = tonumber(string.sub(WireVersion,1,string.find(WireVersion,"[^%d]")-1));
+		self.IsWire = wv>=843
+	end
+	
 	if self.IsWire then self["BaseWireEntity"]=scripted_ents.Get("base_wire_entity"); end
 end
 

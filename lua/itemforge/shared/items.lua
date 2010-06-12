@@ -9,8 +9,6 @@ theJ89's BUG list
 BUG  Shotgun reload loop is failing when trying to reload from a stack of 1 items
 BUG  net_fakelag 500 produces noticable problems with weapons. *sigh*
 BUG  Weapons should have networked, predicted ammo counters instead of using :GetAmount() from the current ammo. This should fix the "dry fire on last shot clientside" bug with ranged weapons.
-BUG  sometimes the view model does not change; this has been noticed when picking up one item, dropping it, and picking up a separate item
-BUG  apparently related to the view model having it's model changed through Lua, viewmodel animations do not play until Weapon:SendWeaponAnim(ACT_VM_PRIMARYATTACK) is called.
 BUG  SWEP pickup issues (Give player weapon but he doesn't pick it up); waiting on garry for this
 BUG	 Odd bug noticed; may be related to entity owner, entity collision group, or damage. Sometimes while in the world an item loses its collision, player can walk through it, can't use it, etc.
 BUG  fix bug with SetNetOwner; is complaining about non-existent inventories table 
@@ -19,9 +17,7 @@ BUG  the new reusable IDs may interfere with full-update checks - If an old item
 BUG  Possibly PVS related or something - players will often see other players holding nothing. Items like the lantern stop working during lag spikes. Lantern light sticks until the local player observes the player holding the lantern.
 BUG  Sometimes players see bullets fired from other players... wierd!
 BUG  Debug module is reporting message -114 is undefined for some clients
-BUG  Wiremod is erroring some clients with message: Lua Error: entities\itemforge_item\shared.lua:80: attempt to compare number with string
 BUG  Okay, WTF? The pumpkin was both inside and outside of an inventory at the same time...
-BUG  Singleplayer - Weapons do not deploy clientside or something - the item slot is not showing up.
 BUG  Hitting ammo results in serverside bugs
 
 theJ89's Giant TODO list
@@ -37,7 +33,7 @@ TODO looping sounds should resume when possible
 TODO change inventory functions from MoveSlot to SwapSlot (functionality and name)
 TODO SetWorldModel and SetViewModel need to work clientside too
 TODO migrate .ReloadsSingly related things from the shotgun to the base_ranged
-TODO base_ranged needs to have "Load" renamed to "FillClip"; StartReload needs to be called OnReload - if the weapon .ReloadsSingly this starts the reload loop, otherwise this immediately fills the clip; items that use :Load() must be configured this way
+TODO base_ranged needs to have "Load" renamed to "FillClip"; StartReload needs to be called OnSWEPReload - if the weapon .ReloadsSingly this starts the reload loop, otherwise this immediately fills the clip; items that use :Load() must be configured this way
 
 Item Ideas
 TODO Wearable gear as suggested by Mr. Bix
@@ -90,8 +86,8 @@ MODULE.Name="Items";										--Our module will be stored at IF.Items
 MODULE.Disabled=false;										--Our module will be loaded
 MODULE.ItemsDirectory="itemforge/items/";					--What folder are the different item types stored in relative to the garrysmod/lua/ directory
 MODULE.ExtensionsDirectory="extend"							--What folder are extensions for item types stored in relative to the item-type's folder (ex: if this is "extend" it means extensions for "item_crowbar" are stored in "garrysmod/lua/itemforge/items/item_crowbar/extend")?
-MODULE.MaxItems=65535;										--WARNING: Item IDs beyond this value CANNOT be sent through networking! DO NOT CHANGE. How many unique items can exist at a single time (a stack of items count as one unique item)?
-MODULE.MaxHeldItems=32;										--How many items can be held by a player at a single time (in the player's weapon menu)? This should NOT exceed 32. If your gamemode wants to set this, use this in your init: IF.Items:SetMaxHeld(amt)
+MODULE.BaseEntityClassName="itemforge_item";				--What is the classname of the base entity that Itemforge uses? This is the entity that allows an item to exist in the world. 
+MODULE.BaseWeaponClassName="itemforge_item_held";			--What is the classname of the base SWEP that Itemforge SWEPs are based off of? This is the SWEP that allows us to hold items.
 
 if CLIENT then
 
@@ -109,6 +105,7 @@ local BaseType="base_item";									--This is the undisputed absolute base item-
 local ItemTypes={};											--Item types. After being loaded from the script they are placed here
 local ItemRefs={};											--Item references - there's an item reference for every item. We pass this instead of the actual item. By storing the references, the actual item the reference refers to can be properly garbage collected when it's removed (freeing up memory). It also informs the scripter of any careless mistakes (referencing an item after it has been deleted mostly).
 local ItemsByType={};										--Items by type are stored here (ex ItemsByType["item_crowbar"] contains all item_crowbar items currently spawned)
+local MaxItems=65535;										--WARNING: Item IDs beyond this value CANNOT be sent through networking! DO NOT CHANGE. How many unique items can exist at a single time (a stack of items count as one unique item)?
 local NextItem=1;											--This is a pointer of types, that records where the next item will be made. IDs are assigned based on this number. This only serves as a starting point to search for a free ID. If this slot is taken then it will search through the entire items array once to look for a free slot.
 local ProtectedKeys={};										--This is a table of protected keys in the base item-type. If an item attempts to override a protected key, the console will report a warning and get rid of the override by setting it to nil. Likewise attempting to override a protected key on an item (myItem.Use="hello" for example) will be stopped as well.
 local AllowProtect=false;									--If this is true, we can protect keys (in other words, we're loading the base item-type while this is true)
@@ -145,6 +142,8 @@ IFI_MSG_PARTIALMERGE	=	-101;	--(Server > Client) Macro; Merge two items partiall
 IFI_MSG_SPLIT			=	-100;	--(Server > Client) Macro; Split an item (saves bandwidth)
 
 --[[
+* SHARED
+
 DoesLuaFileExist returns true if the given path in the lua directory does exist, false otherwise
 LuaPath should be something like "itemforge/items/item/shared.lua"
 ]]--
@@ -157,6 +156,8 @@ local function DoesLuaFileExist(LuaPath)
 end
 
 --[[
+* SHARED
+
 IsLuaFolder will return false if you give it a file (or if the folder given doesn't exist), and true if you give it a folder.
 LuaPath should be something like "itemforge/items/item"
 ]]--
@@ -175,19 +176,32 @@ end
 
 
 
---Initilize Items module. We need to load the item types, then set their bases.
+--[[
+* SHARED
+
+Initilize Items module.
+We need to load the item types, then set their bases.
+]]--
 function MODULE:Initialize()
 	self:LoadItemTypes();
 	self:FixItemTypeMissingData();
 	self:StartTick();
 end
 
---Clean up the items module. Removes all items. Currently I have this done prior to a refresh. It will remove any items and clean up any local stuff stored here.
---TODO make this useful; actually use it somewhere
+--[[
+* SHARED
+
+Clean up the items module. Removes all items.
+Currently I have this done prior to a refresh.
+It will remove any items and clean up any local stuff stored here.
+TODO make this useful; actually use it somewhere
+]]--
 function MODULE:Cleanup()
 	for k,v in pairs(ItemRefs) do
 		v:Remove();
 	end
+	
+	self:StopTick();
 	
 	ItemTypes=nil;
 	ItemRefs=nil;
@@ -195,18 +209,23 @@ function MODULE:Cleanup()
 	ProtectedKeys=nil;
 end
 
---Load itemtypes. This loads the items' scripts and can be used to refresh a changed item.
+--[[
+* SHARED
+
+Load itemtypes.
+This loads the items' scripts and can be used to refresh a changed item.
+]]--
 function MODULE:LoadItemTypes()
 	if ItemTypes then ItemTypes={}; end				--Clear this table in case it has been loaded before (in the case we're refreshing it).
 	
 	--List of all items in the items directory
 	local itemFolders=file.FindInLua(self.ItemsDirectory.."*");		--itemforge/items/*
 	
-	--Search for directories in our item folder
+	--Take a look at each folder, load init.lua, cl_init.lua, or shared.lua.
 	for k,v in pairs(itemFolders) do
 		
-		local path=self.ItemsDirectory..v;							--itemforge/items/item
-		if v!=".." && v!="." && IsLuaFolder(path) then
+		local path=self.ItemsDirectory..v;							--itemforge/items/base_item
+		if v!=".svn" && v!=".." && v!="." && IsLuaFolder(path) then
 			if string.lower(v)==BaseType then AllowProtect=true end
 			
 			--Create a temporary ITEM table at global
@@ -216,7 +235,9 @@ function MODULE:LoadItemTypes()
 			
 			
 			--[[
-			Lets load an item type! (loads init if on the server, or cl_init if on the client - if either init or cl_init is missing, shared will be loaded if shared exists. If shared doesn't exist, nothing will be loaded.)
+			Lets load an item type! (loads init if on the server, or cl_init if on the client.
+			If either init or cl_init is missing, shared will be loaded if shared exists.
+			If shared doesn't exist, nothing will be loaded.)
 			AddCSLuaFile must be done manually. I try to make item scripts resemble entity/swep/effect scripts as much as possible.
 			]]--
 			if SERVER then
@@ -243,7 +264,7 @@ function MODULE:LoadItemTypes()
 			
 			
 			--Load extensions to this item if available (in the case that a scripter wants to add onto an existing item-type for his own purposes - such as adding "temperature" to the base item-type to give all items a temperature rating).
-			local extfolder=path.."/"..self.ExtensionsDirectory;		--itemforge/items/item/extend
+			local extfolder=path.."/"..self.ExtensionsDirectory;		--itemforge/items/base_item/extend
 			if IsLuaFolder(extfolder) then
 				--List of all extensions in this item's extension folder
 				local extensionFolders=file.FindInLua(extfolder.."/*");	--itemforge/items/item/extend/*
@@ -254,7 +275,7 @@ function MODULE:LoadItemTypes()
 				for i=1,table.getn(extensionFolders) do
 					local v=extensionFolders[i];
 					local extpath=extfolder..v;							--itemforge/items/item/extend/temperature
-					if v!=".." && v!="." && IsLuaFolder(extpath) then
+					if v!=".svn" && v!=".." && v!="." && IsLuaFolder(extpath) then
 						--Load init serverside, cl_init clientside. In the abscence of either, load shared in it's place if it exists.
 						if SERVER then
 							
@@ -288,25 +309,27 @@ function MODULE:LoadItemTypes()
 			if ITEM.Base==nil then ITEM.Base=BaseType end
 			
 			--Register class; The type is set to the name of the folder.
-			IF.Base:RegisterClass(ITEM,type);
-			
-			--Store the item type just loaded
-			ItemTypes[type]=ITEM;
-			
-			--Create an Items by Type table to store any items spawned of this type
-			if ItemsByType[type]==nil then ItemsByType[type]={}; end
-			
-			--Pool this string (increases network efficiency by substituting a smaller placeholder for this string when networked)
-			if SERVER then umsg.PoolString(type); end
+			local tClass=IF.Base:RegisterClass(ITEM,type);
+			if tClass != nil then
+				--Store the item type just loaded
+				ItemTypes[type]=tClass;
+				
+				--Create an Items by Type table to store any items spawned of this type
+				if ItemsByType[type]==nil then ItemsByType[type]={}; end
+				
+				--Pool this string (increases network efficiency by substituting a smaller placeholder for this string when networked)
+				if SERVER then umsg.PoolString(type); end
+			end
 			
 			ITEM=nil;								--Get rid of the temporary ITEM table
 			AllowProtect=false;
 		end
 	end
-	
 end
 
 --[[
+* SHARED
+
 We add tables that may be missing, such as NWVarsByName
 Additionally this function checks to make sure item types are not overriding any protected values
 ]]--
@@ -320,6 +343,8 @@ function MODULE:FixItemTypeMissingData()
 end
 
 --[[
+* SHARED
+
 Set network command and network var ID numbers...
 We take hierarchy into consideration with this function.
 For example, if Item A has NWVars "VarString" and "VarInt",
@@ -390,19 +415,8 @@ function MODULE:SetItemTypeNWVarAndCommandIDs()
 end
 
 --[[
-Sets the max number of holdable items (how many items can be held in the player's weapon menu at any given time).
-amt is how many weapons you want the players to hold at any given time. This will be clamped between 0 and 32.
-	If this is 0, no items can be held; any time an item tries to be held, it will return false.
-	The absolute limit to this is 32.
-]]--
-function MODULE:SetMaxHeld(amt)
-	if !amt then ErrorNoHalt("Itemforge Items: Couldn't set max holdable items. No amount was given!\n"); return false end
-	self.MaxHeldItems=math.Clamp(amt,0,32);
-	
-	return true;
-end
+* SHARED
 
---[[
 Protects a key in the base item-type
 Stops items from overriding these keys by removing overrides after parsing item-types (and additionally if a protected key is being overwritten on an item, such as... myItem.Use="TEST").
 Additionally this will alert the scripter that he's tried to override a protected key.
@@ -421,6 +435,8 @@ function MODULE:ProtectKey(key)
 end
 
 --[[
+* SHARED
+
 Creates a networked variable for a type of item.
 The networked command should be created serverside and clientside, in the same order.
 itemtype should usually be ITEM (assuming you're doing this in the itemtype's file)
@@ -491,6 +507,8 @@ function MODULE:CreateNWVar(itemtype,sName,sDatatype,vDefaultValue,bPredicted,bH
 end
 
 --[[
+* SHARED
+
 Creates a networked command for a type of item.
 The networked command should be created serverside and clientside, in the same order.
 itemtype should usually be ITEM (assuming you're doing this in the itemtype's file)
@@ -588,8 +606,28 @@ function MODULE:CreateNWCommand(itemtype,sName,fHook,tDatatypes)
 	return true;
 end
 
---TODO I'm not satisfied with the way this function works; consider reworking it sometime
 --[[
+* SHARED
+
+Registers a scripted weapon for the given itemtype.
+tItem should be the item-type table.
+]]--
+function MODULE:RegisterSWEP(tItemClass)
+	if string.len(tItemClass.ClassName) > 30 then ErrorNoHalt("Itemforge Items: Warning! \""..tItemClass.ClassName.."\"'s name is too long to register a SWEP for. Expect errors when trying to hold this item!\n") end
+	--Make a copy of the base weapon
+	local copy={
+		Base		=	self.BaseWeaponClassName,
+		ViewModel	=	tItemClass.ViewModel,
+	};
+	
+	local sClass="if_"..tItemClass.ClassName;
+	if CLIENT then language.Add(sClass,"Item (held)"); end
+	weapons.Register(copy,sClass,true);
+end
+
+--[[
+* SHARED
+
 Searches the Items[] table for an empty slot.
 iFrom is an optional number describing where to start searching in the table.
 	If this number is not given, is over the max number of items, or is under 1, it will be set to 1.
@@ -597,29 +635,35 @@ This function will keep searching until:
 	It finds an open slot.
 	It has gone through the entire table once.
 The index of an empty slot is returned if one is found, or nil is returned if one couldn't be found.
+
+TODO I'm not satisfied with the way this function works; consider reworking it sometime
 ]]--
 function MODULE:FindEmptySlot(iFrom)
 	--Wrap around to 1 if iFrom wasn't given or was under zero or was over the item limit
-	if !iFrom || iFrom>self.MaxItems || iFrom<1 then iFrom=1; end
+	if !iFrom || iFrom>MaxItems || iFrom<1 then iFrom=1; end
 	
 	local count=0;
-	while count<self.MaxItems do
+	while count<MaxItems do
 		if ItemRefs[iFrom]==nil then return iFrom end
 		count=count+1;
 		iFrom=iFrom+1;
-		if iFrom>self.MaxItems then iFrom=1 end
+		if iFrom>MaxItems then iFrom=1 end
 	end
 	return nil;
 end
 
 --[[
+* SHARED
+
 Starts Itemforge Item's tick
 ]]--
 function MODULE:StartTick()
-	hook.Add("Tick","itemforge_tick",self.Tick,self)
+	hook.Add("Tick","itemforge_tick", function(...) self:Tick(...) end)
 end
 
 --[[
+* SHARED
+
 This runs the Tick() function on every active item on the server (Serverside and Clientside)
 ]]--
 function MODULE:Tick()
@@ -629,6 +673,8 @@ function MODULE:Tick()
 end
 
 --[[
+* SHARED
+
 Stops Itemforge Item's tick
 ]]--
 function MODULE:StopTick()
@@ -636,6 +682,8 @@ function MODULE:StopTick()
 end
 
 --[[
+* SHARED
+
 Creates an item of this type. This should only be called on the server by a scripter. Clientside, this is called to sync creation.
 
 Once the item has been created, it will be floating around in the void (not in the world or in an inventory).
@@ -683,14 +731,14 @@ function MODULE:Create(type,id,fullUpd,owner,bPredict)
 			n=self:FindEmptySlot(n+1);
 			
 			if n==nil then
-				if !bPredict then ErrorNoHalt("Itemforge Items: Couldn't create \""..type.."\" - no free slots (all "..self.MaxItems.." slots occupied)!\n"); end
+				if !bPredict then ErrorNoHalt("Itemforge Items: Couldn't create \""..type.."\" - no free slots (all "..MaxItems.." slots occupied)!\n"); end
 				return nil;
 			end
 		end
 		
 		if !bPredict then
 			NextItem=n+1;
-			if NextItem>self.MaxItems then NextItem=1 end
+			if NextItem>MaxItems then NextItem=1 end
 		end
 	else
 		if id==nil then ErrorNoHalt("Itemforge Items: Could not create \""..type.."\" clientside, the ID of the item to be created wasn't given!\n"); return nil end
@@ -740,6 +788,7 @@ function MODULE:Create(type,id,fullUpd,owner,bPredict)
 		
 		--Items will be initialized right after being created
 		--TODO predicted items need to initialize too but not do any networking shit
+		--TODO addendum: This should be solved in the coming networking update
 		newItem:Initialize(owner);
 	end
 	
@@ -748,6 +797,8 @@ function MODULE:Create(type,id,fullUpd,owner,bPredict)
 end
 
 --[[
+* SHARED
+
 Creates an item and then places it in the given inventory
 If the creation succeeds, the item created is returned. Otherwise, nil is returned.
 ]]--
@@ -774,6 +825,8 @@ end
 MODULE.CreateInInv=MODULE.CreateInInventory;
 
 --[[
+* SHARED
+
 Creates an item and then places it in the world at the given position and angles.
 type is the type of item you want to create.
 vWhere is an optional position you want to create the item at in the world. This defaults to Vector(0,0,0).
@@ -802,6 +855,8 @@ function MODULE:CreateInWorld(type,vWhere,aAngles,bPredict)
 end
 
 --[[
+* SHARED
+
 Creates an item and then places it in the hands of a player as a weapon.
 If the creation succeeds, the item created is returned. Otherwise, nil is returned.
 ]]--
@@ -824,6 +879,8 @@ function MODULE:CreateHeld(type,pPlayer,bPredict)
 end
 
 --[[
+* SHARED
+
 Creates an item and places it in the same location as an existing item.
 This function is probably best for things that are breaking apart (such as a pickaxe breaking into a pickaxe head and a stick)
 extItem is an existing item. The new item will be created in the same location as it.
@@ -857,6 +914,8 @@ function MODULE:CreateSameLocation(type,extItem,bPredict)
 end
 
 --[[
+* SHARED
+
 This will remove an existing item. item:Remove() calls this. When this function is run, the OnRemove() hook on an item is triggered.
 item should be an existing item.
 ]]--
@@ -916,44 +975,56 @@ function MODULE:Remove(item)
 end
 
 --[[
-Returns true if the given entity is actually an item in the world (an "itemforge_item" entity).
-Returns false otherwise.
+* SHARED
+
+Returns true if the given entity is actually an item in the world
+(an "itemforge_item" entity).
+If the entity isn't an item, or is just invalid then false is returned.
 ]]--
 function MODULE:IsEntItem(eEnt)
 	if !eEnt || !eEnt:IsValid() then return false end
-	if eEnt:GetClass()=="itemforge_item" then return true end
+	if eEnt:GetClass()==self.BaseEntityClassName then return true end
 	return false;
 end
 
 --[[
-Returns true if the given weapon is actually an item being held by a player (an "itemforge_item_held*" entity)
+* SHARED
+
+Returns true if the given weapon is actually an item being held by a player
+(in other words, if it's based off of the base itemforge weapon).
+
+If the weapon isn't an item, or is just invalid then false is returned.
 ]]--
 function MODULE:IsWeaponItem(eWep)
 	if !eWep || !eWep:IsValid() then return false end
-	return string.sub(eWep:GetClass(),1,20)=="itemforge_item_held_";
+	return eWep.Base==self.BaseWeaponClassName;
 end
 
 --[[
+* SHARED
+
 If the given entity is actually an item in the world, returns the item.
 Returns nil otherwise.
 ]]--
 function MODULE:GetEntItem(eEnt)
-	if !eEnt || !eEnt:IsValid() then return nil end
-	if eEnt:GetClass()!="itemforge_item" then return nil end
-	return eEnt:GetItem();
-end
-
---[[
-If the given weapon is actually an item being held by a player, returns the item.
-Returns nil otherwise.
-]]--
-function MODULE:GetWeaponItem(eWep)
-	if !eWep || !eWep:IsValid() then return nil end
-	if string.find(eWep:GetClass(),"itemforge_item_held_[1-"..IF.Items.MaxHeldItems.."]") then return eWep:GetItem() end
+	if self:IsEntItem(eEnt) then return eEnt:GetItem() end
 	return nil;
 end
 
 --[[
+* SHARED
+
+If the given weapon is actually an item being held by a player, returns the item.
+Returns nil otherwise.
+]]--
+function MODULE:GetWeaponItem(eWep)
+	if self:IsWeaponItem(eWep) then return eWep:GetItem() end
+	return nil;
+end
+
+--[[
+* SHARED
+
 This returns a reference to an item with the given ID.
 For all effective purposes this is the same thing as returning the actual item,
 except it doesn't hinder garbage collection,
@@ -965,11 +1036,16 @@ function MODULE:Get(id)
 end
 
 --[[
+* SHARED
+
 Returns a table of all items currently available to Itemforge.
 Please note:
-	This function copies the entire table of item references every time it is run. Do not run it all the time! That lags!
-	If this function is run on the client, the client may not have every single item the server has (because of private inventories and lag).
-	However, this function will always return every single item serverside, regardless of who owns it.
+	This function copies the entire table of item references every time it is run.
+	Do not run it all the time! That lags!
+	If this function is run on the client, the client may not have every single item the server has,
+	because of private inventories and lag. However, serverside this function will always return
+	every single item, regardless of who owns it.
+
 TODO possibly a more efficient alternative
 ]]--
 function MODULE:GetAll()
@@ -983,7 +1059,13 @@ function MODULE:GetAll()
 end
 
 --[[
+* SHARED
+
 Returns a table of all items with a given type currently available to Itemforge.
+Please note:
+	This function copies the entire table of items by this type every time it is run.
+	Do not run it all the time! That lags!
+
 TODO possibly a more efficient alternative
 ]]--
 function MODULE:GetByType(sType)
@@ -997,11 +1079,12 @@ function MODULE:GetByType(sType)
 end
 
 --[[
+* SHARED
+
 Returns a list of all item types.
-Please note:
-	This function copies the entire table of item types every time it is run. Do not run it all the time! That lags!
-	Don't modify the item-types. If you do, every currently spawned item with that item-type may change.
-TODO ensure that item-types are write protected in metatable, find a more efficient alternative.
+NOTE:
+	Don't modify the item-types.
+	If you do, every currently spawned item with that item-type may change.
 ]]--
 function MODULE:GetTypes()
 	local t={};
@@ -1014,8 +1097,14 @@ function MODULE:GetTypes()
 end
 
 --[[
+* SHARED
+
 Returns the item type by name sName.
-NOTE: If your item is based off of another item, you can access it's type by doing self["base_class"] (where self is your item, and base_class is whatever it's based off of, like base_lock, base_item, whatever)
+NOTE:
+	If your item is based off of another item, you can access it's type by doing self["base_class"] (where self is your item, and base_class is whatever it's based off of, like base_lock, base_item, whatever)
+	Don't modify the item-types.
+	If you do, every currently spawned item with that item-type may change.
+	
 If the item type exists, returns it. Otherwise, returns nil.
 ]]--
 function MODULE:GetType(sName)
@@ -1047,6 +1136,8 @@ if SERVER then
 
 
 --[[
+* SERVER
+
 Asks the client to create an item clientside. When the request to create the item arrives clientside, if the item already exists it is disregarded.
 item is an existing, valid item that needs to be created.
 If pl isn't nil, this function will only tell that player to create the item. Otherwise, all players are instructed to create this item clientside.
@@ -1079,6 +1170,8 @@ function MODULE:CreateClientside(item,pl,fullUpd)
 end
 
 --[[
+* SERVER
+
 Asks the client to remove an item clientside.
 itemid is the ID of an item that needs to be removed. We use itemid here instead of item because the item has probably already been removed serverside, and we would need to run :GetID() on a non-existent item in that case
 If pl is given/isn't nil, this function will only tell that player to remove the item. Otherwise, all players are instructed to remove this item clientside.
@@ -1105,8 +1198,10 @@ function MODULE:RemoveClientside(itemid,pl)
 end
 
 --[[
+* SERVER
+
 Remove an item clientside on all players except for the given player.
---TODO rename to RemoveClientsideToAllBut
+TODO rename to RemoveClientsideToAllBut
 ]]--
 function MODULE:RemoveClientsideOnAllBut(itemid,pl)
 	if itemid==nil then ErrorNoHalt("Itemforge Items: Couldn't RemoveClientsideOnAllBut - No itemid was given!\n"); return false end
@@ -1125,6 +1220,8 @@ function MODULE:RemoveClientsideOnAllBut(itemid,pl)
 end
 
 --[[
+* SERVER
+
 Sends a full update on an item, as requested by a client usually.
 If the item doesn't exist serverside then instead of a full update, the client will be told to remove that item.
 This should not be used unless necessary.
@@ -1156,8 +1253,12 @@ function MODULE:SendFullUpdate(itemid,pl)
 	return (self:CreateClientside(item,pl)&&item:SendFullUpdate(pl));
 end
 
---Sends a full update of ONE item clientside on all players except for the given player.
---TODO rename to SendFullUpdateToAllBut instead
+--[[
+* SERVER
+
+Sends a full update of ONE item clientside on all players except for the given player.
+TODO rename to SendFullUpdateToAllBut instead
+]]--
 function MODULE:SendFullUpdateOnAllBut(item,pl)
 	if !item or !item:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't SendFullUpdateOnAllBut - Given item was invalid!\n"); return false end
 	
@@ -1178,6 +1279,8 @@ function MODULE:SendFullUpdateOnAllBut(item,pl)
 end
 
 --[[
+* SERVER
+
 Creates all items applicable (the items that aren't in private inventories) as part of a full update on a given player clientside.
 pl is the player to create items on clientside. This can be nil to send to all players
 To do a full update on all items and inventories properly, all items should be created clientside first, then all inventories, then full updates of all items, and then full updates of all inventories.
@@ -1280,6 +1383,8 @@ function MODULE:StartFullUpdateAll(pl)
 end
 
 --[[
+* SERVER
+
 Sends a full update on all items from the server to a player (or players).
 If pl is a player:
 	Returns true if a full update of each individual item was successfully sent to the given player or if the player didn't need any items sent to him (no items, or no items that could be sent to this player)..
@@ -1331,6 +1436,8 @@ end
 
 
 --[[
+* SERVER
+
 IFI usermessage functions are below.
 These usermessage functions are here so the debugger can override them and peek at messages being sent.
 All functions below behave exactly like umsg functions, except with a different syntax.
@@ -1354,7 +1461,11 @@ function MODULE:IFIString(v) umsg.String(v) end
 function MODULE:IFIVector(v) umsg.Vector(v) end
 function MODULE:IFIEnd() umsg.End() end
 
---Handles incoming "ifi" (Itemforge Item) messages from client
+--[[
+* SERVER
+
+Handles incoming "ifi" (Itemforge Item) messages from client
+]]--
 function MODULE:HandleIFIMessages(pl,command,args)
 	if !pl || !pl:IsValid() || !pl:IsPlayer() then ErrorNoHalt("Itemforge Items: Couldn't handle incoming message from client - Player given doesn't exist or wasn't player!\n"); return false end
 	if !args[1] then ErrorNoHalt("Itemforge Items: Couldn't handle incoming message from client "..tostring(pl).." - message type wasn't received.\n"); return false end
@@ -1395,13 +1506,21 @@ else
 
 
 
---Called when a full update has started - We're expecting a certain number of items from the server
+--[[
+* CLIENT
+
+Called when a full update has started - We're expecting a certain number of items from the server
+]]--
 function MODULE:OnStartFullUpdateAll(count)
 	self.FullUpInProgress=true;
 	self.FullUpTarget=count;
 end
 
---Called when a full update has ended. Did we get them all?
+--[[
+* CLIENT
+
+Called when a full update has ended. Did we get them all?
+]]--
 function MODULE:OnEndFullUpdateAll()
 	if self.FullUpCount<self.FullUpTarget then
 		ErrorNoHalt("Itemforge Items: Full item update only updated "..self.FullUpCount.." out of expected "..self.FullUpTarget.." items!\n");
@@ -1424,7 +1543,11 @@ function MODULE:OnEndFullUpdateAll()
 end
 
 
---Handles incoming "ifi" messages from server
+--[[
+* CLIENT
+
+Handles incoming "ifi" messages from server
+]]--
 function MODULE:HandleIFIMessages(msg)
 	--Message type depends what happens next.
 	local msgType=msg:ReadChar();

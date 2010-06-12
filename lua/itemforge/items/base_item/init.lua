@@ -20,9 +20,7 @@ include("shared.lua");
 include("events_server.lua");
 
 ITEM.ThinkRate=0;									--Run think serverside every # of seconds set here. If this is 0 it runs every frame serverside.
-
---SWEP related
-ITEM.HoldType="pistol";								--How does a player hold this item when he is holding it as a weapon? Valid values: "pistol","smg","grenade","ar2","shotgun","rpg","physgun","crossbow","melee","slam","normal"
+ITEM.GibEffect="auto";								--What kind of gibs does this item leave behind if it's destroyed while in the world? Can be "none" for no gibs, "auto" to use the model's default gibs, "metal" to break into metal pieces, or "wood" to break into wood pieces.
 
 --Don't modify/override these. They're either set automatically or don't need to be changed.
 
@@ -240,8 +238,11 @@ WIRE
 ]]--
 function ITEM:WireOutput(outputName,value)
 	--This only works if Wire is present
-	if !WireVersion||WireVersion<843 then return false end
+	local wvType = type(WireVersion);
 	
+	if wvType=="nil" || (wvType=="number" && WireVersion<843) || (wvType=="string" && tonumber(string.sub(WireVersion,1,string.find(WireVersion,"[^%d]")-1))<843) then
+		return false;
+	end
 	--This only works if we are in the world
 	local entity=self:GetEntity();
 	if !entity then return false end

@@ -13,11 +13,9 @@ ITEM.Base="base_ammo";
 ITEM.Weight=8;			--8 grams/bullet, based on Bonded Defense JHP at http://en.wikipedia.org/wiki/.357_Magnum
 ITEM.StartAmount=6;
 
-if SERVER then
-
 ITEM.HoldType="slam";
 
-else
+if CLIENT then
 
 ITEM.WorldModelNudge=Vector(-1,-5,-2);
 ITEM.WorldModelRotate=Angle(0,180,0);

@@ -8,11 +8,241 @@ NOTE: The item type is the name of the folder it is in (this is base_item/shared
 This specific file deals with events that are present on both the client and server.
 ]]--
 
+
+
+
+--[[
+SWEP SPECIFIC EVENTS
+]]--
+
+
+
+
+--[[
+* SHARED
+* Event
+
+Whenever an item is held as a weapon, an SWEP is created to represent it.
+This function will be run while SetItem is being run on the SWEP.
+SWEP is the SWEP table - it's "SWEP".
+eWeapon is the weapon entity - it's "SWEP.Weapon".
+]]--
+function ITEM:OnSWEPInit(SWEP,eWeapon)
+	--We'll grab and set the world model and view models of the SWEP first
+	SWEP.WorldModel	=	self:GetWorldModel();
+	SWEP.ViewModel	=	self:GetViewModel();
+	
+	--TODO use hooks
+	SWEP.Primary.Automatic=self.PrimaryAuto;
+	SWEP.Secondary.Automatic=self.SecondaryAuto;
+	
+	if CLIENT then
+		SWEP.PrintName	=	self:Event("GetName","Itemforge Item");
+		SWEP.Slot		=	self:GetSWEPSlot();
+		SWEP.SlotPos	=	self:GetSWEPSlotPos();
+	end
+	
+	SWEP:SetWeaponHoldType(self.HoldType);
+	
+	return true;
+end
+
+--[[
+* SHARED
+* Event
+
+This is run when a player is holding the item as an SWEP and presses the left mouse button
+(primary attack).
+The default action is to use the item.
+
+NOTE: If ITEM.PrimaryAuto is true, then this event runs every frame the player has his
+Left Mouse button pressed!
+]]--
+function ITEM:OnSWEPPrimaryAttack()
+	if SERVER then self:Use(self:GetWOwner()); end
+end
+
+--[[
+* SHARED
+* Event
+
+This is run when a player is holding the item as an SWEP and presses the right mouse button
+(secondary attack).
+The default action is to use the item.
+
+NOTE: If ITEM.SecondaryAuto is true, then this event runs every frame the player has his
+Right Mouse button pressed!
+]]--
+function ITEM:OnSWEPSecondaryAttack()
+	if SERVER then self:Use(self:GetWOwner()); end
+end
+
+--[[
+* SHARED
+* Event
+
+This is run when a player is holding the item as an SWEP and presses the reload button (usually the "R" key).
+Nothing happens by default.
+
+NOTE: OnSWEPReload is called every frame that the player has his [R] key pressed!
+]]--
+function ITEM:OnSWEPReload()
+end
+
+--[[
+* SHARED
+* Event
+
+I don't really know what this function is or where it's used but it was in the base weapon
+so I included it for you to potentially use
+]]--
+function ITEM:OnSWEPCheckReload()
+end
+
+--[[
+* SHARED
+* Event
+
+When the item is a weapon held by a player, this function runs when that player
+clicks the screen with his mouse.
+
+NOTE: This function is only called in Sandbox based gamemodes. However, if you're making a
+non-sandbox based gamemode and you want screen clicks you can probably write your own code
+to call the ContextScreenClick event on the player's currently active SWEP.
+
+vAim is a normal vector indicating what direction the click was in (it points towards
+whatever point in the world the user clicked on).
+
+eMousecode indicates what kind of click it was.
+	Valid values are MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE, MOUSE_4, MOUSE_5.
+
+bPressed is a true/false that will be:
+	true if the player just pressed his mouse
+	false if the player just released his mouse.
+
+pl is the player who clicked the screen.
+]]--
+function ITEM:OnSWEPContextScreenClick(vAim,eMousecode,bPressed,pl)
+	
+end
+
+--[[
+* SHARED
+* Event
+
+This is the source engine OnDeploy hook (the normal OnDeploy that SWEPs use).
+The source engine OnDeploy hook is predicted serverside and clientside, so it's safe to use
+anything that needs to be predicted on both sides here.
+
+Note, though, that this hook is not as reliable as Itemforge's Deploy/Holster hook.
+It's possible for it to call several times or not at all. 
+
+If the item is a weapon this hook calls when the player swaps to it.
+]]--
+function ITEM:OnSWEPDeploy()
+	--DEBUG
+	Msg("Itemforge Items: Source Deploy on "..tostring(self).."!\n");
+	
+	return true;
+end
+
+--[[
+* SHARED
+* Event
+
+This is itemforge's custom deploy hook.
+It's more reliable than the source engine's OnDeploy hook, but is unpredicted. Anything
+that absolutely needs to be in sync on both the server and client SHOULD NOT go here.
+
+If the item is a weapon this hook calls ONCE when the player swaps to it.
+]]--
+function ITEM:OnSWEPDeployIF()
+	--DEBUG
+	Msg("Itemforge Items: Itemforge Deploy on "..tostring(self).."!\n");
+	
+	if self.WMAttach then self.WMAttach:Show(); end
+	if self.ItemSlot then self.ItemSlot:SetVisible(true); end
+	
+	return true;
+end
+
+--[[
+* SHARED
+* Event
+
+This is the source engine OnHolster hook (the normal OnHolster that SWEPs use).
+The source engine OnHolster hook is predicted serverside and clientside, so it's safe to use
+anything that needs to be predicted on both sides here.
+
+Note, though, that this event is not as reliable as Itemforge's Deploy/Holster event.
+It's possible for it to call several times or not at all. 
+
+If the item is a weapon this event calls when the player had it out but has swapped
+to a different weapon now.
+]]--
+function ITEM:OnSWEPHolster()
+	--DEBUG
+	Msg("Itemforge Items: Source Holster on "..tostring(self).."!\n");
+	return true;
+end
+
+--[[
+* SHARED
+* Event
+
+This is itemforge's custom holster event.
+It's more reliable than the source engine's OnHolster hook, but is unpredicted. Anything
+that absolutely needs to be in sync on both the server and client SHOULD NOT go here.
+
+If the item is a weapon this event calls ONCE when the player had it out but has swapped
+to a different weapon now.
+]]--
+function ITEM:OnSWEPHolsterIF()
+	--DEBUG
+	Msg("Itemforge Items: Itemforge Holster on "..tostring(self).."!\n");
+	
+	if self.WMAttach then self.WMAttach:Hide(); end
+	if self.ItemSlot then self.ItemSlot:SetVisible(false); end
+	
+	return true;
+end
+
+
+
+
 --[[
 ITEM EVENTS
 ]]--
 
+
+
+
 --[[
+* SHARED
+* Event
+
+Runs right after the item is created.
+You can set the item up here if you want.
+]]--
+function ITEM:OnInit(owner)
+	
+end
+
+--[[
+* SHARED
+* Event
+
+This function is run prior to an item being removed.
+It cannot cancel the item from being removed.
+]]--
+function ITEM:OnRemove()
+	
+end
+
+--[[
+* SHARED
+* Event
+
 Returns the name of the item.
 ]]--
 function ITEM:GetName()
@@ -20,6 +250,9 @@ function ITEM:GetName()
 end
 
 --[[
+* SHARED
+* Event
+
 Returns the item's description.
 ]]--
 function ITEM:GetDescription()
@@ -28,6 +261,7 @@ end
 
 --[[
 * SHARED
+* Event
 
 When tostring() is performed on an item reference, it returns a string containing some information about the item.
 Format: "Item ID [ITEM_TYPE]xAMT"
@@ -42,6 +276,63 @@ function ITEM:ToString()
 end
 
 --[[
+* SHARED
+* Event
+
+This is run when the player 'uses' the item.
+An item can be used in the inventory with the use button, or if on the ground,
+by looking at the item's model and pressing E.
+
+IMPORTANT NOTE ABOUT "USE":
+Clientside, there is no way to detect if the player uses the item with "E"
+while it's in the world. That being said, the item's OnUse is not called clientside when used
+like this. Only the serverside OnUse is called.
+
+If the player uses the item in any other way, though, the clientside OnUse calls first,
+and then if it returns true, it sends a message to the server that make the OnUse call there
+too.
+
+In the clientside OnUse, returning false will stop this from happening.
+An example of why you would want to do this:
+	Say the item is a pocket-watch that gives you the current time. You don't need to contact
+	the server to figure this out since your client already knows what time it is. You can
+	just output the time clientside and return false since you have no need to contact the server.
+	
+	Another example, you might determine clientside that the player can't use the item. In this
+	case you know that it's going to fail if it gets to the server, so you just skip the Use
+	entirely. BE AWARE that the client is not secure; this is not a security feature.
+	It's simply to avoid networking unnecessary data.
+
+On the client:
+	Return true if OnUse needs to run on the server too (it usually does)
+	Return false otherwise.
+	
+On the server:
+	Return true if the player used the item with no troubles.
+	
+	Return false if the item doesn't have a specific use, or the player can't use it
+	for some other reason. This will output a failure message to the player ("I can't use this!")
+	and make the player complain verbally.
+
+]]--
+function ITEM:OnUse(pl)
+	if CLIENT then
+		return true;
+	else
+		local ent=self:GetEntity();
+		if self:InWorld() then
+			self:Hold(pl);
+			
+			return true;
+		end
+		return false;
+	end
+end
+
+--[[
+* SHARED
+* Event
+
 If an item is in the void, this hook can be used to return it's position in the world.
 This hook can return nil, a vector, or a table of vectors.
 ]]--
@@ -49,6 +340,9 @@ function ITEM:GetVoidPos()
 end
 
 --[[
+* SHARED
+* Event
+
 This hook is called whenever a player tries to do something with an item (use it, hold it, drag it to world, merge it with something, etc).
 Itemforge uses this in some places, but you can use this hook to check if a player can interact with something youself. EX:
 	if !self:Event("CanPlayerInteract",false,PLAYER) then return false end
@@ -93,6 +387,9 @@ function ITEM:CanPlayerInteract(pl)
 end
 
 --[[
+* SHARED
+* Event
+
 Can the item move to an inventory at the given slot?
 This is run when the item wants to:
 	Enter an inventory
@@ -127,6 +424,9 @@ function ITEM:CanMove(OldInv,OldSlot,NewInv,NewSlot)
 end
 
 --[[
+* SHARED
+* Event
+
 This is run when the item is moved from one inventory to another (or from one slot in an inventory to another).
 The purpose of this event is to give the item a chance to allow it to choose where it can and can't go.
 
@@ -156,6 +456,9 @@ function ITEM:OnMove(OldInv,OldSlot,NewInv,NewSlot,forced)
 end
 
 --[[
+* SHARED
+* Event
+
 Can the item be placed in the world at the given position and angles?
 
 Serverside, if this returns false, attempts to place the item in the world will fail.
@@ -172,6 +475,9 @@ function ITEM:CanEnterWorld(vPos,aAng,bTeleport)
 end
 
 --[[
+* SHARED
+* Event
+
 This event is called after the item has entered the world.
 This runs any time item:ToWorld() was called successfully, including when the item was already in the world and was teleported.
 
@@ -186,6 +492,9 @@ function ITEM:OnEnterWorld(eEnt,vPos,aAng,bTeleport)
 end
 
 --[[
+* SHARED
+* Event
+
 Can the item leave the world?
 
 This event gets called any time the item is in the world and is non-forcefully being taken out of it.
@@ -200,6 +509,9 @@ function ITEM:CanExitWorld(ent)
 end
 
 --[[
+* SHARED
+* Event
+
 This event is called after an item leaves the world.
 
 forced is true if the removal of the item from the world was forced (with good reason usually, such as the item itself being removed).
@@ -208,24 +520,20 @@ function ITEM:OnExitWorld(forced)
 
 end
 
+local SlotDrop;
+if CLIENT then
+
+
+
+
 --[[
-Can the item be held as a weapon?
+* CLIENT
+* Event
 
-Serverside, if this returns false, attempts to hold the item as a weapon will fail.
-Clientside, the function returning true/false is only good for prediction purposes.
-
-By default, items cannot be held if they are too large (30 or more).
-You can override this in your items.
-
-pl is the player who will be holding the weapon.
+This is the default slot drop function for a held weapon's item slot
+Self is this slot, panel is the panel this was dropped on
 ]]--
-function ITEM:CanHold(pl)
-	return self:GetSize()<30;
-end
-
---This is the default slot drop function for a held weapon's item slot
---Self is this slot, panel is the panel this was dropped on
-local SlotDrop=function(self,droppedPanel)
+SlotDrop=function(self,droppedPanel)
 	local item=self:GetItem();
 	if !item then return false end
 	
@@ -243,7 +551,33 @@ local SlotDrop=function(self,droppedPanel)
 	end
 end
 
+
+
+
+end
+
 --[[
+* SHARED
+* Event
+
+Can the item be held as a weapon?
+
+Serverside, if this returns false, attempts to hold the item as a weapon will fail.
+Clientside, the function returning true/false is only good for prediction purposes.
+
+By default, items cannot be held if they are too large (30 or more).
+You can override this in your items.
+
+pl is the player who will be holding the weapon.
+]]--
+function ITEM:CanHold(pl)
+	return self:GetSize()<30;
+end
+
+--[[
+* SHARED
+* Event
+
 This event is called after an item is successfully held by a player.
 
 pl is the player who is holding the item as a weapon.
@@ -299,6 +633,9 @@ function ITEM:OnHold(pl,weapon)
 end
 
 --[[
+* SHARED
+* Event
+
 Can a player lose hold of this item?
 This event gets called any time the item is being held (as a weapon) by a player and is being released (taken out of his weapon menu) non-forcefully.
 By "non-forcefully" I mean that the item doesn't HAVE to be released - IE, it's not being removed, the player didn't just die, etc.
@@ -312,6 +649,9 @@ function ITEM:CanRelease(pl)
 end
 
 --[[
+* SHARED
+* Event
+
 This is run if this item was being held (as a weapon) by a player who lost hold of it.
 
 pl is the player who is currently holding the item.
@@ -332,6 +672,9 @@ function ITEM:OnRelease(pl,forced)
 end
 
 --[[
+* SHARED
+* Event
+
 This is called when the player wants to split a stack of items into two or more stacks.
 You may find this useful for certain kinds of items that have amounts but aren't really loose stacks of items, such as batteries, ropes, etc.
 
@@ -348,6 +691,9 @@ function ITEM:CanPlayerSplit(pl)
 end
 
 --[[
+* SHARED
+* Event
+
 This is called when the player wants to merge two stacks of items in to a single stack.
 You may find this useful for certain kinds of items that have amounts but aren't really loose stacks of items, such as batteries, wires, etc.
 
@@ -364,6 +710,9 @@ function ITEM:CanPlayerMerge(pl,otherItem)
 end
 
 --[[
+* SHARED
+* Event
+
 This is called when two items of the same type bump into each other in the world.
 If this item is in the world (as an ent), and another item of the same type bumps into it, should the two items merge into a stack?
 	Ex: You have a sheet of paper. Another sheet of paper falls on top of it.
@@ -382,11 +731,14 @@ function ITEM:CanWorldMerge(otherItem)
 end
 
 --[[
+* SHARED
+* Event
+
 This is called when an item is inserted into an inventory with an item of the same type.
 If this item is in an inventory, and an item of the same type is placed in the inventory, should the two items merge?
 	Ex: You have 30 grapes in a barrel. You put in 56 grapes.
 	Should they merge into one stack of 86 grapes, or should the two stacks remain seperate (a stack of 30 grapes and a seperate stack of 56 grapes)?
-This hook can decide whether or not this item can be merged with other items in inventories.
+This hook decides whether the two stacks are merged or not.
 Note that if CanMerge returns false, it stops all merges.
 
 otherItem is the other item that this item is attempting to merge with.
@@ -400,6 +752,9 @@ function ITEM:CanInventoryMerge(otherItem,inventory)
 end
 
 --[[
+* SHARED
+* Event
+
 This is called when an item tries to be picked up, but an item of the same type is being held as a weapon.
 Should the item you're trying to pick up be merged with the item you're holding?
 	Ex: You're holding 5 rocks. You see a rock on the ground and want to pick it up, giving you 6 rocks. Can you?
@@ -417,6 +772,9 @@ function ITEM:CanHoldMerge(otherItem,player)
 end
 
 --[[
+* SHARED
+* Event
+
 Can this stack of items merge with another stack?
 This event gets called any time the item wants to merge with another item.
 Serverside, if this returns false, it stops the merge from happening. Returning true allows a merge to occur.
@@ -437,6 +795,9 @@ function ITEM:CanMerge(otherItem,bToHere)
 end
 
 --[[
+* SHARED
+* Event
+
 This runs after another stack's items have been transferred to this stack.
 
 bPartial will be true/false. If bPartial is:
@@ -450,6 +811,9 @@ function ITEM:OnMerge(bPartial,otherItem)
 end
 
 --[[
+* SHARED
+* Event
+
 Can this stack of items split into another stack?
 This event gets called any time a stack wants to split off some of it's items into a new stack.
 Serverside, if this returns false, it stops the split from happening.
@@ -467,6 +831,9 @@ function ITEM:CanSplit(howMany)
 end
 
 --[[
+* SHARED
+* Event
+
 This runs when this stack of items is split into another stack of items.
 
 newStack is the new stack of items.
@@ -478,6 +845,9 @@ function ITEM:OnSplit(newStack,howMany)
 end
 
 --[[
+* SHARED
+* Event
+
 Whenever a stack is split, a new stack is created. If this item is the new stack created by splitting from another stack of items, this function is called.
 This function runs right after this stack has been created. Again, this function only runs if this item results from splitting from another stack of items.
 originItem will be the original stack that this item split from.
@@ -489,13 +859,37 @@ function ITEM:OnSplitFromStack(originItem,howMany)
 end
 
 --[[
+* SHARED
+* Event
+
 This event is called after an inventory has been connected to the item.
 ]]--
 function ITEM:OnConnectInventory(inv,conslot)
 end
 
 --[[
+* SHARED
+* Event
+
 This event is called after an inventory has been severed from the item.
 ]]--
 function ITEM:OnSeverInventory(inv)
+end
+
+--[[
+* SHARED
+* Class
+* Event
+
+This runs after this item class has inherited from it's base class.
+This is not actually an item event, it's a class event. So self is not an item, it's an item class.
+Since this is after inheritence, it runs on any class based off of base_item (all item classes basically),
+unless someone overrides it on purpose.
+
+This function creates the SWEP items of this class will use.
+]]--
+function ITEM:OnClassInherited()
+	--Register the SWEP this type of item uses.
+	--I'd rather make all the items use one weapon but can't because of the goddamn viewmodel animations!!
+	IF.Items:RegisterSWEP(self);
 end

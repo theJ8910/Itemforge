@@ -14,11 +14,9 @@ ITEM.StartAmount=20;
 ITEM.Size=4;
 ITEM.Weight=32;
 
-if SERVER then
-
 ITEM.HoldType="slam";
 
-else
+if CLIENT then
 
 ITEM.WorldModelNudge=Vector(-2,-3,-4);
 ITEM.WorldModelRotate=Angle(0,0,0);

@@ -115,7 +115,7 @@ end
 Starts the network tick
 ]]--
 function MODULE:StartTick()
-	--hook.Add("Tick","itemforge_tick",self.Tick,self)
+	--hook.Add("Tick","itemforge_tick",function(...) self:Tick(...) end)
 end
 
 --[[

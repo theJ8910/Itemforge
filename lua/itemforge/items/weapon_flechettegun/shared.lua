@@ -30,9 +30,9 @@ ITEM.PrimaryFireSounds={Sound("NPC_Hunter.FlechetteShoot")};
 --[[
 When a player is holding it and tries to primary attack
 ]]--
-function ITEM:OnPrimaryAttack()
+function ITEM:OnSWEPPrimaryAttack()
 	--This does all the base ranged stuff - determine if we can fire, do cooldown, consume ammo, play sounds, etc
-	if !self["base_ranged"].OnPrimaryAttack(self) then return false end
+	if !self["base_ranged"].OnSWEPPrimaryAttack(self) then return false end
 	
 	self:ShootFlechette(2000);
 	
@@ -42,7 +42,7 @@ end
 --[[
 The secondary attack does nothing
 ]]--
-function ITEM:OnSecondaryAttack()
+function ITEM:OnSWEPSecondaryAttack()
 	return false;
 end
 

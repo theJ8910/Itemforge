@@ -37,6 +37,9 @@ ITEM.AdminSpawnable=false;								--Can this item be spawned by an admin via the
 --SWEP related
 ITEM.PrimaryAuto=false;									--If this item is held as a weapon, is it's primary fire automatic? Or, in other words, do I have to keep clicking to attack?
 ITEM.SecondaryAuto=false;								--If this item is held as a weapon, is it's secondary fire automatic? Or, in other words, do I have to keep right-clicking to attack?
+ITEM.HoldType="pistol";									--How does a player hold this item when he is holding it as a weapon? Valid values: "pistol","smg","grenade","ar2","shotgun","rpg","physgun","crossbow","melee","slam","normal"
+ITEM.SWEPSlot=0;										--What slot # is this item categorized under in the weapon menu? (where 0 is slot #1, 1 is slot #2, etc)
+ITEM.SWEPSlotPos=0;										--When you're selecting weapons from that slot, what order does this weapon come in? (where 0 means the weapon comes first, 1 means weapon comes second, etc. This is more of a suggestion than a hardline rule to the game; several items can have the same order.)
 
 --Don't modify/override these. They're either set automatically, don't need to be changed, or are listed here so I can keep track of them.
 --Belongs to item-type
@@ -280,8 +283,8 @@ function ITEM:ToWorld(vPos,aAng,eEnt,bPredict)
 			if bPredict then
 				return true;
 			else
-				ent=ents.Create("itemforge_item");
-				if !ent || !ent:IsValid() then return self:Error("Tried to create itemforge_item entity but failed.\n") end
+				ent=ents.Create(IF.Items.BaseEntityClassName);
+				if !ent || !ent:IsValid() then return self:Error("Tried to create "..IF.Items.BaseEntityClassName.." entity but failed.\n") end
 				
 				ent:SetItem(self);
 				ent:SetPos(vPos);
@@ -343,30 +346,22 @@ function ITEM:Hold(pl,bNoMerge,wep,bPredict)
 		
 		
 		
-		--Here we determine two things: Do we have an empty slot, and can we merge this stack of items with a stack we're holding?
-		local iEmptySlot=0;
+		--Here we determine two things: Can we merge this stack of items with a stack we're holding?
+		local strWeaponName="if_"..self.ClassName;
 		
 		--TODO pl:GetWeapon is SERVER ONLY ARGhdhsgsgdjlk garry/valve you cocksuckers
 		if SERVER then
-			for i=1,IF.Items.MaxHeldItems do
-				local currentlyHeld=pl:GetWeapon("itemforge_item_held_"..i);
-				if !currentlyHeld || !currentlyHeld:IsValid() then
-					iEmptySlot=i;
-				elseif !bNoMerge then
+			local currentlyHeld=pl:GetWeapon(strWeaponName);
+			if currentlyHeld && currentlyHeld:IsValid() then
+				if !bNoMerge then
 					local heldItem=currentlyHeld:GetItem();
 					if heldItem && self:Event("CanHoldMerge",false,heldItem,pl) && heldItem:Event("CanHoldMerge",false,self,pl) && heldItem:Merge(self,nil,bPredict) then
 						return false;
 					end
 				end
+				return false;
 			end
 		end
-		
-		--Can't hold an item if the player is holding the max number of items already
-		if iEmptySlot==0 then
-			--return self:Error("Could not hold item as weapon. Player "..pl:Name().." is already holding an item. Release that item first.\n");
-			return false;
-		end
-		
 		
 		--[[
 		Send to void. False is returned in case of errors or if events stop the removal of the item from it's current medium.
@@ -378,11 +373,11 @@ function ITEM:Hold(pl,bNoMerge,wep,bPredict)
 		if bPredict then
 			return true;
 		else
-			ent=pl:Give("itemforge_item_held_"..iEmptySlot);
-			--local ent=ents.Create("itemforge_item_held_"..iEmptySlot);
+			ent=pl:Give(strWeaponName);
+			--local ent=ents.Create(strWeaponName);
 			--ent:SetPos(pl:GetPos()+Vector(0,0,64));
 		
-			if !ent || !ent:IsValid() then return self:Error("Tried to create itemforge_item_held_"..iEmptySlot.." entity but failed.\n") end
+			if !ent || !ent:IsValid() then return self:Error("Tried to create "..strWeaponName.." entity but failed.\n") end
 		
 			--This function triggers the item's OnSWEPInit hook.
 			ent:SetItem(self);
@@ -585,6 +580,24 @@ IF.Items:ProtectKey("SetSize");
 * SHARED
 * Protected
 
+This sets the weapon menu slot and it's position in that slot that the item uses
+when it's being held as a weapon.
+
+Running this on the server will change the slot/position of any player who holds this item.
+Running this on the client will only change the slot/position for that player, however.
+]]--
+function ITEM:SetSWEPSlot(iSlot,iSlotPos)
+	if iSlot == nil then return self:Error("Couldn't set SWEP slot; the slot was invalid.") end
+	if iSlotPos==nil then iSlotPos = self:GetSWEPSlotPos() end
+	
+	return self:SetNWInt("SWEPSlot",iSlot) && self:SetNWInt("SWEPSlotPos",iSlotPos);
+end
+IF.Items:ProtectKey("SetSWEPSlot");
+
+--[[
+* SHARED
+* Protected
+
 This sets the model color/icon color of this item.
 ]]--
 function ITEM:SetColor(cCol)
@@ -682,6 +695,29 @@ IF.Items:ProtectKey("GetViewModel");
 * SHARED
 * Protected
 
+This returns the weapon menu slot the item uses
+when it's being held as a weapon.
+]]--
+function ITEM:GetSWEPSlot()
+	return self:GetNWInt("SWEPSlot");
+end
+IF.Items:ProtectKey("GetSWEPSlot");
+
+--[[
+* SHARED
+* Protected
+
+This returns the position the weapon occupies in the chosen weapon menu slot.
+]]--
+function ITEM:GetSWEPSlotPos()
+	return self:GetNWInt("SWEPSlotPos");
+end
+IF.Items:ProtectKey("GetSWEPSlotPos");
+
+--[[
+* SHARED
+* Protected
+
 This returns the current model color/icon color of this item.
 ]]--
 function ITEM:GetColor()
@@ -716,10 +752,10 @@ The NetOwner of the item depends on what inventory this item is in:
 ]]--
 function ITEM:GetOwner()
 	local inv=self:GetContainer();
-	if inv!=nil then
-		return inv:GetOwner();
+	if inv==nil then
+		return nil;
 	end
-	return nil;
+	return inv:GetOwner();
 end
 IF.Items:ProtectKey("GetOwner");
 
@@ -734,6 +770,7 @@ Doing :IsValid() on an entity returned from here is not necessary; if this funct
 function ITEM:GetEntity()
 	if self.Entity && !self.Entity:IsValid() then
 		self.Entity=nil;
+		return nil;
 	end
 	return self.Entity;
 end
@@ -750,6 +787,7 @@ Doing :IsValid() on a weapon returned from here is not necessary; if this functi
 function ITEM:GetWeapon()
 	if self.Weapon && !self.Weapon:IsValid() then
 		self.Weapon=nil;
+		return nil;
 	end
 	return self.Weapon;
 end
@@ -766,6 +804,7 @@ If the item isn't being held as a weapon, this returns nil.
 function ITEM:GetWOwner()
 	if self.Owner && !self.Owner:IsValid() then
 		self.Owner=nil;
+		return nil;
 	end
 	return self.Owner;
 end
@@ -1026,8 +1065,8 @@ ent must be a valid "itemforge_item" entity, or this function will fail. If for 
 This function is called internally by Itemforge. There should be no reason for a scripter to call this.
 ]]--
 function ITEM:SetEntity(ent)
-	if !ent || !ent:IsValid()			then return self:Error("Couldn't set entity! Given entity was not valid!\n") end
-	if ent:GetClass()!="itemforge_item"	then return self:Error("Couldn't set entity! Given entity was not an itemforge_item!\n") end
+	if !ent || !ent:IsValid()						then return self:Error("Couldn't set entity! Given entity was not valid!\n") end
+	if ent:GetClass()!=IF.Items.BaseEntityClassName	then return self:Error("Couldn't set entity! Given entity was not an "..IF.Items.BaseEntityClassName.."!\n") end
 	
 	self.Entity=ent;
 	return true;

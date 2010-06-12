@@ -62,6 +62,7 @@ function ITEM:Unload(clip)
 	ammo.OldMaxAmount=nil;
 	
 	self.Clip[clip]=nil;
+	self:UpdateWireAmmoCount();
 	self:SendNWCommand("Unload",nil,clip);
 	
 	return true;
@@ -72,7 +73,7 @@ This function runs serverside after a player chooses "reload" from the menu.
 ]]--
 function ITEM:PlayerReload(pl)
 	if !self:Event("CanPlayerInteract",false,pl) then return false end
-	return self:OnReload();
+	return self:OnSWEPReload();
 end
 
 --[[
@@ -104,9 +105,9 @@ end
 --Auto-attack if Wiremod has told us to
 function ITEM:OnThink()
 	if self.PrimaryFiring==true		&& self:CanPrimaryAttackAuto()			then
-		self:OnPrimaryAttack();
+		self:OnSWEPPrimaryAttack();
 	elseif self.SecondaryFiring==true	&& self:CanSecondaryAttackAuto()	then
-		self:OnSecondaryAttack();
+		self:OnSWEPSecondaryAttack();
 	elseif self:GetNWBool("InReload")==true									then
 		self:Reload();
 	end
@@ -144,7 +145,7 @@ function ITEM:OnWireInput(entity,inputName,value)
 		else				self.SecondaryFiring=true;
 		end
 	elseif inputName=="Reload" && value!=0 then
-		self:OnReload();
+		self:OnSWEPReload();
 	end
 end
 
@@ -160,8 +161,8 @@ end
 
 IF.Items:CreateNWCommand(ITEM,"SetClip",nil,{"item","int"});
 IF.Items:CreateNWCommand(ITEM,"Unload",nil,{"int"});
-IF.Items:CreateNWCommand(ITEM,"PlayerFirePrimary",	function(self,...) self:OnPrimaryAttack(...)	end,{});
-IF.Items:CreateNWCommand(ITEM,"PlayerFireSecondary",function(self,...) self:OnSecondaryAttack(...)	end,{});
+IF.Items:CreateNWCommand(ITEM,"PlayerFirePrimary",	function(self,...) self:OnSWEPPrimaryAttack(...)	end,{});
+IF.Items:CreateNWCommand(ITEM,"PlayerFireSecondary",function(self,...) self:OnSWEPSecondaryAttack(...)	end,{});
 IF.Items:CreateNWCommand(ITEM,"PlayerReload",		function(self,...) self:PlayerReload(...)		end,{});
 IF.Items:CreateNWCommand(ITEM,"PlayerLoadAmmo",		function(self,...) self:PlayerLoadAmmo(...)		end,{"item"});
 IF.Items:CreateNWCommand(ITEM,"PlayerUnloadAmmo",	function(self,...) self:PlayerUnloadAmmo(...)	end,{"int"});

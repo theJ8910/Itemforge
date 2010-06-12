@@ -18,11 +18,9 @@ ITEM.Sounds={
 	Sound("buttons/button4.wav")
 };
 
-if SERVER then
-
 ITEM.HoldType="normal";
 
-else
+if CLIENT then
 
 ITEM.WorldModelNudge=Vector(0,0,8);
 
@@ -186,7 +184,8 @@ function ITEM:SwapToHip()
 end
 
 function ITEM:OnHold(pl,weapon)	
-	self["base_item"].OnHold(self,pl,weapon);
+	self:InheritedEvent("OnHold","base_item",nil,pl,weapon);
+	--self["base_item"].OnHold(self,pl,weapon);
 	
 	if pl:GetActiveWeapon()==weapon then	self:SwapToHand();
 	else									self:SwapToHip();
@@ -196,7 +195,7 @@ end
 --[[
 Deploying the lantern moves the world model attachment to the player's hand
 ]]--
-function ITEM:OnDeploy()
+function ITEM:OnSWEPDeployIF()
 	self:SwapToHand();
 	
 	if self.ItemSlot then self.ItemSlot:SetVisible(true); end
@@ -205,7 +204,7 @@ end
 --[[
 Holstering the lantern moves the world model attachment to the player's hip (Legend of Zelda: Twilight Princess anyone?)
 ]]--
-function ITEM:OnHolster()
+function ITEM:OnSWEPHolsterIF()
 	self:SwapToHip();
 	
 	if self.ItemSlot then self.ItemSlot:SetVisible(false); end

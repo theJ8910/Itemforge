@@ -7,7 +7,6 @@ NOTE: The item type is the name of the folder it is in (this is base_item/events
 
 This specific file deals with events that are present on the client.
 ]]--
-
 local mWhite=Material("white_outline");
 local oneVector=Vector(1,1,1);
 
@@ -16,8 +15,11 @@ ENTITY SPECIFIC EVENTS
 ]]--
 
 --[[
+* CLIENT
+* Event
+
 Whenever an item is dropped into the world, an entity is created to represent it.
-This function runs when the entity sets it's item to us clientside.
+This event runs when the entity sets it's item to us clientside.
 
 NOTE: It is impossible for me to run this event when the entity is initialized clientside.
 	Serverside, a networked int with this Item's ID is set on the entity.
@@ -37,29 +39,14 @@ SWEP SPECIFIC EVENTS
 ]]--
 
 --[[
-Whenever an item is held as a weapon, an SWEP is created to represent it. This function will be run while SetItem is being run on the SWEP.
-SWEP is the SWEP table - it's "SWEP".
-eWeapon is the weapon entity - it's "SWEP.Weapon".
-]]--
-function ITEM:OnSWEPInit(SWEP,eWeapon)
-	--We'll grab and set the world model and view models of the SWEP first
-	SWEP.WorldModel	=	self:GetWorldModel();
-	SWEP.ViewModel	=	self:GetViewModel();
-	
-	--TODO use hooks
-	SWEP.Primary.Automatic=self.PrimaryAuto;
-	SWEP.Secondary.Automatic=self.SecondaryAuto;
-	SWEP.PrintName=self:Event("GetName","Itemforge Item");
-	
-	return true;
-end
+* CLIENT
+* Event
 
---[[
-This hook is called when this item needs it's weapon menu graphics drawn.
+This event is called when this item needs it's weapon menu graphics drawn.
 
 The weapon menu graphics are drawn inside of a black box.
-x and y describe where the top-left corner of the black box is.
-w and h describe how wide and tall (respectively) the black box is.
+x and y describe where the top-left corner of the black box is in pixels.
+w and h describe how wide and tall (respectively) the black box is in pixels.
 a is a number between 0 and 255 that describes how opaque the weapon menu graphics should be.
 	This is 255 when the menu is open.
 	The weapons menu slowly fades out if it is left open for too long;
@@ -77,34 +64,86 @@ function ITEM:OnSWEPDrawMenu(x,y,w,h,a)
 							 ,64,64);
 end
 
---This function is run when it comes time to draw a viewmodel. This will only happen while a player is holding an item
+--[[
+* CLIENT
+* Event
+
+This event is run when it comes time to draw a viewmodel.
+This will only be called if the item is a player's active weapon.
+]]--
 function ITEM:OnSWEPDrawViewmodel()
 end
 
---This function is run when it comes time to draw something on the player's HUD. This will only happen while a player is holding an item as a weapon and has it out.
+--[[
+* CLIENT
+* Event
+
+This function is run when it comes time to draw something on the player's HUD.
+This will only be called if the item is a player's active weapon.
+]]--
 function ITEM:OnSWEPDrawHUD()	
 end
 
 --[[
-You receive the player's current FOV here and are allowed to change it while this item is held as a weapon and is out.
-This is useful for items with scopes.
+* CLIENT
+* Event
+
+This event can be used to hide or show elements on the HUD.
+This will only be called if the item is a player's active weapon.
+
+It runs once before each HUD element draws. So this hook is potentially called several times
+in a single draw frame.
+
+The game basically asks the item if a HUD element (whose name is given) is allowed to draw.
+You can return false if you don't want it to draw or true if you do.
+]]--
+function ITEM:OnSWEPHUDShouldDraw(strName)
+	return true;
+end
+
+--[[
+* CLIENT
+* Event
+
+This hook allows you to change the camera's FOV. This is useful for items with scopes.
+This will only be called if the item is a player's active weapon.
+
+The camera's current FOV is passed into the function, in degrees.
+the returned FOV should be between 0 and 180 degrees, but negative values do work and
+have the effect of flipping the screen upside down.
+
+NOTE: the closer FOV gets to 0 the more "zoomed in" the view appears. The closer FOV
+gets to 180 the more "zoomed out" the view appears.
 ]]--
 function ITEM:OnSWEPTranslateFOV(current_fov)
 	return current_fov;
 end
 
 --[[
-This event determines if we should freeze the view (stop the player from rotating his view) of the player holding this item as a weapon.
-Returning true prevents the player holding this item.
-Returning anything else (or nothing at all).
+* CLIENT
+* Event
+
+This event determines if we should freeze the view of the holding player (freeze meaning stop
+the player from rotating his view).
+This will only be called if the item is a player's active weapon.
+
+Returning true prevents the player from rotating his view.
+Returning anything else (or nothing at all) allows him to rotate his view.
 ]]--
-function ITEM:OnSWEPFreezeView()
+function ITEM:OnSWEPFreezeMovement()
 	return false;
 end
 
 --[[
-This event can be used to adjust the mouse sensitivity while holding the weapon.
-You may return a multiplier to change how sensitive the mouse is (such as 2 for double the mouse sensitivity, 3 for triple the sensitivity, 0 for no mouse movement at all).
+* CLIENT
+* Event
+
+This event can be used to adjust the mouse sensitivity.
+This will only be called if the item is a player's active weapon.
+
+You may return a multiplier to change how sensitive the mouse is (such as 2 for double
+the mouse sensitivity, 3 for triple the sensitivity, 0 for no mouse movement at all).
+
 You may also return nil or 1 for no change in mouse sensitivity.
 ]]--
 function ITEM:OnSWEPAdjustMouseSensitivity()
@@ -112,47 +151,45 @@ function ITEM:OnSWEPAdjustMouseSensitivity()
 end
 
 --[[
-This is run when a player is holding the item as a weapon and presses the left mouse button (primary attack).
+* CLIENT
+* Event
+
+This event can be used to modify the ammo counter in the lower-right hand corner.
+This will only be called if the item is a player's active weapon.
+
+If you want to modify the ammo counter, this event should return a table (preferably an existing
+table that is modified in this function; creating tables every frame is expensive!).
+
+The table's members should be:
+	t.Draw:				true if you want the ammo display to draw, false if you don't
+	
+	Set these both to nil if you don't want primary ammo info to show up
+	t.PrimaryClip:		# of bullets/fuel/whatever in the primary clip
+	t.PrimaryAmmo:		# of bullets/fuel/whatever that the player has in reserve
+	
+	Set these both to nil if you don't want secondary ammo info to show up
+	t.SecondaryClip:	# of bullets/fuel/whatever in the secondary clip
+	t.SecondaryAmmo:	# of bullets/fuel/whatever that the player has in reserve
+
+You can also return nil if you don't want to use a custom ammo display.
 ]]--
-function ITEM:OnPrimaryAttack()
+function ITEM:OnSWEPCustomAmmoDisplay()
+	return nil;
 end
 
 --[[
-This is run when a player is holding the item as a weapon and presses the right mouse button (secondary attack).
-]]--
-function ITEM:OnSecondaryAttack()
-end
+* CLIENT
+* Event
 
---[[
-This is run when a player is holding the item as a weapon and presses the reload button (usually the "R" key).
-]]--
-function ITEM:OnReload()
-end
+This event can be used to modify the SWEP's view model position/angles on screen.
+oldPos is the old position of the viewmodel.
+oldAng is the old angles the viewmodel is using.
 
---[[
-This is run when a player is holding the item as a weapon and swaps from a different weapon to this weapon.
+You should return two values in this hook, the new position and the new angles like so:
+return newPos, newAng;
 ]]--
-function ITEM:OnDeploy()
-	--DEBUG
-	Msg("Itemforge Items: Deploying "..tostring(self).."!\n");
-	
-	if self.WMAttach then self.WMAttach:Show(); end
-	if self.ItemSlot then self.ItemSlot:SetVisible(true); end
-	
-	return true;
-end
-
---[[
-This is run when a player is holding the item as a weapon and swaps from this weapon to a different weapon.
-]]--
-function ITEM:OnHolster()
-	--DEBUG
-	Msg("Itemforge Items: Holstering "..tostring(self).."!\n");
-	
-	if self.WMAttach then self.WMAttach:Hide(); end
-	if self.ItemSlot then self.ItemSlot:SetVisible(false); end
-	
-	return true;
+function ITEM:GetSWEPViewModelPosition(oldPos, oldAng)
+	return oldPos, oldAng;
 end
 
 
@@ -166,11 +203,10 @@ end
 ITEM EVENTS
 ]]--
 
-function ITEM:OnInit()
-	
-end
-
 --[[
+* CLIENT
+* Event
+
 Returns the icon this item displays.
 ]]--
 function ITEM:GetIcon()
@@ -178,15 +214,9 @@ function ITEM:GetIcon()
 end
 
 --[[
-This is run when you 'use' an item. An item can be used in the inventory with the use button, or if on the ground, by looking at the item's model and pressing E.
-The default action for when it's on the ground is to pick it up.
-Return false to tell the player the item cannot be used
-]]--
-function ITEM:OnUse(pl)
-	return true;
-end
+* CLIENT
+* Event
 
---[[
 This runs after a right click menu has been created.
 pMenu is the created menu. You can add menu entries here.
 These methods might be of some use:
@@ -207,6 +237,9 @@ function ITEM:OnPopulateMenu(pMenu)
 end
 
 --[[
+* CLIENT
+* Event
+
 While an inventory is opened, this item can be dragged somewhere on screen.
 If this item is drag-dropped to an empty slot in an inventory this function runs.
 ]]--
@@ -216,6 +249,9 @@ function ITEM:OnDragDropToInventory(inv,invSlot)
 end
 
 --[[
+* CLIENT
+* Event
+
 While an inventory is opened, this item can be dragged somewhere on screen.
 If this item is drag-dropped onto another item, this function runs.
 This function will not run if the other item's OnDragDropHere function returns false.
@@ -225,6 +261,8 @@ function ITEM:OnDragDropToItem(item)
 end
 
 --[[
+* CLIENT
+
 While an inventory is opened, an item can be dragged somewhere on screen.
 If an item is drag-dropped on top of this item (either dropped on a panel this item is being displayed on, or dropped onto this item in the world) this function runs.
 A few examples of what this could be used for... You could:
@@ -247,6 +285,9 @@ function ITEM:OnDragDropHere(otherItem)
 end
 
 --[[
+* CLIENT
+* Event
+
 While an inventory is opened, an item can be dragged somewhere on screen.
 If an item is drag-dropped to somewhere in the world, this function will run.
 traceRes is a full trace results table.
@@ -257,6 +298,9 @@ function ITEM:OnDragDropToWorld(traceRes)
 end
 
 --[[
+* CLIENT
+* Event
+
 This function is run periodically (when the client ticks).
 ]]--
 function ITEM:OnTick()
@@ -264,6 +308,9 @@ function ITEM:OnTick()
 end
 
 --[[
+* CLIENT
+* Event
+
 This function is run periodically.
 You can set how often it runs by setting the think rate at the top of the script, or with self:SetThinkRate().
 You need to tell the item to self:StartThink() to start the item thinking.
@@ -273,6 +320,9 @@ function ITEM:OnThink()
 end
 
 --[[
+* CLIENT
+* Event
+
 If this function returns true, a model panel is displayed in an ItemforgeItemSlot control, with this item's world model.
 ]]--
 function ITEM:ShouldUseModelFor2D()
@@ -280,11 +330,17 @@ function ITEM:ShouldUseModelFor2D()
 end
 
 --[[
-This function is run when an item slot (most likely the ItemforgeItemSlot VGUI control) is displaying this item and needs to pose this model before drawing.
-Right before drawing, this event is called to pose the model (rotate, position, animate, whatever).
-Since some models are orientated strangedly (for example, the pickaxe faces straight up, the keypad faces backwards, etc),
-I have tried to automatically orientate it so that most models are facing acceptable angles.
-	The model is posed so that:
+* CLIENT
+* Event
+
+This function is run when an item slot (most likely the ItemforgeItemSlot VGUI control) is
+displaying this item and needs to pose this model before drawing.
+
+When this happens, this event is called to pose the model (rotate, position, animate, whatever).
+Since some models are orientated strangely (for example, the pickaxe faces straight up,
+the keypad faces backwards, etc), I have tried to automatically orientate it so that most
+models are facing acceptable angles.
+	By default the model is posed so that:
 		A. It rotates.
 		B. The end with the most surface area is facing upwards
 		C. The center of the model's bounding box is at 0,0,0
@@ -310,6 +366,9 @@ function ITEM:OnPose3D(eEntity,PANEL)
 end
 
 --[[
+* CLIENT
+* Event
+
 This function is called when a model associated with this item needs to be drawn. This usually happens in three cases:
 	The item is in the world and it's world entity needs to draw.
 	The item is being held as a weapon and it's world model attachment needs to draw
@@ -321,6 +380,7 @@ If bTranslucent is true, this means that the entity is in the Translucent render
 	Or in other words, the entity is most likely partially see-through (has an alpha of less than 255).
 ]]--
 function ITEM:OnDraw3D(eEntity,bTranslucent)
+	--Draw an outline around the entity if we're hovering over it
 	if IF.UI:GetDropEntity()==eEntity then
 		render.SuppressEngineLighting(true);
 		render.SetAmbientLight(1,1,1);
@@ -345,6 +405,9 @@ function ITEM:OnDraw3D(eEntity,bTranslucent)
 end
 
 --[[
+* CLIENT
+* Event
+
 This function is run when an item slot (most likely the ItemforgeItemSlot VGUI control) is displaying this item and needs to draw.
 This function runs AFTER OnDraw3D, so any 2D overlays can be carried out here (ammo meters, item amounts, etc)
 Width is the size of the slot the item is being drawn in,
@@ -373,15 +436,16 @@ function ITEM:OnDraw2D(width,height)
 	end
 end
 
---This function is run prior to an item being removed. It cannot cancel the item from being removed.
-function ITEM:OnRemove()
-	
-end
+--[[
+* CLIENT
+* Event
 
---This runs when a networked var is set on this item (with SetNW* or received from the server).
+This runs when a networked var is set on this item (with SetNW* or received from the server).
+]]--
 function ITEM:OnSetNWVar(sName,vValue)
 	--Changing the weight or amount of an item affects the weight stored in the inventory so update it
 	--If the world model changes we need to update the inventory so it refreshes the model displayed
+	--TODO this is shit - inventories don't display items, item slots do. and item slots can be found outside of inventory windows.
 	if sName=="Amount" || sName=="Weight" || sName=="WorldModel" || sName=="OverrideMaterial" then
 		local container=self:GetContainer();
 		if container then container:Update() end
@@ -391,6 +455,14 @@ function ITEM:OnSetNWVar(sName,vValue)
 		if vValue!=nil then self.OverrideMaterialMat=Material(vValue);
 		else				self.OverrideMaterialMat=nil;
 		end
+	elseif sName == "SWEPSlot" then
+		--If we're currently holding this item as a weapon we need to update it's slot
+		local wep = self:GetWeapon();
+		if wep then wep.Slot = vValue end
+	elseif sName == "SWEPSlotPos" then
+		--If we're currently holding this item as a weapon we need to update it's slot pos
+		local wep = self:GetWeapon();
+		if wep then wep.SlotPos = vValue end
 	end
 	return true;
 end

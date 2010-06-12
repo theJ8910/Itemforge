@@ -17,7 +17,7 @@ ITEM.Size=13;
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 
-if SERVER then ITEM.HoldType="smg"; end
+ITEM.HoldType="smg";
 
 --Overridden Base Weapon stuff
 ITEM.PrimaryDelay=.08;
@@ -46,9 +46,9 @@ ITEM.BulletSpread=Vector(0.04362,0.04362,0.04362); --Taken directly from modcode
 --[[
 When a player is holding it and tries to secondary attack
 ]]--
-function ITEM:OnSecondaryAttack()
+function ITEM:OnSWEPSecondaryAttack()
 	--This does all the base ranged stuff - determine if we can fire, do cooldown, consume ammo, play sounds/animations, etc
-	if !self["base_firearm"].OnSecondaryAttack(self) then return false end
+	if !self["base_firearm"].OnSWEPSecondaryAttack(self) then return false end
 	
 	self:FireGrenade(1000);
 	return true;

@@ -16,11 +16,9 @@ ITEM.StartAmount=1;
 
 ITEM.WorldModel="models/Items/AR2_Grenade.mdl";
 
-if SERVER then
-
 ITEM.HoldType="slam";
 
-else
+if CLIENT then
 
 ITEM.WorldModelNudge=Vector(2,0,0);
 ITEM.WorldModelRotate=Angle(70,0,0);

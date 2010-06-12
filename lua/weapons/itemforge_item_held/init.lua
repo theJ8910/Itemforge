@@ -1,12 +1,11 @@
 --[[
-itemforge_item_held_1
+itemforge_item_held
 SERVER
 
 This SWEP is an 'avatar' of an item. When an item is held, this weapon represents that item.
 ]]--
 AddCSLuaFile("cl_init.lua");
 AddCSLuaFile("shared.lua");
-AddCSLuaFile("makecopy.lua");
 
 include("shared.lua");
 
@@ -16,7 +15,11 @@ SWEP.AutoSwitchFrom		= false;	// Auto switch from if you pick up a better weapon
 SWEP.ExpectRemoval=false;
 
 
---Entity is about to be deleted
+--[[
+* SERVER
+
+Entity is about to be deleted
+]]--
 function SWEP:ExpectedRemoval()
 	if !self.ExpectRemoval then
 		self.ExpectRemoval=true;
@@ -24,7 +27,11 @@ function SWEP:ExpectedRemoval()
 	end
 end
 
---Input run on SWEP
+--[[
+* SERVER
+
+Input run on SWEP
+]]--
 function SWEP:AcceptInput(name,activator,caller,data)
 	local item=self:GetItem();
 	if !item then return false; end
@@ -32,7 +39,11 @@ function SWEP:AcceptInput(name,activator,caller,data)
 	return item:Event("OnInput",false,true,self.Weapon,name,activator,caller,data)==true;
 end
 
---Keyvalue is set on our SWEP
+--[[
+* SERVER
+
+Keyvalue is set on our SWEP
+]]--
 function SWEP:KeyValue(key,value)
 	local item=self:GetItem();
 	if !item then 
@@ -42,8 +53,21 @@ function SWEP:KeyValue(key,value)
 	return item:Event("OnKeyValue",nil,true,self.Weapon,key,value);
 end
 
+--[[
+* SERVER
+
+For NPCs, returns what they should try to do with it.
+]]--
+function SWEP:GetCapabilities()
+	local item=self:GetItem();
+	if !item then return 0 end
+	
+	return self:Event("GetSWEPCapabilities",0);
+end
 
 --[[
+* SERVER
+
 We need to remove the item this SWEP is associated with if the removal wasn't expected (like if you die while holding it)
 Or not remove the item this entity was associated with if the removal was expected (like if the item was just being taken out of the your hands and dropped as an entity)
 ]]--
@@ -82,6 +106,54 @@ function SWEP:OnRemove()
 end
 
 --[[
+* SERVER
+
+Runs when the owner changes
+]]--
+function SWEP:OwnerChanged()
+	local item=self:GetItem();
+	if !item then return false end
+	
+	--DEBUG
+	Msg("Itemforge Item SWEP: "..tostring(item).." changed owner to "..tostring(self.Owner).."\n");
+	item:SetWOwner(self.Owner);
+end
+
+--[[
+* SERVER
+
+This doesn't work for any weapon due to some bug related to the Orange Box I suspect;
+but if it did, we don't want the weapon to drop, we want to get rid of the weapon and send the item to world.
+]]--
+function SWEP:ShouldDropOnDie()
+	return false;
+end
+
+--[[
+* SERVER
+
+Runs when the player picks up this weapon.
+]]--
+function SWEP:Equip( NewOwner )
+	local item=self:GetItem();
+	if !item then return true end
+	
+	Msg("Itemforge Item SWEP (Ent ID "..self.Weapon:EntIndex().."): "..tostring(NewOwner).." equips weapon");
+end
+
+--[[
+* SERVER
+
+Runs when the player picks up this weapon and already has it.
+Shouldn't happen, will report an error message if it does.
+]]--
+function SWEP:EquipAmmo( NewOwner )
+	ErrorNoHalt("Itemforge Item SWEP (Ent ID "..self.Weapon:EntIndex().."): "..tostring(NewOwner).." was given an itemforge weapon he already has. Shouldn't happen.");
+end
+
+--[[
+* SERVER
+
 May allow items to take advantage of this later
 Use GetNetworked* functions (entity) to restore data from a save-game
 ]]--
@@ -103,12 +175,3 @@ function SWEP:OnDrop()
 	return true;
 end
 ]]--
-
-
---[[
-For NPCs, returns what they should try to do with it.
-May allow to take advantage of later
-]]--
-function SWEP:GetCapabilities()
-	return nil;
-end

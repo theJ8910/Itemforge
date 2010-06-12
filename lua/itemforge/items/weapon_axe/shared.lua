@@ -17,12 +17,17 @@ ITEM.WorldModel="models/props/CS_militia/axe.mdl";
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 
+if CLIENT then
+	ITEM.WorldModelNudge=Vector(0,0,7);
+	ITEM.WorldModelRotate=Angle(90,0,-90);
+end
+
 --Overridden Base Weapon stuff
 ITEM.PrimaryDelay=0.8;
 
 --Overridden Base Melee stuff
 ITEM.HitRange=75;
-ITEM.HitForce=6;
+ITEM.HitForce=1.5;
 ITEM.HitDamage=50;
 ITEM.ViewKickMin=Angle(3.0,-3.0,0);
 ITEM.ViewKickMax=Angle(4.0,-2.0,0);
@@ -35,10 +40,12 @@ ITEM.FleshyImpactSounds={
 	Sound("ambient/machines/slicer4.wav")
 }
 
-if CLIENT then
-	ITEM.WorldModelNudge=Vector(0,0,7);
-	ITEM.WorldModelRotate=Angle(90,0,-90);
-end
+ITEM.BloodyMatTypes={
+	[MAT_FLESH]=true,
+	[MAT_BLOODYFLESH]=true,
+	[MAT_ALIENFLESH]=true,
+	[MAT_ANTLION]=true
+};
 
 --Probably could add some wood-chopping function here
 function ITEM:OnHit(pOwner,hitent,hitpos,traceRes)
@@ -46,8 +53,8 @@ end
 
 --Play a fleshy hit sound if we chopped into flesh, or the standard sound if we didn't
 function ITEM:HitSound(traceRes)
-	if traceRes.MatType==MAT_FLESH || traceRes.MatType==MAT_BLOODYFLESH || traceRes.MatType==MAT_ALIENFLESH || traceRes.MatType==MAT_ANTLION then
+	if self.BloodyMatTypes[traceRes.MatType] == true then
 		return self:EmitSound(self.FleshyImpactSounds,true);
 	end
-	return self["base_melee"].HitSound(self);
+	return self:InheritedEvent("HitSound","base_melee",false,traceRes);
 end

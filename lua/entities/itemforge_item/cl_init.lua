@@ -150,7 +150,7 @@ end
 function ENT:OnRemove()
 	--We're removing the item right now, don't try to reaquire the item
 	self.BeingRemoved=true;
-	self.Entity:SetNWInt("i",0);
+	self.Entity:SetDTInt("i",0);
 	
 	--Clear the one-way connection between entity and item
 	local item=self:GetItem();
