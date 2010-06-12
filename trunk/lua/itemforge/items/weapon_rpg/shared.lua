@@ -19,9 +19,7 @@ ITEM.AdminSpawnable=true;
 ITEM.WorldModel="models/weapons/w_rocket_launcher.mdl";
 ITEM.ViewModel="models/weapons/v_RPG.mdl";
 
-if SERVER then
-	ITEM.HoldType="rpg";
-end
+ITEM.HoldType="rpg";
 
 --Overridden Base Weapon stuff
 ITEM.PrimaryDelay=2;									--Taken directly from the modcode.
@@ -42,14 +40,14 @@ ITEM.ReloadSounds={										--There is no reload sound
 
 ITEM.DryFireDelay=0.2;
 
-function ITEM:OnPrimaryAttack()
-	if !self["base_ranged"].OnPrimaryAttack(self) then return false end
+function ITEM:OnSWEPPrimaryAttack()
+	if !self["base_ranged"].OnSWEPPrimaryAttack(self) then return false end
 	
 	return true;
 end
 
-function ITEM:OnSecondaryAttack()
-	if !self["base_ranged"].OnSecondaryAttack(self) then return false end
+function ITEM:OnSWEPSecondaryAttack()
+	if !self["base_ranged"].OnSWEPSecondaryAttack(self) then return false end
 	
 	--Secondary attack swaps firemode
 	self:SetNWVar("LaserSight",!self:GetNWVar("LaserSight"));

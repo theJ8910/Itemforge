@@ -153,12 +153,13 @@ IF.Items:ProtectKey("GetMenu");
 
 Displays this item's right click menu, positioning one of the menu's corners at x,y.
 True is returned if the menu is opened successfully.
-False is returned if the menu could not be opened. One possible reason this may happen is if the item's OnPopulateMenu event fails.
+False is returned if the menu could not be opened. One possible reason this may happen is if the
+item's OnPopulateMenu event fails.
 ]]--
 function ITEM:ShowMenu(x,y)
 	self.RCMenu=DermaMenu();
 	
-	local name=self:Event("GetName","Itemforge Item");
+	local name=string.gsub(self:Event("GetName","Itemforge Item"),"&","&&");
 	if self:IsStack() then name=name.." x "..self:GetAmount() end
 	
 	--Add header

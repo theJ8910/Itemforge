@@ -19,14 +19,17 @@ function EFFECT:Init(data)
 end
 
 function EFFECT:Think()
-	if !IF.GearAttach.Attachments[self.GearID] then return false;
-	elseif !self.Ent || !self.Ent:IsValid() then IF.GearAttach.Attachments[self.GearID]:Remove(); return false end
+	local gear = IF.GearAttach.Attachments[self.GearID];
+	if !gear then return false;
+	elseif !self.Ent || !self.Ent:IsValid() then gear:Remove(); return false end
 	
 	self:SetRenderBoundsWS(self.Ent:LocalToWorld(self.Min),self.Ent:LocalToWorld(self.Max))
 	return true;
 end
 
 function EFFECT:Render()
-	if !IF.GearAttach.Attachments[self.GearID] then return false end
-	IF.GearAttach.Attachments[self.GearID]:Draw();
+	local gear = IF.GearAttach.Attachments[self.GearID];
+	if !gear then return false end
+	gear:PreDraw();
+	gear:Draw();
 end

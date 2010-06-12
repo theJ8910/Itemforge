@@ -16,12 +16,18 @@ ITEM.Weight=1500;
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 
+if SERVER then
+
+ITEM.GibEffect = "metal";
+
+end
+
 --Overridden Base Weapon stuff
 ITEM.PrimaryDelay=.4;
 
 --Overridden Base Melee stuff
 ITEM.HitRange=75;
-ITEM.HitForce=5;
+ITEM.HitForce=1;
 ITEM.HitDamage=25;
 ITEM.ViewKickMin=Angle(1.0,-2.0,0);
 ITEM.ViewKickMax=Angle(2.0,-1.0,0);

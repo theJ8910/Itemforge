@@ -13,9 +13,11 @@ ENTITY SPECIFIC EVENTS
 ]]--
 
 --[[
+* SERVER
+* Event
+
 Whenever an item is dropped into the world, an entity is created to represent it.
-This function will be run when the entity is initialized, before it's spawned.
-entity should be the same thing as self:GetEntity(). It's the entity the item is using while it's in the world.
+This function will be run to initialize the entity before it's spawned.
 
 Scripters can override this to init the entity however they like here.
 Mine is pretty general, it sets the model to whatever the scripter has provided, inits physics, sets it to simple use (you press E once and it uses it once) and spawns it.
@@ -38,6 +40,9 @@ function ITEM:OnEntityInit(entity)
 end
 
 --[[
+* SERVER
+* Event
+
 While the item is in the world as an entity, if it's damaged physically (such as being burned by fire or hit with a crowbar) then this event will be triggered.
 By default, whenever an item's entity is damaged, the item is damaged. Then the item's entity is knocked around a bit when we do TakePhysicsDamage.
 entity should be the same thing as self:GetEntity(). It's the entity the item is using while it's in the world.
@@ -49,6 +54,9 @@ function ITEM:OnEntTakeDamage(entity,dmgInfo)
 end
 
 --[[
+* SERVER
+* Event
+
 While the item is in the world as an entity, if (one of) it's physics objects hits another physics object, this hook is called.
 entity should be the same thing as self.Entity. It's the entity the item is using while it's in the world.
 CollisionData is information about the collision passed on from the entity's event.
@@ -59,6 +67,9 @@ function ITEM:OnPhysicsCollide(entity,CollisionData,HitPhysObj)
 end
 
 --[[
+* SERVER
+* Event
+
 While an item is in the world, if it bumps into another entity this function is called.
 ent should be the same thing as self.Entity. It's the entity the item is using while it's in the world.
 activator is the entity that has been bumped into by our item's entity.
@@ -69,7 +80,10 @@ function ITEM:OnStartTouch(ent,activator,otherItem)
 end
 
 --[[
-While an item is in the world, this function is called while our item is touching something (it will run this function continuiously until the item comes to rest on the entity it's touching, or loses contact with it).
+* SERVER
+* Event
+
+While an item is in the world, this function is called while our item is touching something (it will run this function every frame until the item comes to rest on the entity it's touching, or loses contact with it).
 ent should be the same thing as self.Entity. It's the entity the item is using while it's in the world.
 activator is the entity that is bumping into our entity.
 otherItem will usually be nil, but if it isn't, that means this item has touched another item in the world.
@@ -79,6 +93,9 @@ function ITEM:OnTouch(ent,activator,otherItem)
 end
 
 --[[
+* SERVER
+* Event
+
 While an item is in the world, this function is called when our item loses contact with something it was touching.
 ent should be the same thing as self.Entity. It's the entity the item is using while it's in the world.
 activator is the entity that had been bumped into by our item's entity but now no longer is being touched.
@@ -89,17 +106,25 @@ function ITEM:OnEndTouch(ent,activator,otherItem)
 end
 
 --[[
+* SERVER
+* Event
+* WIRE
+
 This event can be used to give your item a Wire debug name.
 When this item enters the world, this event will be called to give the item's entity a Wire debug name (for Wiremod, if it's installed).
 By default, this grabs the name of the item (with GetName()). If this fails for some reason, it defaults to "Itemforge Item".
 Return a string here to decide what the Wire debug name is.
-WIRE
+
 ]]--
 function ITEM:GetWireDebugName()
 	return self:Event("GetName","Itemforge Item");
 end
 
 --[[
+* SERVER
+* Event
+* WIRE
+
 This event can be used to give your items Wire inputs. This event will never be called if Wiremod is not installed.
 When this item enters the world, this event will be called to give the item's entity Wire inputs.
 Wire entities, like a Wire button, can trigger these inputs and cause things to happen on your item.
@@ -109,7 +134,6 @@ This function just tells Wiremod what inputs the item has, not what the inputs d
 entity is this item's world entity (the same as self:GetEntity()).
 If your item has no inputs:						return nil
 If you want to give your item inputs inputs:	return Wire_CreateInputs(entity,{"Your","Inputs","Here"})
-WIRE
 ]]--
 function ITEM:GetWireInputs(entity)
 	--return Wire_CreateInputs(entity,{"Example Input","Another Input","Yet Another Input"});
@@ -117,6 +141,9 @@ function ITEM:GetWireInputs(entity)
 end
 
 --[[
+* SERVER
+* Event
+* WIRE
 This event can be used to give your items Wire outputs. This event will never be called if Wiremod is not installed.
 When this item enters the world, this event will be called to give the item's entity Wire outputs.
 Wire entities, such as an air compressor, can be controlled by outputs from other wire entities (like buttons or our items)
@@ -126,7 +153,6 @@ This function just tells Wiremod what outputs the item has. Whenever you want to
 entity is this item's world entity (the same as self:GetEntity()).
 If your item has no outputs:					return nil
 If you want to give your item outputs:			return Wire_CreateOutputs(entity,{"Your","Outputs","Here"})
-WIRE
 ]]--
 function ITEM:GetWireOutputs(entity)
 	--return Wire_CreateOutputs(entity,{"Example Output","Another Output","Yet Another Output"});
@@ -134,6 +160,10 @@ function ITEM:GetWireOutputs(entity)
 end
 
 --[[
+* SERVER
+* Event
+* WIRE
+
 This event runs when a wire input is triggered. This event will never be called if Wiremod is not installed.
 While your item is in the world, if a wire input (which you probably specified in GetWireInputs above) is triggered on your item, you can decide what happens here.
 For example:
@@ -145,7 +175,6 @@ For example:
 entity will always be this item's entity (the same as self:GetEntity())
 inputName will be the name of the input triggered. It should be one of the inputs you specified in GetWireInputs above.
 value will be the value of whatever was outputted here. This is usually a number, BUT it could possibly not be a number, keep this in mind.
-WIRE
 ]]--
 function ITEM:OnWireInput(entity,inputName,value)
 	--[[
@@ -160,83 +189,44 @@ function ITEM:OnWireInput(entity,inputName,value)
 	]]--
 end
 
+
+
+
 --[[
 SWEP SPECIFIC EVENTS
 ]]--
 
---[[
-Whenever an item is held as a weapon, an SWEP is created to represent it. This function will be run while SetItem is being run on the SWEP.
-SWEP is the SWEP table. It's the same as eWeapon:GetTable().
-eWeapon is the SWEP entity itself.
-]]--
-function ITEM:OnSWEPInit(SWEP,eWeapon)
-	--We'll set the world model and view models of the weapon first
-	SWEP.WorldModel=self:GetWorldModel();
-	SWEP.ViewModel=self:GetViewModel();
-	
-	--TODO use hooks
-	SWEP.Primary.Automatic=self.PrimaryAuto;
-	SWEP.Secondary.Automatic=self.SecondaryAuto;
-	
-	--TODO use hook
-	SWEP:SetWeaponHoldType(self.HoldType);
-	
-	return true;
-end
+
+
 
 --[[
-This is run when a player is holding the item as an SWEP and presses the left mouse button (primary attack).
-The default action is to use the item.
-NOTE: If ITEM.PrimaryAuto is true, then this event runs every frame the player has his Left Mouse button pressed!
+* SERVER
+* Event
+
+This event runs when an NPC weilds this item as a weapon. This function should tell the NPC
+how he's allowed to use the weapon.
+
+You can return 0 to indicate no capabilities or return a combination of valid enums
+(or'ed with |).
 ]]--
-function ITEM:OnPrimaryAttack()
-	self:Use(self:GetWOwner());
+function ITEM:GetSWEPCapabilities()
+	return 0;
 end
 
---[[
-This is run when a player is holding the item as an SWEP and presses the right mouse button (secondary attack).
-The default action is to use the item.
-NOTE: If ITEM.SecondaryAuto is true, then this event runs every frame the player has his Right Mouse button pressed!
-]]--
-function ITEM:OnSecondaryAttack()
-	self:Use(self:GetWOwner());
-end
 
---[[
-This is run when a player is holding the item as an SWEP and presses the reload button (usually the "R" key).
-Nothing happens by default.
-NOTE: OnReload is called every frame that the player has his [R] key pressed!
-]]--
-function ITEM:OnReload()
-	
-end
-
---[[
-This is run when a player is holding the item as a weapon and swaps from a different weapon to this weapon.
-]]--
-function ITEM:OnDeploy()
-	--DEBUG
-	Msg("Itemforge Items: Deploying "..tostring(self).."!\n");
-	
-	return true;
-end
-
---[[
-This is run when a player is holding the item as a weapon and swaps from this weapon to a different weapon.
-]]--
-function ITEM:OnHolster()
-	--DEBUG
-	Msg("Itemforge Items: Holstering "..tostring(self).."!\n");
-	
-	return true;
-end
 
 
 --[[
 ENTITY/SWEP SHARED EVENTS
 ]]--
 
+
+
+
 --[[
+* SERVER
+* Event
+
 If a key-value is set on the item's entity (either while in the world as an entity or while held as an SWEP), it will trigger this event.
 You get to decide what happens when a keyvalue is set using this function.
 bSWEP will be true if the keyvalue was set on the item while being held as an SWEP. It will be false if it happened while in the world, as an entity.
@@ -257,6 +247,9 @@ function ITEM:OnKeyValue(bSWEP,eEntity,key,value)
 end
 
 --[[
+* SERVER
+* Event
+
 If an input is received on the item's entity (either while in the world as an entity or while held as an SWEP), it will trigger this event.
 With this event, you get to decide what happens when an entity uses an input on this item's entity.
 bSWEP will be true if the input was received on the item while being held as an SWEP. It will be false if it happened while in the world, as an entity.
@@ -277,35 +270,18 @@ end
 
 
 
+
 --[[
 ITEM EVENTS
 ]]--
 
-function ITEM:OnInit(owner)
-	
-end
 
---This function is run prior to an item being removed. It cannot cancel the item from being removed.
-function ITEM:OnRemove()
-	
-end
+
 
 --[[
-This is run when you 'use' an item. An item can be used in the inventory with the use button, or if on the ground, by looking at the item's model and pressing E.
-The default action for when it's on the ground is to pick it up.
-Return false to tell the player the item cannot be used
-]]--
-function ITEM:OnUse(pl)
-	local ent=self:GetEntity();
-	if self:InWorld() then
-		self:Hold(pl);
-		
-		return true;
-	end
-	return false;
-end
+* SERVER
+* Event
 
---[[
 This function runs when an item in the stack is broken (health reaches 0).
 This runs once for each item in the stack. Lets say you have a stack of 10 bottles. Each time a bottle breaks, this function runs.
 howMany is how many items were broke (in the case of a stack of items, several items can possibly be broken with a single, powerful hit)
@@ -318,24 +294,51 @@ function ITEM:OnBreak(howMany,bLastBroke,who)
 	local ent=self:GetEntity();
 	if !ent then return false end
 	
-	breakEnt=ents.Create("prop_physics");
-	breakEnt:SetModel(ent:GetModel());
-	breakEnt:SetPos(ent:GetPos());
-	breakEnt:SetAngles(ent:GetAngles());
-	breakEnt:SetNotSolid(true);
+	--What kind of gibs does this item leave behind if it's destroyed while in the world?
+	--Can be "none" for no gibs,
+	--"auto" to use the model's default gibs,
+	--"metal" to break into metal pieces,
+	--"wood" to break into wood pieces.
 	
-	local phys1=ent:GetPhysicsObject();
-	local phys2=breakEnt:GetPhysicsObject();
-	
-	if phys1 && phys1:IsValid() && phys2 && phys2:IsValid() then
-		phys2:SetVelocity(phys1:GetVelocity());
-		phys2:AddAngleVelocity(phys1:GetAngleVelocity());
+	if self.GibEffect == "auto" then
+		local breakEnt=ents.Create("prop_physics");
+		breakEnt:SetModel(ent:GetModel());
+		breakEnt:SetPos(ent:GetPos());
+		breakEnt:SetAngles(ent:GetAngles());
+		breakEnt:SetNotSolid(true);
+		
+		local phys1=ent:GetPhysicsObject();
+		local phys2=breakEnt:GetPhysicsObject();
+		
+		if phys1 && phys1:IsValid() && phys2 && phys2:IsValid() then
+			phys2:SetVelocity(phys1:GetVelocity());
+			phys2:AddAngleVelocity(phys1:GetAngleVelocity());
+		end
+		breakEnt:Spawn();
+		breakEnt:Fire("break","",0);
+	elseif self.GibEffect == "metal" then
+		local data = EffectData();
+		data:SetOrigin(ent:LocalToWorld(ent:OBBCenter()));
+		data:SetStart(ent:OBBMaxs()-ent:OBBCenter());
+		data:SetAngle(ent:GetAngles());
+		
+		local phys1=ent:GetPhysicsObject();
+		if phys1 && phys1:IsValid() then
+			local v = phys1:GetVelocity();
+			data:SetNormal(v:GetNormal());
+			data:SetScale(v:Length());
+		end
+		util.Effect("MetalGibs",data,true,true);
+	elseif self.GibEffect == "wood" then
+		--local data = EffectData();
+		--util.Effect("");
 	end
-	breakEnt:Spawn();
-	breakEnt:Fire("break","",0);
 end
 
 --[[
+* SERVER
+* Event
+
 This event is called when a full update of this item is being sent to a player.
 pl may be nil - if it is, it's sending the update to everyone.
 ]]--
@@ -344,6 +347,9 @@ function ITEM:OnSendFullUpdate(pl)
 end
 
 --[[
+* SERVER
+* Event
+
 This function is run periodically (when the server ticks).
 ]]--
 function ITEM:OnTick()
@@ -351,6 +357,9 @@ function ITEM:OnTick()
 end
 
 --[[
+* SERVER
+* Event
+
 This function is run periodically.
 You can set how often it runs by setting the think rate at the top of the script, or with self:SetThinkRate().
 You need to tell the item to self:StartThink() to start the item thinking.
@@ -360,6 +369,9 @@ function ITEM:OnThink()
 end
 
 --[[
+* SERVER
+* Event
+
 Before items are combined to create something, this function is run. You can return false to stop the combination from happening. Note: The combination has to work (ex: combining a branch and a stone). Non working combinations (ex: a bottle and a vine) will not trigger this.
 The order this goes in is: (Are there any combinations for these items?) > (Have necessary # of ingredients?) > (Does the combination okay it?) > (does each item in the combination okay it?)
 So, this function is called last. All of the items in the combination must return true for it to work.
@@ -370,7 +382,12 @@ function ITEM:OnCombination(itemset,combination)
 	return true;
 end
 
---This runs when a networked var is set on this item (with SetNW*).
+--[[
+* SERVER
+* Event
+
+This runs when a networked var is set on this item (with SetNW*).
+]]--
 function ITEM:OnSetNWVar(sName,vVal)
 	return true;
 end

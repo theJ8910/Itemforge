@@ -25,11 +25,9 @@ ITEM.MaxHealth=10;				--Paper bags are pathetically weak.
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 
-if SERVER then
-
 ITEM.HoldType="normal";
 
-else
+if CLIENT then
 
 ITEM.WorldModelNudge=Vector(5,0,0);
 ITEM.WorldModelRotate=Angle(0,-10,90);

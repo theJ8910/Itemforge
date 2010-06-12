@@ -40,11 +40,9 @@ ITEM.MaxAmount=0;
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 
-if SERVER then
-
 ITEM.HoldType="normal";
 
-else
+if CLIENT then
 
 ITEM.WorldModelNudge=Vector(2,0,5);
 ITEM.WorldModelRotate=Angle(90,0,0);
@@ -107,7 +105,7 @@ function ITEM:RopeTogether(ent1,bone1,point1,ent2,bone2,point2)
 	return true;
 end
 
-function ITEM:OnPrimaryAttack()
+function ITEM:OnSWEPPrimaryAttack()
 	local pl=self:GetWOwner();
 	--TODO Minimum distance
 	local traceRes=pl:GetEyeTrace();

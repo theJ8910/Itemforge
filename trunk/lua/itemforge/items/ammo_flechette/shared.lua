@@ -16,9 +16,9 @@ ITEM.StartAmount=30;
 
 ITEM.WorldModel="models/weapons/hunter_flechette.mdl";
 
-if SERVER then
-	ITEM.HoldType="melee";
-else
+ITEM.HoldType="melee";
+
+if CLIENT then
 	ITEM.WorldModelNudge=Vector(3,0,7);
 	ITEM.WorldModelRotate=Angle(90,0,0);
 end

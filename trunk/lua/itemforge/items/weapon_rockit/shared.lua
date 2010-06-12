@@ -15,6 +15,8 @@ ITEM.WorldModel = "models/weapons/w_physics.mdl";
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 
+ITEM.HoldType="physgun";
+
 --Overridden Base Weapon stuff
 ITEM.PrimaryDelay=.4;
 ITEM.SecondaryDelay=.4;
@@ -49,9 +51,9 @@ ITEM.UnloadSound=Sound("weapons/physcannon/superphys_hold_loop.wav");
 --[[
 When a player is holding it and tries to primary attack
 ]]--
-function ITEM:OnPrimaryAttack()
+function ITEM:OnSWEPPrimaryAttack()
 	--This does all the base ranged stuff - determine if we can fire, do cooldown, consume ammo, play sounds, etc
-	if !self["base_ranged"].OnPrimaryAttack(self) then return false end
+	if !self["base_ranged"].OnSWEPPrimaryAttack(self) then return false end
 	
 	self:Chuck(2000);
 	
@@ -61,15 +63,15 @@ end
 --[[
 TODO rightclick loads
 ]]--
-function ITEM:OnSecondaryAttack()
+function ITEM:OnSWEPSecondaryAttack()
 	return false;
 end
 
-function ITEM:OnReload()
+function ITEM:OnSWEPReload()
 	if !self:CanReload() then return false end
 
 	return self:FindAmmo(function(self,item)
-		return self:Load(item,i);
+		return self:Load(item,i,nil,true);
 	end);
 end
 
@@ -77,7 +79,7 @@ end
 Overridden from base_ranged.
 When this function is called we load items into the gun's inventory instead of the clip.
 ]]--
-function ITEM:Load(item,clip,amt)
+function ITEM:Load(item,clip,amt,bPredicted)
 	if !self:CanReload() then return false end
 	
 	local pl=item:GetWOwner();
@@ -89,13 +91,15 @@ function ITEM:Load(item,clip,amt)
 	local inv=self:GetInventory();
 	if !inv then return false end
 	
+	if bPredicted == nil then bPredicted = false end
+	
 	--If we don't insert the item successfully we fail.
 	if SERVER then
 		if !item:ToInv(inv) && item:IsValid() then return false end
 		self:UpdateWireAmmoCount();
 	end
 	
-	self:ReloadEffects();
+	self:ReloadEffects(bPredicted);
 	self:SetNextBoth(CurTime()+self:GetReloadDelay());
 	
 	return true;

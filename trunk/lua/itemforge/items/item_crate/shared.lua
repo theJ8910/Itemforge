@@ -26,11 +26,9 @@ ITEM.MaxHealth=20;				--Based upon the :MaxHealth() of a prop with this model.
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 
-if SERVER then
-
 ITEM.HoldType="slam";
 
-else
+if CLIENT then
 
 ITEM.WorldModelNudge=Vector(5,0,0);
 ITEM.WorldModelRotate=Angle(0,-10,90);

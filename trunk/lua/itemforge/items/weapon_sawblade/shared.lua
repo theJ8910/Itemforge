@@ -29,16 +29,41 @@ ITEM.Size=26;
 ITEM.Weight=35856;				--Weighs approximately 36 kg or around 72 pounds (YEESH - the sawblade is about 2 feet in diameter though, and made out of steel. It's not that surprising is it?). Calculated using density of steel #1 (http://hypertextbook.com/facts/2004/KarenSutherland.shtml) multiplied by the volume in cubic centimeters (converted from game units) of an inner cylinder subtracted from an outer cylinder. The thickness and radii were calculated by getting the distance between trace .HitPos itions on the sawblade model.
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
-
+ITEM.HoldType="slam";
 ITEM.WorldModel="models/props_junk/sawblade001a.mdl";
 ITEM.ViewModel="models/weapons/v_sawblade.mdl";
 
-if SERVER then
-	ITEM.HoldType="slam";
-else
+--[[
+These are different ways the sawblade's viewmodel can be oriented
+(horizontal, vertical, or transitioning between the one or the other)
+]]--
+local ORIENT_HORIZ = 1;
+local ORIENT_VERT = 2;
+local ORIENT_HTOV = 3;
+local ORIENT_VTOH = 4;
+
+if CLIENT then
 	ITEM.Icon=Material("itemforge/items/item_sawblade");
 	ITEM.WorldModelNudge=Vector(18,0,0);
 	ITEM.WorldModelRotate=Angle(0,45,0);
+
+	--[[
+	These variables relate to the orientation of the sawblade's viewmodel.
+	While transitioning from one state to another, InterpFromTime is when the
+	transition starts, and InterpToTime is when the transition ends. InterpDelay
+	is how much time that will between these two times.
+	Vertical shift is how much the viewmodel is shifted to the right when the sawblade
+	is oriented vertically. Vertical roll is how much the viewmodel is rotated when the
+	sawblade is oriented horizontally.
+	]]--
+	ITEM.ViewModelOrientation = ORIENT_HORIZ;
+	ITEM.ViewModelInterpDelay = 0.3;
+	ITEM.ViewModelInterpFromTime = 0;
+	ITEM.ViewModelInterpToTime = 0;
+	ITEM.ViewModelVerticalShift = 20;
+	ITEM.ViewModelVerticalRoll = 90;
+else
+	ITEM.GibEffect = "metal";
 end
 
 --Overridden base weapon stuff
@@ -69,6 +94,20 @@ ITEM.StickSounds={				--A random sound here plays whenever the sawblade sticks i
 ITEM.UnstickSounds={
 	Sound("npc/roller/blade_out.wav")
 };
+
+ITEM.BrokenSounds={
+	Sound("physics/metal/metal_box_break1.wav"),
+	Sound("physics/metal/metal_box_break2.wav")
+};
+
+--Random sound from here plays when a cut has been made.
+ITEM.FleshyImpactSounds={
+	Sound("ambient/machines/slicer1.wav"),
+	Sound("ambient/machines/slicer2.wav"),
+	Sound("ambient/machines/slicer3.wav"),
+	Sound("ambient/machines/slicer4.wav")
+}
+
 ITEM.BloodyTypes={
 ["player"]=true,
 ["npc_monk"]=true,
@@ -114,8 +153,9 @@ ITEM.StickingTo=nil;
 Throws the item oriented horizontally.
 This override is necessary because base_thrown only cooldowns the primary attack. This cooldowns the secondary too.
 ]]--
-function ITEM:OnPrimaryAttack()
-	if !self["base_thrown"].OnPrimaryAttack(self) then return false end
+function ITEM:OnSWEPPrimaryAttack()
+	if !self["base_thrown"].OnSWEPPrimaryAttack(self) then return false end
+	if CLIENT then self:OrientHorizontal() end
 	self:SetNextSecondary(CurTime()+self:GetPrimaryDelay(),CurTime()+self:GetPrimaryDelayAuto());
 	
 	return true;
@@ -127,8 +167,9 @@ end
 
 Throws the item oriented vertically.
 ]]--
-function ITEM:OnSecondaryAttack()
-	if !self["base_weapon"].OnSecondaryAttack(self) then return false end
+function ITEM:OnSWEPSecondaryAttack()
+	if !self["base_weapon"].OnSWEPSecondaryAttack(self) then return false end
+	if CLIENT then self:OrientVertical() end
 	self:SetNextPrimary(CurTime()+self:GetSecondaryDelay(),CurTime()+self:GetSecondaryDelayAuto());
 	
 	self:ThrowEffects();
@@ -200,6 +241,7 @@ function ITEM:OnPhysicsCollide(entity,CollisionData,HitPhysObj)
 	--Kill (or at least really mess up) players and NPCs
 	if self.BloodyTypes[ent2:GetClass()] then
 		ent2:TakeDamage(100,killCredit,ent);
+		self:EmitSound(self.FleshyImpactSounds);
 		
 		local effectdata = EffectData();
 		effectdata:SetOrigin(ent:GetPos());
@@ -360,6 +402,11 @@ function ITEM.Unstuck(weld,self,id)
 	self.StickingTo[id]=nil;
 end
 
+function ITEM:OnBreak(howMany,bLastBroke,who)
+	self:EmitSound(self.BrokenSounds);
+	self:InheritedEvent("OnBreak","base_thrown",nil,howMany,bLastBroke,who);
+end
+
 
 
 
@@ -367,6 +414,24 @@ else
 
 
 
+
+--[[
+Cosine interpolate function. Transitions smoothly from fStart to fEnd. If you were to graph
+this function return value vs time it would look something like this:
+
+      return
+       value
+fStart ->|--..__
+		 |      `_
+		 |        .
+fEnd   ->|         `--..__
+		 |________________ time
+		 ^                ^
+	 fTimeStart		  fTimeEnd
+]]--
+local function CosInterpolate(fStart, fEnd, fTimeStart, fTimeEnd, fTime)
+	return fStart + (fEnd-fStart) * 0.5 * (1 - math.cos( math.pi * (fTime-fTimeStart) / (fTimeEnd-fTimeStart) ) );
+end
 
 --The sawblade icon moves in an elliptical way on the weapons menu
 function ITEM:OnSWEPDrawMenu(x,y,w,h,a)
@@ -380,6 +445,51 @@ function ITEM:OnSWEPDrawMenu(x,y,w,h,a)
 	surface.DrawTexturedRect(x + (w-128)*.5 + math.cos(t)*16 ,
 							 y + (h-128)*.5 + math.sin(t)*8  ,
 							 128,128);
+end
+
+--Begins orienting the model to horizontal
+function ITEM:OrientHorizontal()
+	if self.ViewModelOrientation == ORIENT_HORIZ || self.ViewModelOrientation == ORIENT_VTOH then return true end
+	self.ViewModelOrientation = ORIENT_VTOH;
+	self.ViewModelInterpFromTime = CurTime();
+	self.ViewModelInterpToTime = self.ViewModelInterpFromTime + self.ViewModelInterpDelay;
+end
+
+--Begins orienting the model to vertical
+function ITEM:OrientVertical()
+	if self.ViewModelOrientation == ORIENT_VERT || self.ViewModelOrientation == ORIENT_HTOV then return true end
+	self.ViewModelOrientation = ORIENT_HTOV;
+	self.ViewModelInterpFromTime = CurTime();
+	self.ViewModelInterpToTime = self.ViewModelInterpFromTime + self.ViewModelInterpDelay;
+end
+
+--[[
+The sawblade's viewmodel can be rotated horizontally or vertically,
+and transitions smoothly between the two
+]]--
+function ITEM:GetSWEPViewModelPosition(oldPos, oldAng)
+	local fInterp = 0;
+	if self.ViewModelOrientation == ORIENT_HTOV then
+		if CurTime() > self.ViewModelInterpToTime then
+			self.ViewModelOrientation = ORIENT_VERT;
+		else
+			fInterp = CosInterpolate(0,1,self.ViewModelInterpFromTime,self.ViewModelInterpToTime,CurTime());
+		end
+	elseif self.ViewModelOrientation == ORIENT_VTOH then
+		if CurTime() > self.ViewModelInterpToTime then
+			self.ViewModelOrientation = ORIENT_HORIZ;
+		else
+			fInterp = CosInterpolate(1,0,self.ViewModelInterpFromTime,self.ViewModelInterpToTime,CurTime());
+		end
+	end
+	
+	if self.ViewModelOrientation == ORIENT_HORIZ then
+		return oldPos, oldAng;
+	elseif self.ViewModelOrientation == ORIENT_VERT then
+		return oldPos + oldAng:Right()*self.ViewModelVerticalShift , Angle(oldAng.p, oldAng.y, oldAng.r + self.ViewModelVerticalRoll);
+	else
+		return oldPos + oldAng:Right()*(self.ViewModelVerticalShift*fInterp) , Angle(oldAng.p, oldAng.y, oldAng.r + self.ViewModelVerticalRoll*fInterp);
+	end
 end
 
 

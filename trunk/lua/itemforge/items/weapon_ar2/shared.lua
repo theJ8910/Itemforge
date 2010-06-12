@@ -19,9 +19,7 @@ ITEM.AdminSpawnable=true;
 ITEM.WorldModel="models/weapons/w_IRifle.mdl";
 ITEM.ViewModel="models/weapons/v_IRifle.mdl";
 
-if SERVER then
-	ITEM.HoldType="ar2";
-end
+ITEM.HoldType="ar2";
 
 --Overridden Base Weapon stuff
 ITEM.PrimaryDelay=.1;									--Taken directly from the modcode.
@@ -58,10 +56,10 @@ ITEM.ViewKickMin=Angle(0,0,0);							--Taken directly from modcode
 ITEM.ViewKickMax=Angle(0,0,0);
 
 
-function ITEM:OnPrimaryAttack()
-	if !self["base_firearm"].OnPrimaryAttack(self) then return false end
+function ITEM:OnSWEPPrimaryAttack()
+	if !self["base_firearm"].OnSWEPPrimaryAttack(self) then return false end
 end
 
-function ITEM:OnSecondaryAttack()
+function ITEM:OnSWEPSecondaryAttack()
 	--Secondary attack fires a combine ball but right now it does nothing
 end

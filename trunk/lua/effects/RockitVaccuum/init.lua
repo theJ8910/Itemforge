@@ -11,7 +11,7 @@ function EFFECT:Init(data)
 end
 
 function EFFECT:Think( )
-	return true;
+	return false;
 end
 
 function EFFECT:Render()

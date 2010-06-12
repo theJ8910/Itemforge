@@ -87,7 +87,7 @@ end);
 --[[
 This function deals with finding ammo for an item held (as a weapon) by a player.
 
-First, If the player is looking directly at some ammo, we'll give that to the callback first before searching the nearby ammo.
+First, if the player is looking directly at some ammo, we'll give that to the callback first before searching the nearby ammo.
 If the player is holding ammo (in his weapon menu), we'll try to load that.
 If both of those fail, we'll try searching the area around the player instead.
 TODO: THIS IS CRAP, REDO IT
@@ -107,14 +107,6 @@ list.Add("Itemforge_BaseRanged_FindAmmo",function(self,fCallback)
 	if i && fCallback(self,i) then return i end
 	
 	if SERVER then
-		for i=1,IF.Items.MaxHeldItems do
-			local heldWeapon=pOwner:GetWeapon("itemforge_item_held_"..i);
-			if heldWeapon && heldWeapon:IsValid() then
-				local item=heldWeapon:GetItem();
-				if item && fCallback(self,item) then return item end
-			end
-		end
-	else
 		for k,v in pairs(pOwner:GetWeapons()) do
 			local item=IF.Items:GetWeaponItem(v);
 			if item && fCallback(self,item) then
@@ -124,7 +116,7 @@ list.Add("Itemforge_BaseRanged_FindAmmo",function(self,fCallback)
 	end
 	
 	--TODO use IF.Items:GetWorldItems() instead of this
-	for k,v in pairs(ents.FindByClass("itemforge_item")) do
+	for k,v in pairs(ents.FindByClass(IF.Items.BaseEntityClassName)) do
 		local i=IF.Items:GetEntItem(v);
 		if i then
 			local tr={};
@@ -148,7 +140,7 @@ list.Add("Itemforge_BaseRanged_FindAmmo",function(self,fCallback)
 	if !eEnt then return false end
 	
 	--TODO use IF.Items:GetWorldItems() instead of this
-	for k,v in pairs(ents.FindByClass("itemforge_item")) do
+	for k,v in pairs(ents.FindByClass(IF.Items.BaseEntityClassName)) do
 		local i=IF.Items:GetEntItem(v);
 		if i then
 			local tr={};

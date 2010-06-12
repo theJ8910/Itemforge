@@ -24,7 +24,7 @@ ITEM.PrimaryDelay=.9;
 
 --Overridden Base Melee stuff
 ITEM.HitRange=75;
-ITEM.HitForce=10;
+ITEM.HitForce=2;
 ITEM.HitDamage=40;
 ITEM.ViewKickMin=Angle(1.0,-2.0,0);
 ITEM.ViewKickMax=Angle(2.0,-1.0,0);
@@ -47,15 +47,15 @@ ITEM.DeploySounds={
 	Sound("weapons/stunstick/spark3.wav"),
 }
 
-function ITEM:OnDeploy()
-	if !self["base_melee"].OnDeploy(self) then return false end
+function ITEM:OnSWEPDeploy()
+	if !self["base_melee"].OnSWEPDeploy(self) then return false end
 	self:EmitSound(self.DeploySounds,true);
 	
 	return true;
 end
 
-function ITEM:OnHolster()
-	if !self["base_melee"].OnHolster(self) then return false end
+function ITEM:OnSWEPHolster()
+	if !self["base_melee"].OnSWEPHolster(self) then return false end
 	
 	--This isn't a mistake. The holster sounds are the same as the deploy sounds.
 	self:EmitSound(self.DeploySounds,true);

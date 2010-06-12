@@ -37,9 +37,9 @@ ITEM.ViewKickMax=Angle(0,0,0);
 --[[
 When a player is holding it and tries to primary attack
 ]]--
-function ITEM:OnPrimaryAttack()
+function ITEM:OnSWEPPrimaryAttack()
 	--This does all the base ranged stuff - determine if we can fire, do cooldown, consume ammo, play sounds, etc
-	if !self["base_ranged"].OnPrimaryAttack(self) then return false end
+	if !self["base_ranged"].OnSWEPPrimaryAttack(self) then return false end
 	
 	self:ShootBullets(self.BulletsPerShot,self.BulletDamage,self.BulletForce,self:GetBulletSpread());
 	self:MuzzleFlash();

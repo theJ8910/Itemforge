@@ -30,7 +30,7 @@ If the ammo is used clientside, we won't actually load the gun, we'll just retur
 ]]--
 function ITEM:OnUse(pl)
 	local item=IF.Items:GetWeaponItem(pl:GetActiveWeapon());
-	if item && item:InheritsFrom("base_ranged") && (CLIENT || item:Load(self) ) then
+	if item && item:InheritsFrom("base_ranged") && (CLIENT || item:Load(self,nil,nil) ) then
 		return true;
 	end
 	

@@ -2,7 +2,8 @@
 Itemforge Gear Attach Module
 CLIENT
 
-This implements basic functionality for adding, moving, and removing models fake-merged to bones and attachment points on players.
+This implements basic functionality for adding, moving, and removing models fake-merged
+to bones and attachment points on players.
 ]]--
 MODULE.Name="GearAttach";									--Our module will be stored at IF.GearAttach
 MODULE.Disabled=false;										--Our module will be loaded
@@ -10,57 +11,93 @@ MODULE.Attachments={};										--All active attachments are stored here
 
 local Up=Vector(0,0,1);
 
+local ATTACHTYPE_NONE   = 0;
+local ATTACHTYPE_BONE   = 1;
+local ATTACHTYPE_AP     = 2;
+local ATTACHTYPE_MERGE  = 3;
+local ATTACHTYPE_SIMPLE = 4;
+
 --Attachment functions table. All attachments can use functions and values declared here.
 local af={};
 
---Updates the attachment's position and draws it
-function af:Draw()
-	if self.type==0 then
-		return;
-	elseif self.type==1 then
-		local pos,ang=self.parent:GetBonePosition(self.PAP);
-		self.ent:SetPos(pos								+
-						ang:Forward()*self.vOffset.x	+
-						ang:Right()*self.vOffset.y		+
-						ang:Up()*self.vOffset.z);
-		
-		ang:RotateAroundAxis(ang:Forward()		,self.aOffset.r);
-		ang:RotateAroundAxis(ang:Right()		,self.aOffset.p);
-		ang:RotateAroundAxis(ang:Up()			,self.aOffset.y);
-		
-		self.ent:SetAngles(ang);
-	elseif self.type==2 then
-		local ap=self.parent:GetAttachment(self.PAP);
-		self.ent:SetPos(ap.Pos							+
-						ap.Ang:Forward()*self.vOffset.x	+
-						ap.Ang:Right()*self.vOffset.y	+
-						ap.Ang:Up()*self.vOffset.z);
-		ap.Ang:RotateAroundAxis(ap.Ang:Forward(),self.aOffset.r);
-		ap.Ang:RotateAroundAxis(ap.Ang:Right()	,self.aOffset.p);
-		ap.Ang:RotateAroundAxis(ap.Ang:Up()		,self.aOffset.y);
-		
-		self.ent:SetAngles(ap.Ang);
-	elseif self.type==3 then
-		if !self.MAPPos then
-			self.ent:SetPos(Vector(0,0,0));
-			self.ent:SetAngles(Angle(0,0,0));
-			self.MAPPos,self.MAPAng=self.ent:GetBonePosition(self.MAP);
-		end
-		local pos,a=self.parent:GetBonePosition(self.PAP);
-		local b=self.MAPAng*1;
-		
-		local c=Angle(0,0,0);
-		local offset=a-b;
-		c:RotateAroundAxis(b:Forward(),offset.r);
-		c:RotateAroundAxis(Up,offset.y);
-		b.y=a.y;
-		b.p=0;
-		b.r=0;
-		c:RotateAroundAxis(b:Right(),-offset.p);
-		self.ent:SetAngles(c);
-		self.ent:SetPos(pos-(self.ent:LocalToWorld(self.MAPPos)-self.ent:GetPos()));
-	end
+--Draw function used when the gear is attached to anything
+function af:PreDrawNone()
+	return;
+end
+
+--Draw function used when the gear is attached to a bone
+function af:PreDrawBone()
+	local pos,ang=self.parent:GetBonePosition(self.PAP);
+	self.ent:SetPos(pos								+
+					ang:Forward()*self.vOffset.x	+
+					ang:Right()*self.vOffset.y		+
+					ang:Up()*self.vOffset.z);
 	
+	ang:RotateAroundAxis(ang:Forward()		,self.aOffset.r);
+	ang:RotateAroundAxis(ang:Right()		,self.aOffset.p);
+	ang:RotateAroundAxis(ang:Up()			,self.aOffset.y);
+	
+	self.ent:SetAngles(ang);
+end
+
+--Draw function used when the gear is attached to an AP
+function af:PreDrawAP()
+	local ap=self.parent:GetAttachment(self.PAP);
+	if ap==nil then
+		--self.PAP = nil;
+		return nil;
+	end
+	self.ent:SetPos(ap.Pos							+
+					ap.Ang:Forward()*self.vOffset.x	+
+					ap.Ang:Right()*self.vOffset.y	+
+					ap.Ang:Up()*self.vOffset.z);
+	ap.Ang:RotateAroundAxis(ap.Ang:Forward(),self.aOffset.r);
+	ap.Ang:RotateAroundAxis(ap.Ang:Right()	,self.aOffset.p);
+	ap.Ang:RotateAroundAxis(ap.Ang:Up()		,self.aOffset.y);
+	
+	self.ent:SetAngles(ap.Ang);
+end
+
+--Draw function used when the gear is bonemerged
+function af:PreDrawMerge()
+	if !self.MAPPos then
+		self.ent:SetPos(Vector(0,0,0));
+		self.ent:SetAngles(Angle(0,0,0));
+		self.MAPPos,self.MAPAng=self.ent:GetBonePosition(self.MAP);
+	end
+	local pos,a=self.parent:GetBonePosition(self.PAP);
+	local b=self.MAPAng*1;
+	
+	local c=Angle(0,0,0);
+	local offset=a-b;
+	c:RotateAroundAxis(b:Forward(),offset.r);
+	c:RotateAroundAxis(Up,offset.y);
+	b.y=a.y;
+	b.p=0;
+	b.r=0;
+	c:RotateAroundAxis(b:Right(),-offset.p);
+	self.ent:SetAngles(c);
+	self.ent:SetPos(pos-(self.ent:LocalToWorld(self.MAPPos)-self.ent:GetPos()));
+end
+
+--Draw function used when the gear is simulating simple parenting
+function af:PreDrawSimple()
+	local pos=self.parent:GetPos();
+	local ang=self.parent:GetAngles();
+	self.ent:SetPos(pos								+
+					ang:Forward()*self.vOffset.x	+
+					ang:Right()*self.vOffset.y		+
+					ang:Up()*self.vOffset.z);
+	
+	ang:RotateAroundAxis(ang:Forward()		,self.aOffset.r);
+	ang:RotateAroundAxis(ang:Right()		,self.aOffset.p);
+	ang:RotateAroundAxis(ang:Up()			,self.aOffset.y);
+	
+	self.ent:SetAngles(ang);
+end
+
+--No matter what draw function is being used they all have this code in common
+function af:Draw()
 	if self.Hidden || self.parent==GetViewEntity() then return end
 	
 	if self.DrawFunc then	self.DrawFunc(self.ent);
@@ -69,6 +106,9 @@ function af:Draw()
 	
 	return true;
 end
+
+--Updates the attachment's position
+af.PreDraw = af.PreDrawNone;
 
 --[[
 Attaches the gear to a bone on the parent entity.
@@ -88,7 +128,9 @@ function af:ToBone(bone)
 	
 	self.AP=bone;
 	self.PAP=index;
-	self.type=1;
+	self.Hidden = false;
+	self.type=ATTACHTYPE_BONE;
+	self.PreDraw=self.PreDrawBone;
 	
 	return true;
 end
@@ -111,7 +153,10 @@ function af:ToAP(attachPoint)
 	
 	self.AP=attachPoint;
 	self.PAP=index;
-	self.type=2;
+	self.Hidden = false;
+	self.type=ATTACHTYPE_AP;
+	self.PreDraw=self.PreDrawAP;
+	
 	return true;
 end
 
@@ -129,7 +174,7 @@ false is returned if:
 	the attachment's model doesn't have the given bone
 ]]--
 function af:BoneMerge(refBone)
-	if !refBone then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; no reference bone was given.\n"); return false end
+	if !refBone then ErrorNoHalt("Itemforge Gear Attach: Couldn't attach gear via bone merge; no reference bone was given.\n"); return false end
 	
 	local index1=self.parent:LookupBone(refBone);
 	if !index1 then return false end
@@ -137,12 +182,28 @@ function af:BoneMerge(refBone)
 	local index2=self.ent:LookupBone(refBone);
 	if !index2 then return false end
 	
-	self.type=3;
 	self.AP=refBone;
 	self.PAP=index1;
 	self.MAP=index2;
 	self.MAPPos=nil;
 	self.MAPAng=nil;
+	self.Hidden = false;
+	self.type=ATTACHTYPE_MERGE;
+	self.PreDraw=self.PreDrawMerge;
+	
+	return true;
+end
+
+--[[
+Simulates a simple parenting between this gear and the parent entity.
+
+true is returned if the gear is successfully attached
+]]--
+function af:Simple()
+	self.Hidden = false;
+	self.type=ATTACHTYPE_SIMPLE;
+	self.PreDraw=self.PreDrawSimple;
+	
 	
 	return true;
 end
@@ -164,7 +225,10 @@ end
 
 --[[
 Shows the attachment.
-Attachments are shown by default. You don't need to call this unless :Hide() has been called before.
+Attachments are shown automatically after running the appropriate parenting function,
+such as BoneMerge(), Simple(), ToBone(), or ToAP().
+
+You don't need to call this unless :Hide() has been called before.
 ]]--
 function af:Show()
 	self.Hidden=false;
@@ -242,11 +306,11 @@ function MODULE:Create(parent,model)
 	if !model then ErrorNoHalt("Itemforge Gear Attach: Couldn't create gear; no model name was given.\n"); return false end
 	local newAttach={};
 	newAttach.parent=parent;			--Attached to this
-	newAttach.type=0;					--0: None; 1: On Bone; 2: On Attachment Point; 3: Bone-Merge
+	newAttach.type=ATTACHTYPE_NONE;		--Type of attachment behavior
 	newAttach.vOffset=Vector(0,0,0);	--Offset of model relative to bone/attachment
 	newAttach.aOffset=Angle(0,0,0);		--Rotation offset of model relative to bone/attachment
 	newAttach.DrawFunc=nil;				--This function is called prior to drawing
-	newAttach.Hidden=false;				--The model exists but is not drawn
+	newAttach.Hidden=true;				--The model exists but is not drawn
 	newAttach.AP="";					--Name of bone/attachment on parent (and model if dealing with a bone-merge)
 	newAttach.PAP=0;					--Index of bone/attachment on parent
 	newAttach.MAP=0;					--Index of reference bone on gear model (for bone-merge)
@@ -274,6 +338,10 @@ end
 
 function MODULE:Remove(attach)
 	if !attach || !attach.id then return false end
+	if IsValid(attach.ent) then
+		attach.ent:Remove();
+		attach.ent=nil;
+	end
 	self.Attachments[attach.id]=nil;
 	return true;
 end

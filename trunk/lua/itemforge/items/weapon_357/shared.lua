@@ -43,8 +43,8 @@ ITEM.BulletSpread=Vector(0,0,0);						--Taken directly from modcode; this is 0 d
 ITEM.ViewKickMin=Angle(-8,-2,0);						--Taken directly from modcode. The view kicks up.
 ITEM.ViewKickMax=Angle(-8,2,0);
 
-function ITEM:OnPrimaryAttack()
-	if !self["base_firearm"].OnPrimaryAttack(self) then return false end
+function ITEM:OnSWEPPrimaryAttack()
+	if !self["base_firearm"].OnSWEPPrimaryAttack(self) then return false end
 	
 	--We need to snap the holding player's eyes on the server;
 	--if we can't do that for some reason just return true to indicate everything else went as planned
@@ -59,6 +59,6 @@ function ITEM:OnPrimaryAttack()
 	pl:SnapEyeAngles(ang);
 end
 
-function ITEM:OnSecondaryAttack()
+function ITEM:OnSWEPSecondaryAttack()
 	--Secondary attack does NOTHING
 end

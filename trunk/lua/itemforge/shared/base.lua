@@ -22,12 +22,41 @@ local _CLASSmt={};
 --Base Itemforge Object class
 local _BASE={};
 
+--Rather than making a copy of these strings every time an object is created, we just store them here and reference as needed.
 
+--Error with get table
+local IFB_EGT = "Itemforge Base: Couldn't grab object table from removed object.\n";
 
+--Error with index
+local IFB_EI = {
+	"Itemforge Base: Couldn't reference \"",
+	"\" on removed object.\n",
+};
+
+--Error with new index
+local IFB_ENI = {
+	"WARNING! This object tried to override \"",
+	"\", a protected function or value in the \"",
+	"\" class.\n",
+	
+	"Itemforge Base: Couldn't set \"",
+	"\" to \"",
+	"\" on removed object.\n",
+};
+
+--Error with To String
+local IFB_ETS="ToString error: ";
+
+--On new index event
+local IFB_ONI = "OnNewIndex";
+
+--Tostring says this is an invalid object
+local IFB_TSI="Object [invalid]";
 
 
 --[[
 * SHARED
+
 Initilize base module
 ]]--
 function MODULE:Initialize()
@@ -36,6 +65,7 @@ end
 
 --[[
 * SHARED
+
 Cleanup base module
 ]]--
 function MODULE:Cleanup()
@@ -43,6 +73,7 @@ end
 
 --[[
 * SHARED
+
 Registers a class. Class registration should be performed at initialization.
 Classes are templates that can be used to create objects. Item-types and inventory templates are two examples of this.
 After a class has been registered, you can instantiate objects of that class by using IF.Base:CreateObject(sName).
@@ -55,11 +86,17 @@ sName is the name you wish to give to this class. This name will be used for two
 	Making objects from this class.
 	Allowing one class to inherit from another.
 	
-true is returned if the template was successfully registered, false is returned otherwise.
+The class table is returned if the template was successfully registered,
+and nil is returned otherwise.
+
+NOTE:
+The returned class table is not necessarily the same table you gave to the function, tClass.
+If a class with this name has already been registered, we copy the contents of tClass to the
+existing table, and then return that table instead.
 ]]--
 function MODULE:RegisterClass(tClass,sName)
-	if !tClass then ErrorNoHalt("Itemforge Base: Couldn't register class. Class table wasn't given."); return false; end
-	if !sName then ErrorNoHalt("Itemforge Base: Couldn't register class. The name of the class was not given."); return false; end
+	if !tClass then ErrorNoHalt("Itemforge Base: Couldn't register class. Class table wasn't given."); return nil; end
+	if !sName then ErrorNoHalt("Itemforge Base: Couldn't register class. The name of the class was not given."); return nil; end
 	sName=string.lower(sName);
 	
 	tClass.ClassName=sName;
@@ -68,15 +105,23 @@ function MODULE:RegisterClass(tClass,sName)
 	--If this item type is already loaded just empty out the existing table; that way existing items of this type are instantly updated with the new contents.
 	if _CLASSES[sName] then
 		table.CopyFromTo(tClass,_CLASSES[sName]);
-		return true;
+		tClass = _CLASSES[sName];
+	else
+		_CLASSES[sName]=tClass;
 	end
 	
-	_CLASSES[sName]=tClass;
-	return true;
+	--If the class has a post-register function set up we run it here
+	if type(tClass.OnClassRegister)=="function" then
+		local s,r=pcall(tClass.OnClassRegister,tClass);
+		if !s then ErrorNoHalt("Itemforge Base: OnClassRegister event for class \""..sName.."\" failed: "..r.."\n") end
+	end
+	
+	return tClass;
 end
 
 --[[
 * SHARED
+
 This is handled automatically, there's no need for a scripter to call this function.
 
 This function carries out the inheritence between classes.
@@ -106,8 +151,8 @@ function MODULE:DoInheritance()
 				v.BaseClass=_CLASSES[BaseClassName];
 			end
 			
-			--We'll also do something like C++ does with "myObject::InheritedClass" here.
 			--[[
+			We'll also do something like C++ does with "myObject::InheritedClass" here.
 			Lets say you have items that inherit like this (top inherits from bottom):
 			item_crowbar
 			base_melee
@@ -126,7 +171,8 @@ function MODULE:DoInheritance()
 		end
 	end
 	
-	--After the inheritence is finalized, make sure that no child classes are overriding protected keys in their parent, grandparent, etc. 
+	--After the inheritence is finalized, make sure that no child classes are
+	--overriding protected keys in their parent, grandparent, etc. 
 	local pc;
 	for k,v in pairs(_CLASSES) do
 		if v.ClassName!=BaseClassName then
@@ -135,11 +181,16 @@ function MODULE:DoInheritance()
 				if pc then ErrorNoHalt("Itemforge Base: WARNING! "..tostring(k).." tried to override \""..tostring(a).."\", a protected function or value in the \""..pc.ClassName.."\" class.\n"); v[a]=nil; end
 			end
 		end
+		
+		--Run the post inherit function for this class
+		local s,r=pcall(v.OnClassInherited,v);
+		if !s then ErrorNoHalt("Itemforge Base: OnClassInherited event for class \""..k.."\" failed: "..r.."\n") end
 	end
 end
 
 --[[
 * SHARED
+
 Returns true if a class with the given name is registered.
 ]]--
 function MODULE:ClassExists(sName)
@@ -148,12 +199,15 @@ end
 
 --[[
 * SHARED
-Given a class table and a key, this function will check to see if the key is protected and therefore can't (more like shouldn't) be overriden.
+
+Given a class table and a key, this function will check to see if the key is protected and
+therefore can't (more like shouldn't) be overriden.
 
 tClass should be a class table.
 k should be the key you want to check to see if protected.
 
-If the key is protected, the class table is returned. nil is returned otherwise.
+If the key is protected, the class who is protecting the key's table is returned.
+nil is returned otherwise.
 ]]--
 function MODULE:IsProtectedKey(tClass,k)
 	local pk;
@@ -174,6 +228,7 @@ end
 
 --[[
 * SHARED
+
 Creates an object (an instance of a class).
 Generates an error message and returns nil if the object cannot be created.
 
@@ -214,7 +269,7 @@ function MODULE:CreateObject(sClass)
 		
 		--Returns a copy of everything unique to the object, so long as it's valid
 		GetTable	=	function()
-								if !o then ErrorNoHalt("Itemforge Base: Couldn't grab object table from removed object.\n"); return false; end
+								if !o then ErrorNoHalt(IFB_EGT); return nil; end
 								local tC={};
 								for k,v in pairs(o) do tC[k]=v; end
 								return tC;
@@ -223,16 +278,18 @@ function MODULE:CreateObject(sClass)
 	
 	local mt={};
 	
-	--Objects draw their functions/data from three sources (checked in first to last order as listed here):
-	--1. (f) References have their own set of functions which are linked to here.
-	--2. (o) is the object itself. Anything unique to that individual object is stored here.
-	--3. (t) is the class (or type) of the object. Anything in t or any inherited class is stored here.
+	--[[
+	Objects draw their functions/data from three sources (checked in first to last order as listed here):
+	  1. (f) References have their own set of functions which are linked to here.
+	  2. (o) is the object itself. Anything unique to that individual object is stored here.
+	  3. (t) is the class (or type) of the object. Anything in t or any inherited class is stored here.
+	]]--
 	function mt:__index(k)
 		if f[k] then		return f[k];
 		elseif o!=nil then
 			if o[k] then		return o[k];
 			else				return t[k];	end
-		else				ErrorNoHalt("Itemforge Base: Couldn't reference \""..tostring(k).."\" on removed object.\n");
+		else				ErrorNoHalt(IFB_EI[1]..tostring(k)..IFB_EI[2]);
 		end
 	end
 	
@@ -241,11 +298,11 @@ function MODULE:CreateObject(sClass)
 		if o!=nil then
 			--Is the key protected? If so, on what class?
 			local pc=IF.Base:IsProtectedKey(t,k);
-			if pc then return self:Error("WARNING! This object tried to override \""..tostring(k).."\", a protected function or value in the \""..pc.ClassName.."\" class.\n"); end
+			if pc then return self:Error(IFB_ENI[1]..tostring(k)..IFB_ENI[2]..pc.ClassName..IFB_ENI[3]); end
 			
-			if self:Event("OnNewIndex",true,k,v)==true then o[k]=v; end
+			if self:Event(IFB_ONI,true,k,v)==true then o[k]=v; end
 		else
-			ErrorNoHalt("Itemforge Base: Couldn't set \""..tostring(k).."\" to \""..tostring(v).."\" on removed object.\n");
+			ErrorNoHalt(IFB_ENI[4]..tostring(k)..IFB_ENI[5]..tostring(v)..IFB_ENI[6]);
 			return false;
 		end
 	end
@@ -255,9 +312,9 @@ function MODULE:CreateObject(sClass)
 		if o!=nil then
 			local s,r=pcall(self.ToString,self);
 			if s then return r
-			else	  return "(ToString error: "..r..")"; end
+			else	  return IFB_ETS..r..")"; end
 		else
-			return "Object [invalid]";
+			return IFB_TSI;
 		end
 	end
 	
@@ -273,6 +330,7 @@ end
 
 --[[
 * SHARED
+
 This metatable protects the base class.
 The base class has no inheritence.
 See comments below for more information on class protection.
@@ -283,6 +341,7 @@ end
 
 --[[
 * SHARED
+
 This metatable handles class protection and inheritence.
 Inheritence means the class can use everything from the class it's based off of (it's base-class).
 If both the class and the base-class don't have it, nil is returned.
@@ -428,18 +487,120 @@ Example: I want to call this object's CanEnterWorld event:
 ]]--
 function _BASE:Event(sEventName,vDefaultReturn,...)
 	local f=self[sEventName];
-	if !f then self:Error(sEventName.." ("..tostring(self)..") failed: This event does not exist."); return vDefaultReturn,false end
+	if !f then self:Error("\""..sEventName.."\" failed: This event does not exist."); return vDefaultReturn,false end
 		
 	local s,r=pcall(f,self,...);
-	if !s then self:Error(sEventName.." ("..tostring(self)..") failed: "..r); return vDefaultReturn,false end
+	if !s then self:Error("\""..sEventName.."\" failed: "..r); return vDefaultReturn,false end
 	
 	return r,true;
 end
 _BASE._ProtectedKeys["Event"]=true;
 
+--[[
+* SHARED
+* Protected
+
+Calls an event that was inherited from one of the object's parent classes.
+
+If you want to override an event so that it does everything it's parent does, plus something
+extra, this is the event for you.
+
+Example: I want to draw a health bar on all items, but on bottled water I want to draw
+a water bar as well.
+
+If there is an error calling the event, a non-halting error message is generated and a default value is returned.
+
+strEventName is a string which should be the name of the event to call (EX: "OnDraw2D", "OnThink", etc)
+strParentName is a string indicating which parent to take the event from.
+	IMPORTANT: DO NOT GIVE self.BaseClass. Use "name_of_class" like this.
+	
+	Because of the way inheritence works in Itemforge, passing self.BaseClass will sometimes
+	cause an infinite loop (Lua should report the error as "Stack overflow" or
+	"infinite loop detected").
+	
+	Example of valid values: "base_melee", "base_item", "base_inv", etc.
+	
+vDefaultReturn is what will be returned in case of errors calling the hook.
+... - You can pass arguments to the hook here
+
+This function returns two values: vReturn,bSuccess
+	vReturn will be what the event returned, or if there were errors, then it will be vDefaultReturn.
+	bSuccess will be true if the event was called successfully, or false if there were errors.
+
+Example:
+	I want to make an OnUse event that does everything it's parent does plus what I want:
+	function ITEM:OnUse(pl)
+		if !self:InheritedEvent("OnUse","base_item",true,pl) then return true end
+		
+		if SERVER then self:Eat(pl) end
+		return true;
+	end
+	
+	Lets pretend this item is item_food, and it's based off of base_item.
+	In this example we call base_item's OnUse event, passing the player we got.
+	If a problem occurs when running the event, we want true to be returned.
+	
+	base_item's OnUse will make the player pick up the item up if it's in the world.
+	In that case, true is returned and we return true in item_food's OnUse.
+	
+	But if false is returned, that means base_item couldn't figure out what to do when
+	the item was used. So that's where we take over and tell the item to be eaten.
+	We return true to indicate that we've handled the event.
+]]--
+function _BASE:InheritedEvent(strEventName,strParentName,vDefaultReturn,...)
+	strParentName = string.lower(strParentName);
+	local p=self[strParentName]
+	if !p then self:Error("\""..strEventName.."\" from base \""..strParentName.."\" failed: \""..self.Classname.."\" is not based off of \""..strParentName.."\"."); return vDefaultReturn,false end
+	
+	local f=p[strEventName];
+	if !f then self:Error("\""..strEventName.."\" from base \""..strParentName.."\" failed: This event does not exist on base class \""..strParentName.."\"."); return vDefaultReturn,false end
+		
+	local s,r=pcall(f,self,...);
+	if !s then self:Error("\""..strEventName.."\" from base \""..strParentName.."\" failed: "..r); return vDefaultReturn,false end
+	
+	return r, true;
+end
+_BASE._ProtectedKeys["InheritedEvent"]=true;
+
+
+
+
+--[[
+CLASS/OBJECT EVENTS
+]]--
+
+
+
 
 --[[
 * SHARED
+* Class
+* Event
+
+This function runs after registering a class, but before inheriting from it's base.
+Since this is before inheritence, the OnClassRegister event only calls if it's present in the
+class you're registering. That is, each class you want this to run on should have it's own
+OnClassRegister.
+]]--
+function _BASE:OnClassRegister()
+end
+
+--[[
+* SHARED
+* Class
+* Event
+
+This runs after this class has inherited from it's base class.
+
+Since this is after inheritence, it runs on any class based off the base class (all classes basically),
+unless someone overrides it on purpose.
+]]--
+function _BASE:OnClassInherited()
+end
+
+--[[
+* SHARED
+* Event
 
 This function runs when a value has been set in this object.
 Returning true allows the change, and returning false stops the change from occuring.
@@ -450,6 +611,7 @@ end
 
 --[[
 * SHARED
+* Event
 
 When tostring() is performed on an object reference, it returns a string containing some information about the object.
 ]]--

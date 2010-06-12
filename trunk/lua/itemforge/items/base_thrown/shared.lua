@@ -26,9 +26,9 @@ ITEM.MaxAmount=0;								--Thrown weapons are usually stacks of items
 ITEM.Spawnable=false;
 ITEM.AdminSpawnable=false;
 
-if SERVER then
-	ITEM.HoldType="grenade";
-end
+
+ITEM.HoldType="grenade";
+
 
 
 
@@ -63,8 +63,8 @@ end
 
 Throws the item.
 ]]--
-function ITEM:OnPrimaryAttack()
-	if !self["base_weapon"].OnPrimaryAttack(self) then return false end
+function ITEM:OnSWEPPrimaryAttack()
+	if !self["base_weapon"].OnSWEPPrimaryAttack(self) then return false end
 	self:ThrowEffects();
 	if self.ThrowDelay then
 		self:CreateTimer("ThrowTimer",self.ThrowDelay,1,self.Throw,self:GetWOwner());
@@ -80,7 +80,7 @@ end
 
 Secondary attack doesn't do anything
 ]]--
-function ITEM:OnSecondaryAttack()
+function ITEM:OnSWEPSecondaryAttack()
 	return true;
 end
 
