@@ -15,6 +15,8 @@ A FindAmmo function should return nil if ammo couldn't be found with that functi
 See the example FindAmmo function below for more information:
 ]]--
 
+ITEM.AmmoMaxRange = 64;
+
 --[[
 I made an example FindAmmo function for you.
 This searches a holding player's inventory for ammo (lets pretend that pOwner.Inventory is his inventory).
@@ -115,17 +117,17 @@ list.Add("Itemforge_BaseRanged_FindAmmo",function(self,fCallback)
 		end
 	end
 	
-	--TODO use IF.Items:GetWorldItems() instead of this
-	for k,v in pairs(ents.FindByClass(IF.Items.BaseEntityClassName)) do
-		local i=IF.Items:GetEntItem(v);
-		if i then
-			local tr={};
-			tr.start=pOwner:GetShootPos();
-			tr.endpos=tr.start+((v:LocalToWorld(v:OBBCenter())-tr.start):GetNormal()*64);
-			tr.filter=pOwner;
-			local traceRes=util.TraceLine(tr);
-			if traceRes.Entity==v && fCallback(self,i) then return i end
-		end
+	local shoot = pOwner:GetShootPos();
+	
+	for k,v in pairs(IF.Items:GetWorld()) do
+		local e = v:GetEntity();
+		local tr={};
+		
+		tr.start=shoot;
+		tr.endpos=shoot+((e:LocalToWorld(e:OBBCenter())-shoot):Normalize()*self.AmmoMaxRange);
+		tr.filter=pOwner;
+		local traceRes=util.TraceLine(tr);
+		if traceRes.Entity==e && fCallback(self,v) then return v end
 	end
 	
 	return nil;
@@ -140,16 +142,15 @@ list.Add("Itemforge_BaseRanged_FindAmmo",function(self,fCallback)
 	if !eEnt then return false end
 	
 	--TODO use IF.Items:GetWorldItems() instead of this
-	for k,v in pairs(ents.FindByClass(IF.Items.BaseEntityClassName)) do
-		local i=IF.Items:GetEntItem(v);
-		if i then
-			local tr={};
-			tr.start=eEnt:LocalToWorld(eEnt:OBBCenter());
-			tr.endpos=tr.start+((v:LocalToWorld(v:OBBCenter())-tr.start):GetNormal()*64);
-			tr.filter=eEnt;
-			local traceRes=util.TraceLine(tr);
-			if traceRes.Entity==v && fCallback(self,i) then return i end
-		end
+	for k,v in pairs(IF.Items:GetWorld()) do
+		local e = v:GetEntity();
+		local tr={};
+		
+		tr.start=eEnt:LocalToWorld(eEnt:OBBCenter());
+		tr.endpos=tr.start+((e:LocalToWorld(e:OBBCenter())-tr.start):Normalize()*self.AmmoMaxRange);
+		tr.filter=eEnt;
+		local traceRes=util.TraceLine(tr);
+		if traceRes.Entity==e && fCallback(self,v) then return v end
 	end
 	
 	return nil;

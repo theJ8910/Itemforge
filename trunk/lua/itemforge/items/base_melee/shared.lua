@@ -48,8 +48,8 @@ ITEM.HoldType="melee";
 
 --TODO: Garry needs to add the TraceAttackToTriggers binding so I can make melee weapon swings break glass
 function ITEM:OnSWEPPrimaryAttack()
-	--We do base_weapon's primary attack (it handles the cooldown and tells us if we can attack or not)
-	if !self["base_weapon"].OnSWEPPrimaryAttack(self) then return false end
+	--We do base_weapon's primary attack first (it handles the cooldown and tells us if we can attack or not)
+	if !self:InheritedEvent("OnSWEPPrimaryAttack","base_weapon",false) then return false end
 	
 	local eWeapon=self:GetWeapon();
 	local pOwner=self:GetWOwner();
@@ -59,42 +59,37 @@ function ITEM:OnSWEPPrimaryAttack()
 	
 	--We have to figure out if the player hit something before dealing damage.
 	--First we'll see if the player is looking directly at something.
+	local shoot=pOwner:GetShootPos();
 	local aim=pOwner:GetAimVector();
+	local bIndirectHit = false;
+	
 	local tr={};
-	tr.start=pOwner:GetShootPos();
-	tr.endpos=tr.start+(aim*self:GetHitRange());
+	tr.start=shoot;
+	tr.endpos=shoot+(aim*self:GetHitRange());
 	tr.filter=pOwner;
 	tr.mask=MASK_SHOT;
-	
 	local traceRes=util.TraceLine(tr);
-	local eHit = traceRes.Entity;
-	local hitEntPos = traceRes.HitPos;
 	
 	--[[
 	If he wasn't looking directly at something we'll try a hull trace instead.
-	This is a box trace basically. We'll run a 16x16 box along the same line and see if it
+	This is a box trace basically. We'll run a 32x32 box along the same line and see if it
 	hits anything. It's not entirely clear if this trace is an OBB or AABB...
 	I'd assume an OBB, because an AABB would offer a wider hit range when swinging diagonal
-	to the world axes... but who knows?
+	to the world axes... but who knows? NOTE: the 1.732*self.SwingHullDims is me pulling the
+	box back by it's bounding radius, like the modcode does. If I didn't do this the hits would
+	reach further than they're supposed to. 1.732 is the square root of 3.
 	]]--
 	if !traceRes.Hit then
-		local tr={};
-		tr.start=pOwner:GetShootPos();
-		tr.endpos = tr.start + aim * (self:GetHitRange()-1.732*self.SwingHullDims);
-		tr.filter=pOwner;
-		tr.mask=MASK_SHOT;
+		tr.endpos = shoot + aim * (self:Event("GetHitRange",75)-1.732*self.SwingHullDims);
 		tr.mins = self.SwingHullMin;
 		tr.maxs = self.SwingHullMax;
 		
 		traceRes=util.TraceHull(tr);
-		eHit = traceRes.Entity;
-		if traceRes.HitNonWorld && IsValid(eHit) then
-			hitEntPos = eHit:LocalToWorld(eHit:OBBCenter());
-		end
+		bIndirectHit = true;
 	end
 	
-	--Validate that the hit occured within a 90 degree cone from the player's view
-	if aim:Dot((hitEntPos-traceRes.StartPos):Normalize())<0.70721 then
+	local eHit = traceRes.Entity;
+	if traceRes.HitNonWorld && IsValid(eHit) && self:Event("IsValidHit",false,shoot,aim,eHit) then
 		traceRes.Hit = false;
 	end
 	
@@ -106,7 +101,7 @@ function ITEM:OnSWEPPrimaryAttack()
 		if !self:OnHit(pOwner,traceRes.Entity,traceRes.HitPos,traceRes) then
 			--Melee weapons apply damage with trace attack dispatches.
 			local dmg = DamageInfo();
-			dmg:SetDamagePosition(traceRes.StartPos);
+			dmg:SetDamagePosition(shoot);
 			dmg:SetDamageForce(aim*self:Event("GetHitForce",1,traceRes));
 			dmg:SetInflictor(pOwner);
 			dmg:SetAttacker(pOwner);
@@ -116,12 +111,13 @@ function ITEM:OnSWEPPrimaryAttack()
 			eHit:DispatchTraceAttack(dmg,traceRes.StartPos,traceRes.HitPos);
 			
 			--We have to use bullets clientside for impact effects since garry doesn't
-			--have UTIL_ImpactEffect either...
-			if CLIENT then
+			--have UTIL_ImpactEffect either... additonally should avoid the effects if it's not a direct
+			--hit. In the case it's not a direct hit a bullet goes flying off into the sunset.
+			if CLIENT && !bIndirectHit then
 				local hitbullet={};
 				hitbullet.Num    = 1;
-				hitbullet.Src    = tr.start;
-				hitbullet.Dir    = (hitEntPos-tr.start):Normalize();
+				hitbullet.Src    = shoot;
+				hitbullet.Dir    = aim;
 				hitbullet.Spread = Vector(0,0,0);
 				hitbullet.Tracer = 0;
 				hitbullet.Force  = self:Event("GetHitForce",1,traceRes);
@@ -173,6 +169,26 @@ You could potentially use it for damaging things differently depending on what w
 ]]--
 function ITEM:GetHitDamage(traceRes)
 	return self.HitDamage;
+end
+
+--[[
+* SHARED
+* Event
+
+This event should determine if hitting an entity is valid, returning true if it is,
+or false if it isn't.
+
+If a hit is invalid, the weapon misses.
+
+vShoot should be the player's shoot position.
+vAimDir should be a normalized vector pointing the direction the player is facing.
+eHit should be the entity hit.
+
+]]--
+function ITEM:IsValidHit(vShoot,vAimDir,eHit)
+	local vCenter=eHit:LocalToWorld(eHit:OBBCenter());
+	--Did this occur within the hit range and within a 90 degree cone from the player's view
+	return vShoot:Distance(vCenter) <= self:Event("GetHitRange",75)+eHit:BoundingRadius() && (vAimDir:Dot(vCenter-vShoot)<0.70721);
 end
 
 --[[

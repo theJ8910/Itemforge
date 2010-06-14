@@ -51,11 +51,6 @@ function ITEM:Unload(clip)
 	return true;
 end
 
---Clientside this does not take ammo; it's just so you can have TakeAmmo in a shared function without it generating errors clientside.
-function ITEM:TakeAmmo(amt,clip)
-	return true;
-end
-
 --[[
 Runs when a player wants to load this weapon with the given ammo (currently this is used when ammo is drag-dropped here).
 It doesn't actually load the ammo clientside; it requests the server to load the given ammo.

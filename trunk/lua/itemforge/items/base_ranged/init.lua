@@ -33,24 +33,6 @@ include("shared.lua");
 ITEM.PrimaryFiring=false;
 ITEM.SecondaryFiring=false;
 
---[[
-Consumes the given amount of ammo from the given clip.
-One reason this could fail is if we're trying to take too much ammo.
-	For example, what if we have one shotgun shell and try to take two?
-Returns true if ammo was consumed, false otherwise
-]]--
-function ITEM:TakeAmmo(amt,clip)
-	local ammo=self:GetAmmo(clip);
-	if !ammo then return false end
-	
-	local currentAmt=ammo:GetAmount();
-	if currentAmt<amt then return false end
-	
-	local s=ammo:SubAmount(amt);
-	self:UpdateWireAmmoCount();
-	return s;
-end
-
 --Unloads the ammo in the given clip. Sends the ammo to the same location as the weapon.
 function ITEM:Unload(clip)
 	local ammo=self:GetAmmo(clip);

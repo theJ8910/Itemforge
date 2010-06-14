@@ -128,7 +128,6 @@ function af:ToBone(bone)
 	
 	self.AP=bone;
 	self.PAP=index;
-	self.Hidden = false;
 	self.type=ATTACHTYPE_BONE;
 	self.PreDraw=self.PreDrawBone;
 	
@@ -153,7 +152,6 @@ function af:ToAP(attachPoint)
 	
 	self.AP=attachPoint;
 	self.PAP=index;
-	self.Hidden = false;
 	self.type=ATTACHTYPE_AP;
 	self.PreDraw=self.PreDrawAP;
 	
@@ -187,7 +185,6 @@ function af:BoneMerge(refBone)
 	self.MAP=index2;
 	self.MAPPos=nil;
 	self.MAPAng=nil;
-	self.Hidden = false;
 	self.type=ATTACHTYPE_MERGE;
 	self.PreDraw=self.PreDrawMerge;
 	
@@ -200,7 +197,6 @@ Simulates a simple parenting between this gear and the parent entity.
 true is returned if the gear is successfully attached
 ]]--
 function af:Simple()
-	self.Hidden = false;
 	self.type=ATTACHTYPE_SIMPLE;
 	self.PreDraw=self.PreDrawSimple;
 	

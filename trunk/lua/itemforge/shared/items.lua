@@ -23,6 +23,7 @@ BUG  Hitting ammo results in serverside bugs
 theJ89's Giant TODO list
 This is why the system hasn't been released yet:
 
+TODO Cache results for faster lookups
 TODO code maintainence... make sure that multi-line comments are used for function descriptions, check arguments, do cleanup code (for items listed in an inventory for example), for collections check to see if something being inserted still exists, check events to make sure they are all being pcalled, consider putting base item's events into their own lua file.
 TODO remember to divide default files into sections: Methods, events, internal methods (things scripters won't be calling)
 TODO Have it so item types can be reloaded without needing a full map change/restart
@@ -105,10 +106,26 @@ local BaseType="base_item";									--This is the undisputed absolute base item-
 local ItemTypes={};											--Item types. After being loaded from the script they are placed here
 local ItemRefs={};											--Item references - there's an item reference for every item. We pass this instead of the actual item. By storing the references, the actual item the reference refers to can be properly garbage collected when it's removed (freeing up memory). It also informs the scripter of any careless mistakes (referencing an item after it has been deleted mostly).
 local ItemsByType={};										--Items by type are stored here (ex ItemsByType["item_crowbar"] contains all item_crowbar items currently spawned)
+local WorldItems={};										--All items in the world
+local HeldItems={};											--All items that are held
 local MaxItems=65535;										--WARNING: Item IDs beyond this value CANNOT be sent through networking! DO NOT CHANGE. How many unique items can exist at a single time (a stack of items count as one unique item)?
 local NextItem=1;											--This is a pointer of types, that records where the next item will be made. IDs are assigned based on this number. This only serves as a starting point to search for a free ID. If this slot is taken then it will search through the entire items array once to look for a free slot.
 local ProtectedKeys={};										--This is a table of protected keys in the base item-type. If an item attempts to override a protected key, the console will report a warning and get rid of the override by setting it to nil. Likewise attempting to override a protected key on an item (myItem.Use="hello" for example) will be stopped as well.
 local AllowProtect=false;									--If this is true, we can protect keys (in other words, we're loading the base item-type while this is true)
+
+--Lookup table for CreateNWVar. Used to convert a datatype string to a datatype ID.
+local DatatypeStrToID = {
+	["int"]=1, ["integer"]=1, ["long"]=1, ["char"]=1, ["short"]=1, ["uchar"]=1, ["uint"]=1, ["uinteger"]=1, ["ulong"]=1, ["ushort"]=1,
+	["float"]=2,
+	["bool"]=3, ["boolean"]=3,
+	["str"]=4, ["string"]=4,
+	["ent"]=5, ["entity"]=5,
+	["pl"]=5, ["ply"]=5, ["player"]=5, ["vec"]=6, ["vector"]=6,
+	["ang"]=7, ["angle"]=7,
+	["item"]=8,
+	["inventory"]=9, ["inv"]=9,
+	["color"]=10,
+};
 
 --Itemforge Item (IFI) Message (-128 to 127. Uses char in usermessage).
 IFI_MSG_CREATE			=	-128;	--(Server > Client) Sync Create item clientside
@@ -183,8 +200,6 @@ Initilize Items module.
 We need to load the item types, then set their bases.
 ]]--
 function MODULE:Initialize()
-	self:LoadItemTypes();
-	self:FixItemTypeMissingData();
 	self:StartTick();
 end
 
@@ -305,8 +320,13 @@ function MODULE:LoadItemTypes()
 			
 			local type=string.lower(v);
 			
-			--If a base was not given, the base is set to the base item-type
-			if ITEM.Base==nil then ITEM.Base=BaseType end
+			--If a base was not given, the base is set to the base item-type. Additionally we fix up any other missing data here.
+			if ITEM.Base==nil				then	ITEM.Base=BaseType end
+			
+			if ITEM.NWVarsByName==nil		then	ITEM.NWVarsByName={} end
+			if ITEM.NWVarsByID==nil			then	ITEM.NWVarsByID={} end
+			if ITEM.NWCommandsByName==nil	then	ITEM.NWCommandsByName={} end
+			if ITEM.NWCommandsByID==nil		then	ITEM.NWCommandsByID={} end
 			
 			--Register class; The type is set to the name of the folder.
 			local tClass=IF.Base:RegisterClass(ITEM,type);
@@ -324,21 +344,6 @@ function MODULE:LoadItemTypes()
 			ITEM=nil;								--Get rid of the temporary ITEM table
 			AllowProtect=false;
 		end
-	end
-end
-
---[[
-* SHARED
-
-We add tables that may be missing, such as NWVarsByName
-Additionally this function checks to make sure item types are not overriding any protected values
-]]--
-function MODULE:FixItemTypeMissingData()
-	for k,v in pairs(ItemTypes) do
-		v.NWVarsByName		=	v.NWVarsByName		or {};
-		v.NWVarsByID		=	v.NWVarsByID		or {};
-		v.NWCommandsByName	=	v.NWCommandsByName	or {};
-		v.NWCommandsByID	=	v.NWCommandsByID	or {};
 	end
 end
 
@@ -407,10 +412,10 @@ function MODULE:SetItemTypeNWVarAndCommandIDs()
 			b=b.BaseClass;
 		end
 		
-		v.NWVarsByName=NWVarNames;
-		v.NWCommandsByName=NWCommandNames;
-		v.NWVarsByID=NWVarIDs;
-		v.NWCommandsByID=NWCommandIDs;
+		rawset(v,"NWVarsByName",NWVarNames);
+		rawset(v,"NWCommandsByName",NWCommandNames);
+		rawset(v,"NWVarsByID",NWVarIDs);
+		rawset(v,"NWCommandsByID",NWCommandIDs);
 	end
 end
 
@@ -477,28 +482,17 @@ function MODULE:CreateNWVar(itemtype,sName,sDatatype,vDefaultValue,bPredicted,bH
 	NewNWVar.Save=bNoSave or false;
 	local t=string.lower(sDatatype);
 		
-	if t=="int" || t=="integer" || t=="long" || t=="char" || t=="short" || t=="uchar" || t=="uint" || t=="uinteger" || t=="ulong" || t=="ushort" then
-		NewNWVar.Type=1;
-	elseif t=="float" then
-		NewNWVar.Type=2;
-	elseif t=="bool" || t=="boolean" then
-		NewNWVar.Type=3;
-	elseif t=="str" || t=="string" then
-		NewNWVar.Type=4;
-	elseif t=="ent" || t=="entity" || t=="pl" || t=="ply" || t=="player" then
-		NewNWVar.Type=5;
-	elseif t=="vec" || t=="vector" then
-		NewNWVar.Type=6;
-	elseif t=="ang" || t=="angle" then
-		NewNWVar.Type=7;
-	elseif t=="item" then
-		NewNWVar.Type=8;
-	elseif t=="inventory" || t=="inv" then
-		NewNWVar.Type=9;
-	elseif t=="color" then
-		NewNWVar.Type=10;
-	else
-		ErrorNoHalt("Itemforge Items: Bad datatype for NWVar \""..sName.."\". \""..t.."\" is invalid; valid types are:\n int,integer,long,char,short,uchar,ulong,ushort,float,bool,boolean,str,string,ent,entity,pl,ply,player,vec,vector,ang,angle,item,inventory,inv,and color\n");
+	
+	NewNWVar.Type=DatatypeStrToID[t];
+	if NewNWVar.Type == nil then
+		ErrorNoHalt("Itemforge Items: Bad datatype for NWVar \""..sName.."\". \""..t.."\" is invalid; valid types are:\n");
+		
+		local l=#DatatypeStrToID;
+		for i=1,l-1 do
+			ErrorNoHalt(DatatypeStrToID[i]..", ");
+		end
+		ErrorNoHalt(" and "..DatatypeStrToID[l]..".\n");
+		
 		NewNWVar.Type=0;
 	end
 	
@@ -1072,6 +1066,82 @@ function MODULE:GetByType(sType)
 	local t={};
 	
 	for k,v in pairs(ItemsByType[sType]) do
+		t[k]=v;
+	end
+	
+	return t;
+end
+
+--[[
+* SHARED
+
+Internal Itemforge function. Adds the item to the list of held items.
+]]--
+function MODULE:AddWorldItem(item)
+	WorldItems[item:GetID()] = item;
+end
+
+--[[
+* SHARED
+
+Internal Itemforge function. Removes the item from the list of world items.
+]]--
+function MODULE:RemoveWorldItem(item)
+	WorldItems[item:GetID()] = nil;
+end
+
+--[[
+* SHARED
+
+Internal Itemforge function. Adds the item to the list of held items.
+]]--
+function MODULE:AddHeldItem(item)
+	HeldItems[item:GetID()] = item;
+end
+
+--[[
+* SHARED
+
+Internal Itemforge function. Removes the item from the list of held items.
+]]--
+function MODULE:RemoveHeldItem(item)
+	HeldItems[item:GetID()] = nil;
+end
+
+--[[
+* SHARED
+
+Returns a table of all items that are known to be in the world.
+Please note:
+	This function copies the entire table of items in the world every time it is run.
+	Do not run it all the time! That lags!
+
+TODO possibly a more efficient alternative
+]]--
+function MODULE:GetWorld()
+	local t={};
+	
+	for k,v in pairs(WorldItems) do
+		t[k]=v;
+	end
+	
+	return t;
+end
+
+--[[
+* SHARED
+
+Returns a table of all items that are known to be held by players.
+Please note:
+	This function copies the entire table of items held by players every time it is run.
+	Do not run it all the time! That lags!
+
+TODO possibly a more efficient alternative
+]]--
+function MODULE:GetHeld()
+	local t={};
+	
+	for k,v in pairs(HeldItems) do
 		t[k]=v;
 	end
 	

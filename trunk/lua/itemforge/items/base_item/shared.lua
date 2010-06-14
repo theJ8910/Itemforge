@@ -290,6 +290,8 @@ function ITEM:ToWorld(vPos,aAng,eEnt,bPredict)
 				ent:SetPos(vPos);
 				ent:SetAngles(aAng);
 				self:SetEntity(ent);
+				
+				IF.Items:AddWorldItem(self);
 			end
 		end
 	else
@@ -300,6 +302,8 @@ function ITEM:ToWorld(vPos,aAng,eEnt,bPredict)
 		
 		ent=eEnt;
 		self:SetEntity(ent);
+		
+		IF.Items:AddWorldItem(self);
 	end
 	
 	--Run events to indicate a :ToWorld() occured
@@ -330,6 +334,7 @@ False is returned if the item can't be held for any reason. Otherwise, the newly
 ]]--
 function ITEM:Hold(pl,bNoMerge,wep,bPredict)
 	if self.BeingRemoved then return false end
+	if self:GetWOwner() == pl then return true end
 	
 	if bNoMerge==nil then bNoMerge=false end
 	if bPredict==nil then bPredict=CLIENT end
@@ -388,9 +393,10 @@ function ITEM:Hold(pl,bNoMerge,wep,bPredict)
 	
 	self:SetWeapon(ent);
 	self:SetWOwner(pl);
+	IF.Items:AddHeldItem(self);
 	
 	--Run OnHold event
-	self:Event("OnHold",nil,pl,ent);	
+	self:Event("OnHold",nil,pl,ent);
 	
 	return ent;
 end
@@ -519,6 +525,8 @@ function ITEM:ToVoid(forced,vDoubleCheck,bNotFromClient,bPredict)
 			self:ClearEntity();
 			if SERVER then ent:ExpectedRemoval(); end
 			
+			IF.Items:RemoveWorldItem(self);
+			
 			--TODO: DETERMINE IF SERVER FORCED REMOVAL
 			self:OnExitWorldSafe(forced);
 		end
@@ -532,6 +540,8 @@ function ITEM:ToVoid(forced,vDoubleCheck,bNotFromClient,bPredict)
 		if !bPredict then
 			if SERVER then ent:ExpectedRemoval(); end
 			self:ClearWeapon(vDoubleCheck);
+			
+			IF.Items:RemoveHeldItem(self);
 			
 			--TODO: DETERMINE IF SERVER FORCED REMOVAL
 			self:Event("OnRelease",nil,pOwner,forced);
@@ -1098,7 +1108,7 @@ This function is called internally by Itemforge. There should be no reason for a
 ]]--
 function ITEM:SetWeapon(ent)
 	if !ent || !ent:IsValid()		then return self:Error("Couldn't set weapon! Given entity was not valid!\n") end
-	if !IF.Items:IsWeaponItem(ent)	then return self:Error("Couldn't set weapon! Given entity was not an itemforge_item_held!\n") end
+	if !IF.Items:IsWeaponItem(ent)	then return self:Error("Couldn't set weapon! Given entity was not a valid Itemforge weapon class!\n") end
 	
 	self.Weapon=ent;
 	return true;
