@@ -6,7 +6,7 @@ This file is the foundation of Itemforge. Version is stored here, and modules ar
 The module loading is carried out here. Modules are loaded, then initialized. After that, client and server initilizations are performed respectively.
 ]]--
 IF={};
-IF.Version=0.19;							--Itemforge Version. Your items can use this if you want.
+IF.Version=0.20;							--Itemforge Version. Your items can use this if you want.
 IF.Tag="itemforge_beta_"..IF.Version;		--Server Tag. Whenever a server is hosting Itemforge, this shows up next to the server's name in the "Tags" column of the Server Browser.
 IF.Modules={};
 
@@ -28,14 +28,25 @@ function IF:Initialize()
 		end
 	end
 	
-	--Base needs to handle inheritance of registered types
-	if IF.Base then IF.Base:DoInheritance(); end
-	
-	if IF.Items then IF.Items:SetItemTypeNWVarAndCommandIDs(); end
+	self:ReloadItemTypes();
 	
 	--Call serverside or clientside initilization after initializing modules.
 	if SERVER then	self:ServerInitialize()
 	else			self:ClientInitialize() end
+end
+
+--[[
+Loads or reloads the items from disk
+]]--
+function IF:ReloadItemTypes()
+	--Load item types
+	if IF.Items then IF.Items:LoadItemTypes(); end
+	
+	--Base needs to handle inheritance of registered types
+	if IF.Base then IF.Base:DoInheritance(); end
+	
+	--After inheritence we do the networked var/networked command inheritence.
+	if IF.Items then IF.Items:SetItemTypeNWVarAndCommandIDs(); end
 end
 
 --Clean up itemforge. This will call every module's cleanup functions and set Itemforge's table to nil to garbage collect it.

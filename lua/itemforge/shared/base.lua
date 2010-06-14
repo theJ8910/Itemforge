@@ -103,9 +103,16 @@ function MODULE:RegisterClass(tClass,sName)
 	tClass.Classname=sName;
 	
 	--If this item type is already loaded just empty out the existing table; that way existing items of this type are instantly updated with the new contents.
-	if _CLASSES[sName] then
-		table.CopyFromTo(tClass,_CLASSES[sName]);
-		tClass = _CLASSES[sName];
+	local tExt=_CLASSES[sName];
+	if tExt then
+		setmetatable(tExt,nil);
+		for k,v in pairs(tExt) do
+			tExt[k]=nil;
+		end
+		for k,v in pairs(tClass) do
+			tExt[k]=v;
+		end
+		tClass = tExt;
 	else
 		_CLASSES[sName]=tClass;
 	end
@@ -336,7 +343,9 @@ The base class has no inheritence.
 See comments below for more information on class protection.
 ]]--
 function _BASECLASSmt:__newindex(k,v)
-	ErrorNoHalt("Itemforge Base: WARNING! Override blocked on class \""..self.ClassName.."\": Tried to set \""..k.."\" to \""..v.."\".\n");
+	ErrorNoHalt("Itemforge Base: WARNING! Override blocked on class \""..self.ClassName.."\": Tried to set \""..tostring(k).."\" to \""..tostring(v).."\".\n");
+	debug.Trace();
+	Msg("\n");
 end
 
 --[[

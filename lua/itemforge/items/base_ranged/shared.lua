@@ -109,59 +109,56 @@ ITEM.MuzzleAP=nil;								--What attachment ID does the muzzle on the gun use (i
 ITEM.ReloadSource=nil;							--If we ReloadSingly, we have selected this stack to reload from.
 ITEM.ReloadClip=nil;							--If we ReloadSingly, we are currently reloading this clip.
 
+--[[
+* SHARED
+* Event
+
+Runs when the item is created. It has it's clip table created and it starts thinking.
+]]--
 function ITEM:OnInit(owner)
 	self.Clip={};
 	self:StartThink();
 end
 
 --[[
-When the player is holding it and tries to primary attack
+* SHARED
+* Event
+
+Runs when a player is holding the weapon and primary-attacks with it
 ]]--
 function ITEM:OnSWEPPrimaryAttack()
 	if !self:CanPrimaryAttack() || (self:IsHeld() && self:GetWOwner():KeyDownLast(IN_ATTACK) && !self:CanPrimaryAttackAuto()) then return false end
 	
-	if !self.PrimaryFiresUnderwater && self:GetWaterLevel()==3 then
+	--Don't fire underwater and if the primary uses ammo make sure we have enough
+	if (!self.PrimaryFiresUnderwater && self:GetWaterLevel()==3) || (self.PrimaryClip!=0 && !self:TakeAmmo(self.PrimaryTakes,self.PrimaryClip)) then
 		self:DryFire();
 		
 		return false;
-	--If we use ammo check the clip
-	elseif self.PrimaryClip!=0 then
-		local ammo=self:GetAmmo(self.PrimaryClip);
-		if !ammo || ammo:GetAmount()<self.PrimaryTakes then
-			self:DryFire();
-			
-			return false;
-		end
 	end
 	
 	self:SetNextBoth(CurTime()+self:GetPrimaryDelay(),CurTime()+self:GetPrimaryDelayAuto());
-	self:TakeAmmo(self.PrimaryTakes,self.PrimaryClip);
 	self:PrimaryFireEffects();
 	
 	return true;
 end
 
 --[[
-When the player is holding it and tries to secondary attack
+* SHARED
+* Event
+
+Runs when a player is holding the weapon and secondary-attacks with it
 ]]--
 function ITEM:OnSWEPSecondaryAttack()
 	if !self:CanSecondaryAttack() || (self:IsHeld() && self:GetWOwner():KeyDownLast(IN_ATTACK2) && !self:CanSecondaryAttackAuto()) then return false end
 	
-	if !self.SecondaryFiresUnderwater && self:GetWaterLevel()==3 then
+	--Don't fire underwater and if the secondary uses ammo make sure we have enough
+	if (!self.SecondaryFiresUnderwater && self:GetWaterLevel()==3) || (self.SecondaryClip!=0 && !self:TakeAmmo(self.SecondaryTakes,self.SecondaryClip)) then
 		self:DryFire();
 		
 		return false;
-	--If the secondary uses ammo make sure we have enough
-	elseif self.SecondaryClip!=0 then
-		local ammo=self:GetAmmo(self.SecondaryClip);
-		if !ammo || ammo:GetAmount()<self.SecondaryTakes then
-			self:DryFire();
-			return false;
-		end
 	end
 	
 	self:SetNextBoth(CurTime()+self:GetSecondaryDelay(),CurTime()+self:GetSecondaryDelayAuto());
-	self:TakeAmmo(self.SecondaryTakes,self.SecondaryClip);
 	self:SecondaryFireEffects();
 	
 	return true;
@@ -196,6 +193,24 @@ function ITEM:OnSWEPReload()
 end
 
 --[[
+If a player [USE]s this gun while holding some ammo (an item based off of base_ammo), we'll try to load this gun with it.
+If the gun is used clientside, we won't actually load the gun, we'll just return true to indiciate we want the server to load the gun.
+TODO check clips instead of checking for base_ammo
+]]--
+function ITEM:OnUse(pl)
+	local wep=pl:GetActiveWeapon();
+	if wep:IsValid() then
+		local item=IF.Items:GetWeaponItem(wep);
+		if item && item:InheritsFrom("base_ammo") && (CLIENT || self:Load(item) ) then
+			return true;
+		end
+	end
+	
+	--We couldn't load whatever the gun with whatever the player was carrying, so just do the default OnUse
+	return self:InheritedEvent("OnUse","base_weapon",false,pl);
+end
+
+--[[
 Loads a clip with the given item.
 clip tells us which clip to load. If this is 0, we'll try to load it in any available clip.
 item is the stack of ammo to load.
@@ -223,7 +238,8 @@ function ITEM:Load(item,clip,amt,bPredicted)
 	
 	if SERVER then
 		--How much ammo are we loading
-		amt=math.Clamp(amt or item:GetAmount(),1,item:GetAmount());
+		local maxamt = item:GetAmount();
+		amt=math.Clamp(amt or maxamt,1,maxamt);
 		
 		local clipSize=self:GetClipSize(clip);
 		local currentAmmo=self:GetAmmo(clip);
@@ -240,7 +256,7 @@ function ITEM:Load(item,clip,amt,bPredicted)
 		
 		--We're loading more ammo of the same type
 		elseif currentAmmo:GetType()==item:GetType() then
-			if item:GetAmount()>amt then
+			if maxamt>amt then
 				if !item:Transfer(amt,currentAmmo) then return false end
 				isOldAmmo=true;
 			else
@@ -285,28 +301,31 @@ function ITEM:Load(item,clip,amt,bPredicted)
 end
 
 --[[
-If a player [USE]s this gun while holding some ammo (an item based off of base_ammo), we'll try to load this gun with it.
-If the gun is used clientside, we won't actually load the gun, we'll just return true to indiciate we want the server to load the gun.
-TODO check clips instead of checking for base_ammo
+* SHARED
+
+Consumes the given amount of ammo from the given clip.
+One reason this could fail is if we're trying to take too much ammo.
+	For example, what if we have one shotgun shell and try to take two?
+Returns true if ammo was consumed, false otherwise
+
+Clientside ammo is not actually taken; instead the function just returns true if there is ammo to take.
 ]]--
-function ITEM:OnUse(pl)
-	local wep=pl:GetActiveWeapon();
-	if wep:IsValid() then
-		local item=IF.Items:GetWeaponItem(wep);
-		if item && item:InheritsFrom("base_ammo") && (CLIENT || self:Load(item) ) then
-			return true;
-		end
-	end
+function ITEM:TakeAmmo(amt,clip)
+	local ammo=self:GetAmmo(clip);
+	if !ammo then return false end
 	
-	--We couldn't load whatever the gun with whatever the player was carrying, so just do the default OnUse
-	return self["base_item"].OnUse(self,pl);
+	local currentAmt=ammo:GetAmount();
+	if currentAmt<amt then return false end
+	
+	local s=ammo:SubAmount(amt);
+	if SERVER then self:UpdateWireAmmoCount(); end
+	return s;
 end
 
-
-
-
-
 --[[
+* SHARED
+* Event
+
 Plays a random sound for the primary fire.
 Also plays the primary attack animation, both on the weapon and player himself
 ]]--
@@ -320,6 +339,9 @@ function ITEM:PrimaryFireEffects()
 end
 
 --[[
+* SHARED
+* Event
+
 Returns the viewmodel activity to play when the primary is fired
 ]]--
 function ITEM:GetPrimaryActivity()
@@ -328,6 +350,9 @@ end
 
 
 --[[
+* SHARED
+* Event
+
 This function runs when the player fires the secondary successfully.
 It plays the weapon's secondary fire sound.
 It plays the secondary attack animation on both the player and the viewmodel.
@@ -343,6 +368,9 @@ end
 
 
 --[[
+* SHARED
+* Event
+
 Returns the viewmodel activity to play when the secondary is fired
 ]]--
 function ITEM:GetSecondaryActivity()
@@ -353,6 +381,9 @@ end
 
 
 --[[
+* SHARED
+* Event
+
 Returns true if we can reload right now.
 The only time we can't reload is if the primary or secondary is cooling down;
 That means we can't reload if we're already reloading, and we can't reload right after attacking with the primary/secondary.
@@ -364,6 +395,8 @@ function ITEM:CanReload()
 end
 
 --[[
+* SHARED
+
 If we ReloadSingly, then this function is called whenever the gun is told to reload.
 It returns true if we have started reloading, or false if we couldn't.
 ]]--
@@ -402,6 +435,8 @@ function ITEM:StartReload()
 end
 
 --[[
+* SHARED
+
 If we ReloadSingly then this loads one bullet into a clip.
 ]]--
 function ITEM:Reload()
@@ -422,6 +457,8 @@ function ITEM:Reload()
 end
 
 --[[
+* SHARED
+
 If we ReloadSingly, then this function is called when the gun is finished reloading (it's clip is full)
 It returns true if we finished reloading successfully, or false otherwise.
 ]]--
@@ -439,6 +476,9 @@ function ITEM:FinishReload()
 end
 
 --[[
+* SHARED
+* Event
+
 Plays a reload sound and plays the reload animation (both on the weapon and player himself).
 ]]--
 function ITEM:ReloadEffects(bPredicted)
@@ -453,6 +493,9 @@ function ITEM:ReloadEffects(bPredicted)
 end
 
 --[[
+* SHARED
+* Event
+
 Returns the reload delay (this is how long it takes to reload a weapon).
 The weapon cannot attack while reloading.
 ]]--
@@ -464,6 +507,8 @@ end
 
 
 --[[
+* SHARED
+
 This function runs when the player tries to fire, but the gun doesn't fire anything.
 Typically, this runs when the gun is out of ammo or tries to fire underwater
 It plays the weapon's dry-fire sound and plays the dry-fire viewmodel animation.
@@ -479,6 +524,9 @@ function ITEM:DryFire()
 end
 
 --[[
+* SHARED
+* Event
+
 Returns the dry-fire delay.
 ]]--
 function ITEM:GetDryDelay()
@@ -489,6 +537,8 @@ end
 
 
 --[[
+* SHARED
+
 Returns the item in the given clip.
 If that clip doesn't exist, or if nothing is loaded in it, returns nil.
 ]]--
@@ -499,6 +549,8 @@ function ITEM:GetAmmo(clip)
 end
 
 --[[
+* SHARED
+
 Returns false if:
 	That given clip doesn't exist.
 	No valid item was given.
@@ -513,6 +565,8 @@ function ITEM:CanLoadClipWith(item,clip)
 end
 
 --[[
+* SHARED
+
 Returns the size of the given clip (the number of 'bullets' it can hold).
 Returns 0 if the clip can hold an unlimited amount of ammo.
 Returns false if the clip doesn't exist.
@@ -527,6 +581,8 @@ end
 
 
 --[[
+* SHARED
+
 Returns how submerged the gun is in water, between 0 and 3.
 If the item is held, we use the player to calculate water level.
 If the item is in the world, we use the item's world entity to calculate water level.
@@ -534,15 +590,17 @@ Returns 0 if not submerged, returns 3 if fully submerged.
 NOTE: The item is considered to be dry if it is in the void or in an inventory.
 ]]--
 function ITEM:GetWaterLevel()
-	if self:IsHeld() then
-		return self:GetWOwner():WaterLevel();
-	elseif self:InWorld() then
-		return self:GetEntity():WaterLevel();
-	end
+	local ent = self:GetWOwner() or self:GetEntity();
+	if ent then return ent:WaterLevel() end
+	
 	return 0;
 end
 
---Returns the muzzle position; expects the item to be in the world
+--[[
+* SHARED
+
+Returns the muzzle position; expects the item to be in the world
+]]--
 function ITEM:GetMuzzle(eEnt)
 	if !self.MuzzleAP then		self.MuzzleAP=eEnt:LookupAttachment(self.MuzzleName) end
 	if self.MuzzleAP!=0 then	return eEnt:GetAttachment(self.MuzzleAP);

@@ -27,7 +27,7 @@ function MODULE:AddResources(path)
 	local pathRelToData=self.RelativeToData..path;		--"../materials/itemforge/"
 	local files=file.Find(pathRelToData.."*");
 	for k,v in pairs(files) do
-		if v~=".." && v~="." then
+		if v!= ".svn" && v!=".." && v!="." then
 			if file.IsDir(pathRelToData..v) then
 				self:AddResources(path..v.."/");							--"materials/itemforge/inventory/"
 			else
@@ -42,7 +42,7 @@ function MODULE:AddCSLuaFiles(path)
 	local pathRelToData=self.RelativeToData..self.LuaFolder..path;			--"../addons/itemforge/lua/itemforge/shared/"
 	local files=file.FindInLua(path.."*");
 	for k,v in pairs(files) do
-		if v~=".." && v~="." then
+		if v!=".svn" && v!=".." && v!="." then
 			if file.IsDir(pathRelToData..v) then
 				self:AddCSLuaFiles(path..v.."/");
 			else
@@ -50,4 +50,8 @@ function MODULE:AddCSLuaFiles(path)
 			end
 		end
 	end
+end
+
+function MODULE:Reload()
+	
 end

@@ -603,6 +603,7 @@ function ITEM:OnHold(pl,weapon)
 			
 			--Hide if we're not out
 			if bNotOut then self.WMAttach:Hide() end
+			Msg("Out when held: "..tostring(bNotOut).."\n")
 			
 			--We try to bone-merge first and if that fails we try to attach to the right-hand attachment point instead
 			if !self.WMAttach:BoneMerge("ValveBiped.Bip01_R_Hand") && !self.WMAttach:ToAP("anim_attachment_RH") then

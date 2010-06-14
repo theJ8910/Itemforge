@@ -9,7 +9,7 @@ if SERVER then AddCSLuaFile("shared.lua") end
 
 ITEM.Name="Metal Reinforcement Kit";
 ITEM.Description="Scrap metal, bolts, rivets, and other miscellanious materials.\nThis kit would be useful for reinforcing wooden objects.";
-ITEM.Weight=15000;
+ITEM.Weight=15000; --15 kg
 ITEM.Size=41;
 ITEM.WorldModel="models/props_debris/metal_panelchunk01d.mdl";
 

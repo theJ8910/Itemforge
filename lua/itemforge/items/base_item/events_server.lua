@@ -327,6 +327,7 @@ function ITEM:OnBreak(howMany,bLastBroke,who)
 			local v = phys1:GetVelocity();
 			data:SetNormal(v:GetNormal());
 			data:SetScale(v:Length());
+			data:SetRadius(phys1:GetVolume());
 		end
 		util.Effect("MetalGibs",data,true,true);
 	elseif self.GibEffect == "wood" then

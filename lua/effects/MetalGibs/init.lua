@@ -4,7 +4,7 @@ CLIENT
 
 This effect spawns a few metal gibs where it's told to.
 ]]--
-local GibModels={
+EFFECT.MetalModels={
 	"models/Gibs/metal_gib1.mdl",
 	"models/Gibs/metal_gib2.mdl",
 	"models/Gibs/metal_gib3.mdl",
@@ -12,11 +12,30 @@ local GibModels={
 	"models/Gibs/metal_gib5.mdl"
 };
 
+EFFECT.MetalVolumes={
+	7.1886806488037,
+	83.349411010742,
+	38.257247924805,
+	7.8723797798157,
+	9.2407827377319
+};
+
+EFFECT.WoodModels={
+
+};
+
+EFFECT.WoodVolumes={
+
+};
+
 EFFECT.DecayDelay = 10;
 EFFECT.FadeDelay = 8;
 EFFECT.StartFadeAt = 0;
 EFFECT.DecayedAt = 0;
 EFFECT.Gibs = nil;
+
+local minrandomvel= Vector(-150,-150,-150);
+local maxrandomvel= Vector(150,150,150);
 
 function EFFECT:Init(data)
 	self.Gibs = {};
@@ -28,14 +47,16 @@ function EFFECT:Init(data)
 							 -maxcorner.y,
 							 -maxcorner.z);
 	local basevel = data:GetNormal() * data:GetScale();
-	local minrandomvel= Vector(-5,-5,-5);
-	local maxrandomvel= Vector(5,5,5);
-	for i=1,5 do
+	local vol = data:GetRadius();
+	local gibvol = 0;
+	
+	while gibvol < vol do
 		local offset = self:RandomVector(mincorner,maxcorner);
 		offset:Rotate(rot);
 		
+		local chosen = math.random(1,#GibModels);
 		local gib=ents.Create("prop_physics");
-		gib:SetModel(GibModels[math.random(1,#GibModels)]);
+		gib:SetModel(GibModels[chosen]);
 		gib:SetAngles(self:RandomAngle());
 		gib:SetPos(origin + offset);
 		gib:SetCollisionGroup(COLLISION_GROUP_DEBRIS);
@@ -48,6 +69,7 @@ function EFFECT:Init(data)
 		gibphys:SetVelocity(basevel + self:RandomVector(minrandomvel,maxrandomvel));
 		
 		table.insert(self.Gibs,gib);
+		gibvol = gibvol + GibVolumes[chosen];
 	end
 	
 	self.StartFadeAt = CurTime() + self.FadeDelay;
