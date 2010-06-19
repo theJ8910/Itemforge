@@ -54,6 +54,10 @@ ITEM.Size=34;
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 
+if SERVER then
+	ITEM.GibEffect = "metal";
+end
+
 ITEM.SecondaryAuto=false;
 
 ITEM.HoldType="shotgun";

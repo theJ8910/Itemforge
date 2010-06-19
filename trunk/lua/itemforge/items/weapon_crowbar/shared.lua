@@ -39,8 +39,15 @@ ITEM.ImpactSounds={
 	Sound("weapons/crowbar/crowbar_impact2.wav"),
 };
 
+--[[
+* SHARED
+
+If the crowbar's in the world, it gets picked up like any normal item.
+But in any other case, we find the entity the player is looking at
+and try to open it up.
+]]--
 function ITEM:OnUse(pl)
-	if self["base_melee"].OnUse(self,pl) then return true end
+	if self:InheritedEvent("OnUse","base_melee",false,pl) then return true end
 	
 	--We'll try to find a door to open
 	local tr={};
@@ -53,10 +60,28 @@ function ITEM:OnUse(pl)
 	return self:OpenDoor(traceRes.Entity);
 end
 
-function ITEM:OnHit(pOwner,hitent,hitpos,traceRes)
-	return self:OpenDoor(hitent);
+--[[
+* SHARED
+
+If a door is hit, opens the door.
+Otherwise just does the same thing as any other melee weapon.
+]]--
+function ITEM:OnHit(vShootPos,vAim,traceRes,bIndirectHit)
+	if self:OpenDoor(traceRes.Entity) then return true end
+	return self:InheritedEvent("OnHit","base_melee",false,vShootPos,vAim,traceRes,bIndirectHit);
 end
 
+--[[
+* SHARED
+
+Serverside this will open the given door.
+Clientside it just returns whether or not this is possible.
+
+door is the door entity you want to open.
+
+Returns false if the given entity isn't a door / was invalid / otherwise couldn't be opened.
+Returns true otherwise.
+]]--
 function ITEM:OpenDoor(door)
 	if !door || !door:IsValid() || door:GetClass()!="prop_door_rotating" then return false end
 	
@@ -75,6 +100,8 @@ if SERVER then
 
 
 --[[
+* SERVER
+
 Impact sounds.
 CollisionData is information about the collision passed on from the entity's event.
 HitPhysObj is the physics object belonging to this entity which collided.

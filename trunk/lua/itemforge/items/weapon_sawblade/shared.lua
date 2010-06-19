@@ -82,22 +82,19 @@ ITEM.ThrowSpinMax=Angle(0,0,-500);
 ITEM.StickSpeed=500;			--The sawblade has to be going at least this fast to stick into something
 ITEM.StickBy=9;					--The sawblade will dig in this far (in units) when it hits something
 ITEM.StickStrength=30000;		--When the sawblade welds to another prop it takes this much force to break the weld.
-ITEM.MinAngle=math.pi*.25;		--This is the minimum angle the sawblade must hit an object "head on" to stick into. It is 45 degrees in radians:	PI * .25 = PI/4  = 45 degrees
-ITEM.MaxAngle=math.pi*.75;		--This is the maximum angle the sawblade must hit an object "head on" to stick into. It is 135 degrees in radians:	PI * .75 = 3PI/4 = 135 degrees
+ITEM.MinAngleCos=0.7071067812;	--This is the cosine of the minimum angle the sawblade must hit an object "head on" to stick into. It is cosine of 45 degrees in radians:	PI * .25 = PI/4  = 45 degrees; cos(PI/4) = 0.7071067812
+ITEM.MaxAngleCos=-0.7071067812;	--This is the cosine of the maximum angle the sawblade must hit an object "head on" to stick into. It is cosine of 135 degrees in radians:	PI * .75 = 3PI/4 = 135 degrees; cos(3PI/4) = -0.7071067812
 
-ITEM.StickSounds={				--A random sound here plays whenever the sawblade sticks in something
+--A random sound here plays whenever the sawblade sticks in something
+ITEM.StickSounds={
 	Sound("physics/metal/sawblade_stick1.wav"),
 	Sound("physics/metal/sawblade_stick2.wav"),
 	Sound("physics/metal/sawblade_stick3.wav")
 }
 
+--Random sound from here plays when the sawblade has been pulled out of something
 ITEM.UnstickSounds={
 	Sound("npc/roller/blade_out.wav")
-};
-
-ITEM.BrokenSounds={
-	Sound("physics/metal/metal_box_break1.wav"),
-	Sound("physics/metal/metal_box_break2.wav")
 };
 
 --Random sound from here plays when a cut has been made.
@@ -108,6 +105,12 @@ ITEM.FleshyImpactSounds={
 	Sound("ambient/machines/slicer4.wav")
 }
 
+if SERVER then
+
+
+--[[
+These entities are considered bloody (they bleed when they are hit with the sawblade)
+]]--
 ITEM.BloodyTypes={
 ["player"]=true,
 ["npc_monk"]=true,
@@ -144,11 +147,15 @@ ITEM.BloodyTypes={
 ["npc_headcrab_black"]=true,
 }
 
+
+end
+
 --Don't modify/override these; they're set automatically.
 ITEM.StickingTo=nil;
 
 --[[
 * SHARED
+* Event
 
 Throws the item oriented horizontally.
 This override is necessary because base_thrown only cooldowns the primary attack. This cooldowns the secondary too.
@@ -188,21 +195,35 @@ if SERVER then
 
 
 
+--[[
+* SERVER
+* Event
+
+When the sawblade is used we unstick it from anything it might be attached to.
+]]--
 function ITEM:OnUse(pl)
 	if self:IsStuck() then
 		self:UnstickSound();
 		self:Unstick(pl);
 		return true;
 	end
-	return self["base_thrown"].OnUse(self,pl);
+	return self:InheritedEvent("OnUse","base_thrown",false,pl);
 end
 
---Unstick without sounds when we leave the world
+--[[
+* SERVER
+* Event
+
+Unstick without sounds when we leave the world
+]]--
 function ITEM:OnExitWorld(forced)
 	self:Unstick();
 end
 
 --[[
+* SERVER
+* Event
+
 We use this function for the sawblade's awesome stick-in stuff.
 If the sawblade is going fast enough, and hits something head on, we can stick in it.
 
@@ -233,10 +254,10 @@ function ITEM:OnPhysicsCollide(entity,CollisionData,HitPhysObj)
 	local sawUp=ent:GetAngles():Up();
 	local hitDir=CollisionData.HitNormal;
 	
-	local angMeasure=math.acos(sawUp:Dot(hitDir));
+	local dotMeasure=sawUp:Dot(hitDir);
 	
 	--We only damage or stick in things we hit head on
-	if angMeasure<self.MinAngle || angMeasure>self.MaxAngle then return false end
+	if dotMeasure>self.MinAngleCos || dotMeasure<self.MaxAngleCos then return false end
 	
 	--Kill (or at least really mess up) players and NPCs
 	if self.BloodyTypes[ent2:GetClass()] then
@@ -400,11 +421,6 @@ function ITEM.Unstuck(weld,self,id)
 	local ent=self:GetEntity();
 	self.StickingTo[id][2]:TakeDamage(10,ent,ent);
 	self.StickingTo[id]=nil;
-end
-
-function ITEM:OnBreak(howMany,bLastBroke,who)
-	self:EmitSound(self.BrokenSounds);
-	self:InheritedEvent("OnBreak","base_thrown",nil,howMany,bLastBroke,who);
 end
 
 

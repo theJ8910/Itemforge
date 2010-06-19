@@ -21,7 +21,9 @@ ITEM.Sounds={
 	Sound("ambient/levels/citadel/extract_loop1.wav"),
 };
 
-if CLIENT then
+if SERVER then
+	ITEM.GibEffect = "metal";
+else
 	ITEM.Icon=Material("itemforge/items/item_magnet");
 end
 

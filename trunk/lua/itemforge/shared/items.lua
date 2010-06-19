@@ -19,11 +19,14 @@ BUG  Sometimes players see bullets fired from other players... wierd!
 BUG  Debug module is reporting message -114 is undefined for some clients
 BUG  Okay, WTF? The pumpkin was both inside and outside of an inventory at the same time...
 BUG  Hitting ammo results in serverside bugs
+BUG  The melee weapons' bullet effects are still giving me shit, maybe I need to direct the bullets or something.
 
 theJ89's Giant TODO list
 This is why the system hasn't been released yet:
 
 TODO Cache results for faster lookups
+TODO Ebayle's suggestion of numbering dynamically generated weapons (hash code?).
+TODO You can dragdrop stuff to/from another player's inventory... fix this
 TODO code maintainence... make sure that multi-line comments are used for function descriptions, check arguments, do cleanup code (for items listed in an inventory for example), for collections check to see if something being inserted still exists, check events to make sure they are all being pcalled, consider putting base item's events into their own lua file.
 TODO remember to divide default files into sections: Methods, events, internal methods (things scripters won't be calling)
 TODO Have it so item types can be reloaded without needing a full map change/restart
@@ -480,12 +483,9 @@ function MODULE:CreateNWVar(itemtype,sName,sDatatype,vDefaultValue,bPredicted,bH
 	NewNWVar.Predicted=bPredicted or false;
 	NewNWVar.HoldFromUpdate=bHoldFromUpdate or false;
 	NewNWVar.Save=bNoSave or false;
-	local t=string.lower(sDatatype);
-		
-	
-	NewNWVar.Type=DatatypeStrToID[t];
+	NewNWVar.Type=DatatypeStrToID[string.lower(sDatatype)];
 	if NewNWVar.Type == nil then
-		ErrorNoHalt("Itemforge Items: Bad datatype for NWVar \""..sName.."\". \""..t.."\" is invalid; valid types are:\n");
+		ErrorNoHalt("Itemforge Items: Bad datatype for NWVar \""..sName.."\". \""..string.lower(sDatatype).."\" is invalid; valid types are:\n");
 		
 		local l=#DatatypeStrToID;
 		for i=1,l-1 do
@@ -854,18 +854,18 @@ end
 Creates an item and then places it in the hands of a player as a weapon.
 If the creation succeeds, the item created is returned. Otherwise, nil is returned.
 ]]--
-function MODULE:CreateHeld(type,pPlayer,bPredict)
-	if type==nil then ErrorNoHalt("Itemforge Items: Tried to create item as weapon but type of item was not given!\n"); return nil end
-	if pPlayer==nil then ErrorNoHalt("Itemforge Items: Tried to create item as weapon but player to give the item to wasn't given!\n"); return nil end
-	
+function MODULE:CreateHeld(strType,ePlayer,bPredict)
+	if strType==nil then ErrorNoHalt("Itemforge Items: Tried to create item held by player, but type of item to create wasn't given.\n"); return nil end
+	if !IsValid(ePlayer) then ErrorNoHalt("Itemforge Items: Tried to create item held by player, but the player wasn't given/was invalid.\n"); return nil end
+	if !ePlayer:IsPlayer() then ErrorNoHalt("Itemforge Items: Tried to create item held by player, but the player given wasn't a player."); return nil end
 	if bPredict==nil then bPredict=CLIENT end
 	
-	local item=self:Create(type,nil,nil,nil,bPredict);
+	local item=self:Create(strType,nil,nil,nil,bPredict);
 	if !item then return nil end
 	
 	--TODO PREDICT
-	if !bPredict && !item:Hold(pPlayer) then
-		item:Remove(true);
+	if !bPredict && !item:Hold(ePlayer) then
+		if item:IsValid() then item:Remove(); end
 		return nil;
 	end
 	

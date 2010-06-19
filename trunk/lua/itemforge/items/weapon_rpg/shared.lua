@@ -13,13 +13,17 @@ ITEM.Base="base_ranged";
 ITEM.Weight=1160;				--Based upon http://www.army-technology.com/projects/mbt_law/
 ITEM.Size=27;
 
-ITEM.Spawnable=true;
-ITEM.AdminSpawnable=true;
-
 ITEM.WorldModel="models/weapons/w_rocket_launcher.mdl";
 ITEM.ViewModel="models/weapons/v_RPG.mdl";
 
+if SERVER then
+	ITEM.GibEffect = "metal";
+end
+
 ITEM.HoldType="rpg";
+
+ITEM.Spawnable=true;
+ITEM.AdminSpawnable=true;
 
 --Overridden Base Weapon stuff
 ITEM.PrimaryDelay=2;									--Taken directly from the modcode.

@@ -12,6 +12,11 @@ ITEM.Description="This is a Heckler & Koch USP (or Universal Self-Loading Pistol
 ITEM.Base="base_firearm";
 ITEM.Weight=771;				--Based on http://en.wikipedia.org/wiki/Heckler_&_Koch_USP Tactical 9mm (USP Match weight unavailable)
 ITEM.Size=7;
+
+if SERVER then
+	ITEM.GibEffect = "metal";
+end
+
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 

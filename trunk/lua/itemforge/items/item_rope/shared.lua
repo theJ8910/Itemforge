@@ -13,28 +13,39 @@ ITEM.Name="Rope";
 ITEM.Description="A rope woven from strands of hemp fibers. ";
 ITEM.WorldModel="models/Items/CrossbowRounds.mdl";
 ITEM.StartAmount=500;
+ITEM.MaxHealth=2;
 
 --[[
-To determine the weight, http://compostablegoods.com/product_info.php?products_id=102 was used.
+To determine the weight and density, http://compostablegoods.com/product_info.php?products_id=102 was used.
 According to this page, 63 meters of 4mm diameter hemp rope was 1kg.
 For what we are going to do, we want the radius, so we divide the diameter by half to get 2mm.
-We convert 63 meters to 2480.31496 inches, and convert the 2 mm to 0.0787401575.
-We then convert from inches to game units, according to http://developer.valvesoftware.com/wiki/Dimensions, by dividing both numbers by .75 (1 game unit = .75 inches).
+We convert 63 meters to 2480.31496 inches, and convert the 2 mm to 0.0787401575 inches.
 
-This gives us 3307.086613 gu and .1049868767 gu, respectively.
+This gives us 2480.31496 inches and .0787401575 inches, respectively.
 By treating the rope as a very tall cylinder, we can get it's volume:
-	PI * (0.1049868767 gu)^2 * 3307.086613 gu = 114.5158165 gu^3
+	PI * (.0787401575 inches)^2 * 2480.31496 inches = 48.31136004 inches^3
 Density is mass/volume. We know the rope weighs 1 kg, or 1000 grams. We know that it's volume is 114.5158165 gu^3, so we can use this to calculate the density of the rope.
-	d=1000 grams/114.5158165 gu^3 = 8.732418198 grams/gu^3
-We then get the volume of our rope; we assume the rope is one gu tall:
-	PI * (1.5 gu)^2 * 1 gu = 7.068583471 gu^3
-Then we mutliply the density of rope times the volume of our rope to get the mass of our rope:
-	7.06883471 gu^3 * 8.732418198 grams/gu^3 = 61.72582693 grams
-	
-	so, a one unit rope with a radius of 3 has a mass of ~62 grams.
+	d=1000 grams/48.31136004 inches^3 = 20.69906538 grams/inches^3
 ]]--
-ITEM.Weight=62;
-ITEM.Size=2;			--I'm thinking the rope's "size" is it's radius in game units... this works out to about 1.5.
+ITEM.Density = 20.69906538;
+
+--[[
+We then get the volume of our rope; we assume the rope is one inch tall and has a diameter of 1.5 inches (radius 0.75 inches):
+	PI * (.75 inch)^2 * 1 inch = 1.767145868 inches^3
+Then we mutliply the density of rope times the volume of our rope to get the mass of our rope:
+	1.767145868 in^3 * 20.69906538 grams/in^3 = 36.57826785 grams
+	
+So, a one inch rope with a radius of 1.5 inches has a mass of ~37 grams.
+]]--
+ITEM.Weight=37;
+
+--[[
+I'm thinking the rope's "size" is it's diameter in game units.
+This is 1.5 so it works out to 2. This fits into a container easily like you'd expect,
+but the more rope you get the heavier the rope becomes so weight balances out having
+"too much rope" in a container.
+]]--
+ITEM.Size=1;
 ITEM.MaxAmount=0;
 
 ITEM.Spawnable=true;
@@ -50,29 +61,57 @@ ITEM.WorldModelRotate=Angle(90,0,0);
 end
 
 --Rope Item
-ITEM.Strength=40000;				--The rope breaks when this much force is applied to it
-ITEM.Width=3;						--The rope graphic appears to be this thick
+if SERVER then
+
+ITEM.Width=1.5;						--The rope graphic appears to be this thick
 ITEM.Material="cable/rope";			--The rope graphic uses this material
+ITEM.Strength=40000;				--The rope breaks when this much force is applied to it (force being kg inches / s^2)
+ITEM.Rigid=false;					--Not a rigid rope (like a metal pendulum rod) right?
 ITEM.FirstEntity=nil;
 ITEM.FirstBone=0;
 ITEM.FirstAnchor=Vector(0,0,0);
 
+end
+
+--[[
+* SHARED
+* Event
+
+Returns a dynamic description of the item. In addition to it's normal description, we also return
+]]--
 function ITEM:GetDescription()
 	--Length of rope in meters
-	local len=self:GetAmount()/0.01905;
-	if len > 1 then		return self.Description.."It is "..len.." meters long.";
+	local len=math.floor(self:GetAmount()*2.54)*0.01;
+	if len >= 1 then	return self.Description.."It is "..len.." meter"..((len>1 && "s") || "").." long.";
 	else				return self.Description.."It is "..(len*100).." centimeters long."
 	end
 end
 
---The player can't split the rope directly
+--[[
+* SHARED
+* Event
+
+The player can't split the rope directly
+]]--
 function ITEM:CanPlayerSplit(pl)
+	return false;
+end
+
+--[[
+* SHARED
+* Event
+
+Ropes don't merge
+]]--
+function ITEM:CanMerge()
 	return false;
 end
 
 if SERVER then
 
 --[[
+* SERVER
+
 Ropes two entities together.
 The length of the rope is determined by the amount of this item.
 
@@ -99,12 +138,43 @@ function ITEM:RopeTogether(ent1,bone1,point1,ent2,bone2,point2)
 	if dis>len then return false end
 	
 	local dis=point1:Distance(point2);
-	if !constraint.Rope(ent1,ent2,bone1,bone2,point1,point2,dis,len-dis,self.Strength,self.Width,self.Material,false) then return false end
+	if !constraint.Rope(ent1,ent2,bone1,bone2,point1,point2,dis,len-dis,self.Strength,self.Width,self.Material,self.Rigid) then return false end
 	
 	self:Remove();
 	return true;
 end
 
+--[[
+* SERVER
+
+Allows you to set rope properties all in one function
+]]--
+function ITEM:SetRopeProperties(iLength, fDiameter, strMaterial, fStrength, bRigid)
+	self:SetAmount(math.floor(iLength));
+	self:SetWidth(fDiameter);
+	self.Material = strMaterial;
+	self.Strength = fStrength;
+	self.Rigid = bRigid;
+end
+
+--[[
+* SERVER
+
+Sets the rope diameter, and it's size and weight since they depend upon these quantities.
+Weight is rounded to the nearest gram, and size is rounded to the nearest inch.
+]]--
+function ITEM:SetWidth(fDiameter)
+	self.Width = fDiameter;
+	self:SetSize(math.Round(fDiameter*0.5));
+	self:SetWeight(math.Round(math.pi * fDiameter*fDiameter*.25 * self.Density));
+end
+
+--[[
+* SERVER
+* Event
+
+We rope stuff together here
+]]--
 function ITEM:OnSWEPPrimaryAttack()
 	local pl=self:GetWOwner();
 	--TODO Minimum distance

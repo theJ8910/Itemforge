@@ -20,7 +20,11 @@ ITEM.Sounds={
 
 ITEM.HoldType="normal";
 
-if CLIENT then
+if SERVER then
+
+ITEM.GibEffect = "glass";
+
+else
 
 ITEM.WorldModelNudge=Vector(0,0,8);
 

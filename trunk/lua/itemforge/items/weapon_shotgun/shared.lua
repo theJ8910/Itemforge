@@ -16,6 +16,11 @@ ITEM.Weight=4400;	--Based on http://half-life.wikia.com/wiki/SPAS-12_(HL2) and h
 ITEM.Size=19;
 ITEM.WorldModel="models/weapons/w_shotgun.mdl";
 ITEM.ViewModel="models/weapons/v_shotgun.mdl";
+
+if SERVER then
+	ITEM.GibEffect = "metal";
+end
+
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 

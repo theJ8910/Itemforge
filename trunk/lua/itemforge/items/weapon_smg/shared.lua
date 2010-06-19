@@ -14,6 +14,11 @@ ITEM.WorldModel="models/weapons/w_smg1.mdl";
 ITEM.ViewModel="models/weapons/v_smg1.mdl";
 ITEM.Weight=1900;		--1.9kg according to http://en.wikipedia.org/wiki/Heckler_&_Koch_MP7
 ITEM.Size=13;
+
+if SERVER then
+	ITEM.GibEffect = "metal";
+end
+
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 

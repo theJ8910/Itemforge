@@ -24,6 +24,10 @@ ITEM.Size=30;					--This is the bounding radius of the footlocker model.
 ITEM.Weight=1000;				--Weighs 1kg (around 2 pounds)
 ITEM.MaxHealth=500;
 
+if SERVER then
+	ITEM.GibEffect = "wood";
+end
+
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 
@@ -134,9 +138,6 @@ function ITEM:OnEntTakeDamage(entity,dmgInfo)
 	else
 		self:Hurt(dmgInfo:GetDamage(),dmgInfo:GetAttacker());
 	end
-	
-	print("Attacker",dmgInfo:GetAttacker());
-	print("Inflictor",dmgInfo:GetInflictor());
 	
 	--GetWeaponItem(eWep)
 	entity:TakePhysicsDamage(dmgInfo);

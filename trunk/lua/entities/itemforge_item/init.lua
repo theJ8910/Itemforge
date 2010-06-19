@@ -139,34 +139,42 @@ function ENT:TriggerInput(inputName,value)
 end
 
 --[[
+* WIRE
+
 May allow items to take advantage of this later
 Use GetNetworked* functions (entity) to restore data from a save-game
-WIRE
 ]]--
 function ENT:OnRestore()
 	if self.IsWire then return self["BaseWireEntity"].OnRestore(self); end
 end
 
 --[[
+* WIRE
+
 I don't have a clue what this is, I'm guessing it's something related to the advanced duplicator?
 It's in the base wire entity though so I figure it's necessary to include it.
-WIRE
 ]]--
 function ENT:BuildDupeInfo()
 	if self.IsWire then return self["BaseWireEntity"].BuildDupeInfo(self); end
 end
 
---WIRE
+--[[
+* WIRE
+]]--
 function ENT:ApplyDupeInfo(pl,ent,info,GetEntByID)
 	if self.IsWire then return self["BaseWireEntity"].ApplyDupeInfo(self,pl,ent,info,GetEntByID); end
 end
 
---WIRE
+--[[
+* WIRE
+]]--
 function ENT:PreEntityCopy()
 	if self.IsWire then return self["BaseWireEntity"].PreEntityCopy(self); end
 end
 
---WIRE
+--[[
+* WIRE
+]]--
 function ENT:PostEntityPaste(Player,Ent,CreatedEntities)
 	if self.IsWire then return self["BaseWireEntity"].PostEntityPaste(self,Player,Ent,CreatedEntities); end
 end
