@@ -19,6 +19,10 @@ ITEM.AdminSpawnable=true;
 ITEM.WorldModel="models/weapons/W_357.mdl";
 ITEM.ViewModel="models/weapons/v_357.mdl";
 
+if SERVER then
+	ITEM.GibEffect = "metal";
+end
+
 --Overridden Base Weapon stuff
 ITEM.PrimaryDelay=.75;									--Taken directly from the modcode.
 

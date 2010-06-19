@@ -14,6 +14,11 @@ ITEM.Weight=850;			--This is somewhat arbitrary. It's heavier than the H&K USP M
 ITEM.Size=7;
 ITEM.ViewModel = "models/weapons/v_pistol.mdl";
 ITEM.WorldModel = "models/weapons/w_pistol.mdl";
+
+if SERVER then
+	ITEM.GibEffect = "metal";
+end
+
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 

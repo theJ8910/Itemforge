@@ -586,7 +586,6 @@ function MODULE:CleanupInvs(pl)
 		--If the player is a connected object of an inventory...
 		for i,c in pairs(v.ConnectedObjects) do
 			if c.Obj==pl then
-				print(v);
 				v.ConnectedEntityRemoved(pl,v);
 			end
 		end
@@ -900,10 +899,18 @@ function _INV:SetWeightCapacity(cap,pl)
 end
 
 --[[
-Set size limit for this inventory. If called serverside, the clients are instructed to set the size limit as well.
-Item size limit can be used to restrict objects of certain sizes from entering the inventory. For example, maybe your backpack can hold a soda can, but can't hold a desk. On the other hand, maybe a trailer's inventory could hold a desk.
+Set size limit for this inventory.
+If called serverside, the clients are instructed to set the size limit as well.
+
+Item size limit can be used to restrict objects of certain sizes from entering the inventory.
+	For example, maybe your backpack can hold a soda can, but can't hold a desk.
+	On the other hand, maybe a trailer's inventory could hold a desk.
+
+You can set the size limit to 0 to allow items of any size to be placed in the inventory.
+
 Note: If the size limit changes, items will not be removed to compensate for the size limit changing.
-Example: Item with size 506 is in inventory, but size limit changes to 500. The item is not taken out because the size limit changed.
+	Example: Item with size 506 is in inventory, but size limit changes to 500.
+	The item is not taken out because the size limit changed.
 ]]--
 function _INV:SetSizeLimit(sizelimit,pl)
 	if sizelimit==nil	then return self:Error("Couldn't set size limit... sizelimit wasn't given.\n") end
@@ -935,8 +942,13 @@ function _INV:SetSizeLimit(sizelimit,pl)
 end
 
 --[[
-Set max slots for this inventory. If called serverside, the clients are instructed to set the max slots as well.
-A slot limit can be used to restrict how many items (or stacks of items) may be placed in this inventory. For example, maybe a weapon rack can only hold four items?
+Set max slots for this inventory.
+
+If called serverside, the clients are instructed to set the max slots as well.
+
+A slot limit can be used to restrict how many items (or stacks of items) may be placed
+in this inventory.
+	For example, maybe a weapon rack can only hold four items?
 NOTE: If the max slots changes, items will not be removed to compensate for the max slots changing.
 WARNING: If an item is in, say, slot 7, and max slots is changed to 5, you'll open up the inventory and see a closed slot where item 7 is supposed to be.
 ]]--
@@ -1963,7 +1975,8 @@ function _INV:InsertItem(item,slotnum,bNoSplit,bPredict)
 
 		--Can this inventory support the weight of all the items being inserted?
 		--TODO Hard Weight Caps and Soft Weight Caps
-		if self:GetWeightCapacity()!=0 && (self:GetWeightFree()-item:GetStackWeight())<0 then
+		local iStackWeight=item:GetStackWeight();
+		if self:GetWeightCapacity()!=0 && iStackWeight != 0 && (self:GetWeightFree()-iStackWeight)<0 then
 			--Since we don't have enough room, will you settle for moving part of the stack instead?
 			if bNoSplit then return false end
 			

@@ -19,6 +19,10 @@ ITEM.AdminSpawnable=true;
 ITEM.WorldModel="models/weapons/w_IRifle.mdl";
 ITEM.ViewModel="models/weapons/v_IRifle.mdl";
 
+if SERVER then
+	ITEM.GibEffect = "metal";
+end
+
 ITEM.HoldType="ar2";
 
 --Overridden Base Weapon stuff

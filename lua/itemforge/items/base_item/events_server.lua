@@ -8,6 +8,12 @@ NOTE: The item type is the name of the folder it is in (this is base_item/events
 This specific file deals with events that are present on the server.
 ]]--
 
+local GibHash={
+	["metal"] = 1,
+	["wood"]  = 2,
+	["glass"] = 3
+}
+
 --[[
 ENTITY SPECIFIC EVENTS
 ]]--
@@ -29,7 +35,7 @@ function ITEM:OnEntityInit(entity)
 	--Next we init physics (and wake the object so it starts moving immediately)
 	entity:PhysicsInit(SOLID_VPHYSICS);
 	local phys = entity:GetPhysicsObject();
-	if (phys:IsValid()) then
+	if phys:IsValid() then
 		phys:Wake();
 	end
 	
@@ -316,7 +322,7 @@ function ITEM:OnBreak(howMany,bLastBroke,who)
 		end
 		breakEnt:Spawn();
 		breakEnt:Fire("break","",0);
-	elseif self.GibEffect == "metal" then
+	elseif GibHash[self.GibEffect] then
 		local data = EffectData();
 		data:SetOrigin(ent:LocalToWorld(ent:OBBCenter()));
 		data:SetStart(ent:OBBMaxs()-ent:OBBCenter());
@@ -329,10 +335,9 @@ function ITEM:OnBreak(howMany,bLastBroke,who)
 			data:SetScale(v:Length());
 			data:SetRadius(phys1:GetVolume());
 		end
-		util.Effect("MetalGibs",data,true,true);
-	elseif self.GibEffect == "wood" then
-		--local data = EffectData();
-		--util.Effect("");
+		
+		data:SetAttachment(GibHash[self.GibEffect]);
+		util.Effect("BasicGibs",data,true,true);
 	end
 end
 

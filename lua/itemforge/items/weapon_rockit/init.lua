@@ -10,6 +10,8 @@ AddCSLuaFile("cl_init.lua");
 
 include("shared.lua");
 
+ITEM.GibEffect = "metal";
+
 --Rock-It Launcher
 ITEM.AutoUnloadDelay=0.3;
 ITEM.EjectFrom=Vector(9.2274,0.3052,5.4279);

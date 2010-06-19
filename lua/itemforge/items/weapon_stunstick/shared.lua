@@ -19,6 +19,10 @@ ITEM.AdminSpawnable=true;
 ITEM.WorldModel="models/weapons/W_stunbaton.mdl";
 ITEM.ViewModel="models/weapons/v_stunstick.mdl";
 
+if SERVER then
+	ITEM.GibEffect = "metal";
+end
+
 --Overridden Base Weapon stuff
 ITEM.PrimaryDelay=.9;
 

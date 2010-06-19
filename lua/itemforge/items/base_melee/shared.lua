@@ -54,9 +54,6 @@ function ITEM:OnSWEPPrimaryAttack()
 	local eWeapon=self:GetWeapon();
 	local pOwner=self:GetWOwner();
 	
-	--We play the player's attack animation
-	pOwner:SetAnimation(PLAYER_ATTACK1);
-	
 	--We have to figure out if the player hit something before dealing damage.
 	--First we'll see if the player is looking directly at something.
 	local shoot=pOwner:GetShootPos();
@@ -89,47 +86,12 @@ function ITEM:OnSWEPPrimaryAttack()
 	end
 	
 	local eHit = traceRes.Entity;
-	if traceRes.HitNonWorld && IsValid(eHit) && self:Event("IsValidHit",false,shoot,aim,eHit) then
+	if traceRes.HitNonWorld && IsValid(eHit) && !self:Event("IsValidHit",false,shoot,aim,eHit) then
 		traceRes.Hit = false;
 	end
 	
-	if traceRes.Hit then
-		--If he hit, we'll display his weapon hitting, play a hit sound, and then it's up to the weapon to decide what happens
-		eWeapon:SendWeaponAnim(ACT_VM_HITCENTER);
-		self:HitSound(traceRes);
-		
-		if !self:OnHit(pOwner,traceRes.Entity,traceRes.HitPos,traceRes) then
-			--Melee weapons apply damage with trace attack dispatches.
-			local dmg = DamageInfo();
-			dmg:SetDamagePosition(shoot);
-			dmg:SetDamageForce(aim*self:Event("GetHitForce",1,traceRes));
-			dmg:SetInflictor(pOwner);
-			dmg:SetAttacker(pOwner);
-			dmg:SetDamage(self:Event("GetHitDamage",0,traceRes));
-			dmg:SetDamageType(DMG_CLUB);
-			
-			eHit:DispatchTraceAttack(dmg,traceRes.StartPos,traceRes.HitPos);
-			
-			--We have to use bullets clientside for impact effects since garry doesn't
-			--have UTIL_ImpactEffect either... additonally should avoid the effects if it's not a direct
-			--hit. In the case it's not a direct hit a bullet goes flying off into the sunset.
-			if CLIENT && !bIndirectHit then
-				local hitbullet={};
-				hitbullet.Num    = 1;
-				hitbullet.Src    = shoot;
-				hitbullet.Dir    = aim;
-				hitbullet.Spread = Vector(0,0,0);
-				hitbullet.Tracer = 0;
-				hitbullet.Force  = self:Event("GetHitForce",1,traceRes);
-				hitbullet.Damage = self:Event("GetHitDamage",1,traceRes);
-
-				pOwner:FireBullets(hitbullet);
-			end
-		end
-	else
-		--If he missed, we'll display him missing and play a miss sound
-		eWeapon:SendWeaponAnim(ACT_VM_MISSCENTER);
-		self:MissSound(traceRes);
+	if traceRes.Hit then	self:Event("OnHit",nil,shoot,aim,traceRes,bIndirectHit);
+	else					self:Event("OnMiss",nil,shoot,aim,traceRes);
 	end
 	
 	self:AddViewKick(self.ViewKickMin,self.ViewKickMax);
@@ -188,7 +150,7 @@ eHit should be the entity hit.
 function ITEM:IsValidHit(vShoot,vAimDir,eHit)
 	local vCenter=eHit:LocalToWorld(eHit:OBBCenter());
 	--Did this occur within the hit range and within a 90 degree cone from the player's view
-	return vShoot:Distance(vCenter) <= self:Event("GetHitRange",75)+eHit:BoundingRadius() && (vAimDir:Dot(vCenter-vShoot)<0.70721);
+	return vShoot:Distance(vCenter) <= self:Event("GetHitRange",75)+eHit:BoundingRadius() && (vAimDir:Dot(vCenter-vShoot)>0.70721);
 end
 
 --[[
@@ -232,18 +194,70 @@ end
 * SHARED
 * Event
 
-When the melee weapon hits something, this is called. This is before damage is applied.
-You can use this hook to give a special function to your weapon, like healing other items or players, for example.
-hitent is the entity hit. This may be nil or invalid so make sure to check for that with IsValid.
-hitpos is the position something was hit.
+If the melee weapon hits something, this is called.
+The default OnHit action is to apply damage to the target.
+
+You can override this event to give a special function to your weapon, like healing other
+items or players, for example.
+
+
 traceRes is a full trace result table, it has everything that's normally in a trace result:
 	FractionLeftSolid,HitNonWorld,Fraction,Entity,HitNoDraw,HitSky,HitPos,StartSolid,HitWorld,HitGroup,HitNormal,HitBox,Normal,Hit,MatType,StartPos,PhysicsBone
 
-Return false to do damage (fires an invisible bullet).
-Return true to not do damage (doesn't fire an invisible bullet).
+bIndirectHit is true if the player struck the entity, but wasn't quite looking at it (a glance shot).
+	In other words, a line trace didn't hit the entity, a box trace did.
 ]]--
-function ITEM:OnHit(pOwner,hitent,hitpos,traceRes)
-	return false;
+function ITEM:OnHit(vShootPos,vAim,traceRes,bIndirectHit)	
+	local eWeapon=self:GetWeapon();
+	local pOwner=self:GetWOwner();
+	
+	--If he hit, we'll display his weapon hitting, play a hit sound, and then it's up to the weapon to decide what happens
+	pOwner:SetAnimation(PLAYER_ATTACK1);
+	eWeapon:SendWeaponAnim(ACT_VM_HITCENTER);
+	self:Event("HitSound",nil,traceRes);
+	
+	--Melee weapons apply damage with trace attack dispatches.
+	local dmg = DamageInfo();
+	dmg:SetDamagePosition(vShootPos);
+	dmg:SetInflictor(pOwner);
+	dmg:SetAttacker(pOwner);
+	dmg:SetDamageForce(vAim*self:Event("GetHitForce",1,traceRes));
+	dmg:SetDamage(self:Event("GetHitDamage",0,traceRes));
+	dmg:SetDamageType(DMG_CLUB);
+	
+	traceRes.Entity:DispatchTraceAttack(dmg,vShootPos,traceRes.HitPos);
+	
+	--We have to use bullets clientside for impact effects since garry doesn't
+	--have UTIL_ImpactEffect either... additonally should avoid the effects if it's not a direct
+	--hit. In the case it's not a direct hit a bullet goes flying off into the sunset.
+	if CLIENT && !bIndirectHit then
+		local hitbullet={};
+		hitbullet.Num    = 1;
+		hitbullet.Src    = vShootPos;
+		hitbullet.Dir    = vAim;
+		hitbullet.Spread = Vector(0,0,0);
+		hitbullet.Tracer = 0;
+		hitbullet.Force  = 1;
+		hitbullet.Damage = 0;
+
+		pOwner:FireBullets(hitbullet);
+	end
+end
+
+--[[
+* SHARED
+* Event
+
+If the melee weapon fails to strike anything, this is called.
+]]--
+function ITEM:OnMiss(vShoot,vAim,traceRes)
+	local eWeapon=self:GetWeapon();
+	local pOwner=self:GetWOwner();
+	
+	--If he missed, we'll display him missing and play a miss sound
+	eWeapon:SendWeaponAnim(ACT_VM_MISSCENTER);
+	pOwner:SetAnimation(PLAYER_ATTACK1);
+	self:Event("MissSound",nil,traceRes);
 end
 
 if SERVER then

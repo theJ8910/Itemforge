@@ -7,6 +7,7 @@ This module begrudgingly gives players inventories.
 
 MODULE.Name="PlayerInv";										--Our module will be stored at IF.PlayerInv
 MODULE.Disabled=false;											--Our module will be loaded
+MODULE.InvType=nil;
 
 --Initilize player inventory module
 function MODULE:Initialize()
@@ -49,13 +50,21 @@ function MODULE:GivePlayerInventory(pl)
 	if !pl || !pl:IsValid() then return false end
 	if pl.Inventory then return false end
 	
-	local inv=IF.Inv:Create();
+	local inv=IF.Inv:Create(self.InvType);
 	inv.RemovalAction=IFINV_RMVACT_REMOVEITEMS;
 	inv:ConnectEntity(pl);
 	pl.Inventory=inv;
 	pl:SetNWInt("itemforge_inventory_id",inv:GetID());
 	
 	return true;
+end
+
+--[[
+* SERVER
+
+]]--
+function MODULE:SetType(strType)
+	self.InvType = strType;
 end
 
 function MODULE:GetPlayerInventory(pl)

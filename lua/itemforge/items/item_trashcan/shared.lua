@@ -19,6 +19,10 @@ ITEM.Weight=30000;
 ITEM.Size=38;
 ITEM.WorldModel="models/props_trainstation/trashcan_indoor001a.mdl";
 
+if SERVER then
+	ITEM.GibEffect = "metal";
+end
+
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
 

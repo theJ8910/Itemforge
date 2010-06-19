@@ -19,6 +19,10 @@ ITEM.AdminSpawnable=true;
 ITEM.WorldModel="models/weapons/W_crossbow.mdl";
 ITEM.ViewModel="models/weapons/v_crossbow.mdl";
 
+if SERVER then
+	ITEM.GibEffect = "metal";
+end
+
 ITEM.HoldType="crossbow";
 
 --Overridden Base Weapon stuff

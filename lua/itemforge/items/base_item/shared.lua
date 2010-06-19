@@ -578,11 +578,15 @@ IF.Items:ProtectKey("ToVoid");
 * Protected
 
 Sets the size of every item in the stack.
+
 Size has nothing to do with weight or how big the item looks.
 The only thing size determines is if an item can be placed inside of an inventory that has a size limit.
+
+iSize can be 0 to indicate it has no size, but negative values will result in an error.
 ]]--
-function ITEM:SetSize(size)
-	return self:SetNWInt("Size",size);
+function ITEM:SetSize(iSize)
+	if iSize<0 then return self:Error("You can't set size to a negative value ("..iSize..").") end
+	return self:SetNWInt("Size",iSize);
 end
 IF.Items:ProtectKey("SetSize");
 
