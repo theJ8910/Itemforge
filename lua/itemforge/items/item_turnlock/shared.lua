@@ -23,11 +23,11 @@ ITEM.AdminSpawnable=true;
 ITEM.TurnSound=Sound("buttons/lever7.wav");
 
 function ITEM:LockAttachment()
-	if !self["base_lock"].LockAttachment(self) then return false end
+	if !self:BaseEvent("LockAttachment",false) then return false end
 	self:EmitSound(self.TurnSound);
 end
 
 function ITEM:UnlockAttachment()
-	if !self["base_lock"].UnlockAttachment(self) then return false end
+	if !self:BaseEvent("UnlockAttachment",false) then return false end
 	self:EmitSound(self.TurnSound);
 end

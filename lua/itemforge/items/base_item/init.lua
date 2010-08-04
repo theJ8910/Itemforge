@@ -396,24 +396,6 @@ IF.Items:ProtectKey("ReceiveNWCommand");
 * SERVER
 * Protected
 
-Runs when a client requests to send this item to an inventory
-]]--
-function ITEM:PlayerSendToInventory(pl,inv,invSlot)
-	if !self:Event("CanPlayerInteract",false,pl) then return false end
-	if !inv || !inv:IsValid()	then return self:Error("Couldn't move to inventory as requested by "..tostring(pl)..", inventory given was not valid!\n") end
-	if invSlot==nil				then return self:Error("Couldn't move to "..tostring(inv).." as requested by "..tostring(pl)..", no slot was given!\n") end
-	
-	if invSlot==0 then invSlot=nil end
-	
-	local container,cSlot=self:GetContainer();
-	self:ToInventory(inv,invSlot,nil,true);
-end
-IF.Items:ProtectKey("PlayerSendToInventory");
-
---[[
-* SERVER
-* Protected
-
 Runs when a client requests to send this item to the world somewhere
 ]]--
 function ITEM:PlayerSendToWorld(pl,from,to)

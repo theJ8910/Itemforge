@@ -45,13 +45,13 @@ ITEM.ReloadSounds={										--There is no reload sound
 ITEM.DryFireDelay=0.2;
 
 function ITEM:OnSWEPPrimaryAttack()
-	if !self["base_ranged"].OnSWEPPrimaryAttack(self) then return false end
+	if !self:BaseEvent("OnSWEPPrimaryAttack",false) then return false end
 	
 	return true;
 end
 
 function ITEM:OnSWEPSecondaryAttack()
-	if !self["base_ranged"].OnSWEPSecondaryAttack(self) then return false end
+	if !self:BaseEvent("OnSWEPSecondaryAttack",false) then return false end
 	
 	--Secondary attack swaps firemode
 	self:SetNWVar("LaserSight",!self:GetNWVar("LaserSight"));

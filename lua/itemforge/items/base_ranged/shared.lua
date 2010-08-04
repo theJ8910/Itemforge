@@ -173,7 +173,7 @@ It locates nearby ammo and tells the gun to load it.
 ]]--
 function ITEM:OnSWEPReload()
 	if !self:CanReload() then return false end
-	if self.ReloadsSingly then return self:StartReload(); end
+	if self.ReloadsSingly then return self:Event("StartReload",false,self:GetWOwner()); end
 	
 	for i=1,table.getn(self.Clips) do
 		local clipsize=self:GetClipSize(clip);
@@ -207,7 +207,7 @@ function ITEM:OnUse(pl)
 	end
 	
 	--We couldn't load whatever the gun with whatever the player was carrying, so just do the default OnUse
-	return self:InheritedEvent("OnUse","base_weapon",false,pl);
+	return self:BaseEvent("OnUse",false,pl);
 end
 
 --[[
@@ -396,11 +396,17 @@ end
 
 --[[
 * SHARED
+* Event
 
 If we ReloadSingly, then this function is called whenever the gun is told to reload.
 It returns true if we have started reloading, or false if we couldn't.
+
+If pl is a player, then the weapon will stop reloading if that player can no longer
+interact with the source of ammunition.
+
+If pl is nil, then the gun will always reload no matter how close it is to the ammunition.
 ]]--
-function ITEM:StartReload()
+function ITEM:StartReload(pl)
 	if self:GetNWBool("InReload") then return false end
 	
 	--Determine what clip needs to be loaded and locate ammo for it
@@ -425,6 +431,8 @@ function ITEM:StartReload()
 	--If we couldn't find any ammo then stop
 	if self.ReloadSource==nil then return false end
 	
+	self.ReloadPlayer = pl;
+	
 	--Show shotgun shell (I'm not sure this even works? But it's in the modcode so uhh)
 	local wep=self:GetWeapon();
 	if wep then wep:SetBodygroup(1,0) end
@@ -436,6 +444,7 @@ end
 
 --[[
 * SHARED
+* Event
 
 If we ReloadSingly then this loads one bullet into a clip.
 ]]--
@@ -446,8 +455,8 @@ function ITEM:Reload()
 	
 	--If our ammo source disappeared or we're full we can stop
 	--TODO clip holds unlimited ammo??
-	if !self:GetNWBool("InReload") || (SERVER && (!self.ReloadSource || !self.ReloadSource:IsValid())) || (curAmmo && curAmmo:GetAmount()>=self:GetClipSize(self.ReloadClip)) then
-		self:FinishReload();
+	if !self:GetNWBool("InReload") || (SERVER && (!self.ReloadSource || !self.ReloadSource:IsValid() || (self.ReloadPlayer && self.ReloadPlayer:IsValid() && !self.ReloadSource:Event("CanPlayerInteract",false,self.ReloadPlayer) ) )) || (curAmmo && curAmmo:GetAmount()>=self:GetClipSize(self.ReloadClip)) then
+		return self:Event("FinishReload");
 	end
 	
 	--TODO if ammo is unloadable (ex can't split a shell from the stack) it keeps trying to reload; fix this
@@ -458,6 +467,7 @@ end
 
 --[[
 * SHARED
+* Event
 
 If we ReloadSingly, then this function is called when the gun is finished reloading (it's clip is full)
 It returns true if we finished reloading successfully, or false otherwise.
@@ -465,6 +475,7 @@ It returns true if we finished reloading successfully, or false otherwise.
 function ITEM:FinishReload()
 	self.ReloadSource=nil;
 	self.ReloadClip=nil;
+	self.ReloadPlayer=nil;
 	
 	--Hide shotgun shell (I'm not sure this even works? But it's in the modcode so uhh)
 	local wep=self:GetWeapon();

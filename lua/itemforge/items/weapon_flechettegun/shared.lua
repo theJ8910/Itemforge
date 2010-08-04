@@ -37,7 +37,7 @@ When a player is holding it and tries to primary attack
 ]]--
 function ITEM:OnSWEPPrimaryAttack()
 	--This does all the base ranged stuff - determine if we can fire, do cooldown, consume ammo, play sounds, etc
-	if !self["base_ranged"].OnSWEPPrimaryAttack(self) then return false end
+	if !self:BaseEvent("OnSWEPPrimaryAttack",false) then return false end
 	
 	self:ShootFlechette(2000);
 	

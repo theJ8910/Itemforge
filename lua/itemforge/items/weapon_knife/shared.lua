@@ -59,7 +59,7 @@ Basically same rules as base_melee but we also ignore rope ends
 ]]--
 function ITEM:IsValidHit(vShoot,vAimDir,eHit)
 	if eHit:GetClass() == self.RopeEndClass then return false end
-	return self:InheritedEvent("IsValidHit","base_melee",nil,vShoot,vAimDir,eHit);
+	return self:BaseEvent("IsValidHit",nil,vShoot,vAimDir,eHit);
 end
 
 
@@ -222,7 +222,7 @@ end
 Does everything a normal hit does but we also cut ropes
 ]]--
 function ITEM:OnHit(vShoot,vAim,traceRes,bIndirectHit)
-	self:InheritedEvent("OnHit","base_melee",nil,vShoot,vAim,traceRes,bIndirectHit);
+	self:BaseEvent("OnHit",nil,vShoot,vAim,traceRes,bIndirectHit);
 	self:CutRopes(vShoot,vAim);
 end
 
@@ -233,7 +233,7 @@ end
 Does everything a normal miss does but we also cut ropes
 ]]--
 function ITEM:OnMiss(vShoot,vAim,traceRes)
-	self:InheritedEvent("OnMiss","base_melee",nil,vShoot,vAim,traceRes);
+	self:BaseEvent("OnMiss",nil,vShoot,vAim,traceRes);
 	self:CutRopes(vShoot,vAim);
 end
 

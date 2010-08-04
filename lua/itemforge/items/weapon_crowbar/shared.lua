@@ -47,9 +47,13 @@ But in any other case, we find the entity the player is looking at
 and try to open it up.
 ]]--
 function ITEM:OnUse(pl)
-	if self:InheritedEvent("OnUse","base_melee",false,pl) then return true end
+	if self:BaseEvent("OnUse",false,pl) then return true end
 	
-	--We'll try to find a door to open
+	--If this is the active weapon we'll take a swing with it
+	local wep = self:GetWeapon();
+	if wep && pl:GetActiveWeapon()==wep then return self:Event("OnSWEPPrimaryAttack",false) end
+	
+	--Otherwise (if it was used in an inventory for example) We'll try to find a door to open
 	local tr={};
 	tr.start=pl:GetShootPos();
 	tr.endpos=tr.start+(pl:GetAimVector()*self:GetHitRange());
@@ -67,8 +71,12 @@ If a door is hit, opens the door.
 Otherwise just does the same thing as any other melee weapon.
 ]]--
 function ITEM:OnHit(vShootPos,vAim,traceRes,bIndirectHit)
-	if self:OpenDoor(traceRes.Entity) then return true end
-	return self:InheritedEvent("OnHit","base_melee",false,vShootPos,vAim,traceRes,bIndirectHit);
+	if self:OpenDoor(traceRes.Entity) then
+		self:Event("HitAnim",nil,vShootPos,vAim,traceRes,bIndirectHit);
+		self:Event("HitSound",nil,vShootPos,vAim,traceRes,bIndirectHit);
+		return true;
+	end
+	return self:BaseEvent("OnHit",false,vShootPos,vAim,traceRes,bIndirectHit);
 end
 
 --[[

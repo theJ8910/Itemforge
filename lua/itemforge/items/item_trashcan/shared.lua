@@ -34,7 +34,7 @@ if SERVER then
 ITEM.ThinkRate=30;
 
 function ITEM:OnInit()
-	if !self["base_container"].OnInit(self) then return false end
+	if !self:BaseEvent("OnInit",false) then return false end
 	self:StartThink();
 end
 

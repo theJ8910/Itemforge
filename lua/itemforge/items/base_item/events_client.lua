@@ -243,9 +243,8 @@ end
 While an inventory is opened, this item can be dragged somewhere on screen.
 If this item is drag-dropped to an empty slot in an inventory this function runs.
 ]]--
-function ITEM:OnDragDropToInventory(inv,invSlot)
-	if !self:Event("CanPlayerInteract",false,LocalPlayer()) then return false end
-	self:SendNWCommand("PlayerSendToInventory",inv,invSlot);
+function ITEM:OnDragDropToInventory(inv,iSlot)
+	self:PlayerSendToInventory(LocalPlayer(),inv,iSlot);
 end
 
 --[[

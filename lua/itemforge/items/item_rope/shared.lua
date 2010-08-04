@@ -77,13 +77,14 @@ end
 * SHARED
 * Event
 
-Returns a dynamic description of the item. In addition to it's normal description, we also return
+Returns a dynamic description of the item. In addition to it's normal description,
+we also return how long it is.
 ]]--
 function ITEM:GetDescription()
 	--Length of rope in meters
-	local len=math.floor(self:GetAmount()*2.54)*0.01;
-	if len >= 1 then	return self.Description.."It is "..len.." meter"..((len>1 && "s") || "").." long.";
-	else				return self.Description.."It is "..(len*100).." centimeters long."
+	local len=math.floor(IF.Util:InchesToCM(self:GetAmount()))*0.01;
+	if len >= 1 then	return self.Description.."It is "..len..IF.Util:Pluralize(" meter",len).." long.";
+	else				return self.Description.."It is "..(len*100)..IF.Util:Pluralize(" centimeter",len).." long."
 	end
 end
 
@@ -160,7 +161,7 @@ end
 --[[
 * SERVER
 
-Sets the rope diameter, and it's size and weight since they depend upon these quantities.
+Sets the rope diameter, and it's size and weight per unit length since they depend upon these quantities.
 Weight is rounded to the nearest gram, and size is rounded to the nearest inch.
 ]]--
 function ITEM:SetWidth(fDiameter)

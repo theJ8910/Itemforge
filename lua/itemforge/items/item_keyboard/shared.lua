@@ -117,7 +117,7 @@ end
 
 --Called when a model associated with this item needs to be drawn
 function ITEM:OnDraw3D(eEntity,bTranslucent)
-	self["base_item"].OnDraw3D(self,eEntity,bTranslucent);
+	self:BaseEvent("OnDraw3D",nil,eEntity,bTranslucent);
 	self:DrawLight(eEntity);
 end
 

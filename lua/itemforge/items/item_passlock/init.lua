@@ -30,9 +30,9 @@ function ITEM:OnUse(pl)
 		if self.Password=="" then
 			self:SetPassword(pl);
 		elseif self:IsAttachmentLocked() then
-			self:RequestPassword(pl,"Enter password to unlock:",self.UnlockAttachment);
+			self:RequestPassword(pl,"Enter password to unlock:",function(self,pl,string) self:Event("UnlockAttachment",false,pl,string) end);
 		else
-			self:RequestPassword(pl,"Enter password to lock:",self.LockAttachment);
+			self:RequestPassword(pl,"Enter password to lock:",function(self,pl,string) self:Event("LockAttachment",false,pl,string) end);
 		end
 	elseif self:InWorld() then	self:WorldAttach();
 	else						self:EmitSound(self.DenySound);
@@ -68,10 +68,10 @@ end
 Unlocks the attached entity if the password given matches this password.
 ]]--
 function ITEM:LockAttachment(pl,password)
-	if !pl then return self["base_lock"].LockAttachment(self); end
+	if !pl then return self:BaseEvent("LockAttachment",false); end
 	
 	if password==self.Password then
-		self["base_lock"].LockAttachment(self);
+		self:BaseEvent("LockAttachment");
 		self:PasswordSuccess();
 		return true;
 	else
@@ -84,10 +84,10 @@ end
 Unlocks the attached entity if the password given matches this password.
 ]]--
 function ITEM:UnlockAttachment(pl,password)
-	if !pl then return self["base_lock"].UnlockAttachment(self); end
+	if !pl then return self:BaseEvent("UnlockAttachment",false); end
 	
 	if password==self.Password then
-		self["base_lock"].UnlockAttachment(self);
+		self:BaseEvent("UnlockAttachment");
 		self:PasswordSuccess();
 		return true;
 	else

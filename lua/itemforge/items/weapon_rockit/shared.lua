@@ -5,6 +5,8 @@ SHARED
 A gun that fires random crap from it's inventory.
 ]]--
 
+include("inv_rockit.lua");
+
 ITEM.Name="Rock-It Launcher";
 ITEM.Description="An odd device that propels ordinary objects at deadly speed.\nThe words \"Vault Dweller\" are etched into the stock. You're not sure who that is.";
 ITEM.Base="base_ranged";
@@ -47,13 +49,14 @@ ITEM.MuzzleName="core";			--The gravity gun model has "core" instead of "muzzle"
 --Rock-It Launcher
 ITEM.UnloadSound=Sound("weapons/physcannon/superphys_hold_loop.wav");
 
-
 --[[
-When a player is holding it and tries to primary attack
+* SHARED
+
+Runs when fired; tries to chuck an item in the rock-it-launcher
 ]]--
 function ITEM:OnSWEPPrimaryAttack()
 	--This does all the base ranged stuff - determine if we can fire, do cooldown, consume ammo, play sounds, etc
-	if !self["base_ranged"].OnSWEPPrimaryAttack(self) then return false end
+	if !self:BaseEvent("OnSWEPPrimaryAttack",false) then return false end
 	
 	self:Chuck(2000);
 	
@@ -61,12 +64,19 @@ function ITEM:OnSWEPPrimaryAttack()
 end
 
 --[[
+* SHARED
+
 TODO rightclick loads
 ]]--
 function ITEM:OnSWEPSecondaryAttack()
 	return false;
 end
 
+--[[
+* SHARED
+
+Loads nearby ammo when you reload the Rock-It-Launcher
+]]--
 function ITEM:OnSWEPReload()
 	if !self:CanReload() then return false end
 
@@ -76,6 +86,8 @@ function ITEM:OnSWEPReload()
 end
 
 --[[
+* SHARED
+
 Overridden from base_ranged.
 When this function is called we load items into the gun's inventory instead of the clip.
 ]]--
@@ -105,7 +117,11 @@ function ITEM:Load(item,clip,amt,bPredicted)
 	return true;
 end
 
---Returns the gun's inventory.
+--[[
+* SHARED
+
+Returns the gun's inventory.
+]]--
 function ITEM:GetInventory()
 	if self.Inventory && !self.Inventory:IsValid() then
 		self.Inventory=nil;
@@ -114,6 +130,8 @@ function ITEM:GetInventory()
 end
 
 --[[
+* SHARED
+
 Override so we look in the inventory instead of clips
 ]]--
 function ITEM:GetAmmo(clip)
@@ -124,6 +142,17 @@ function ITEM:GetAmmo(clip)
 end
 
 --[[
+* SHARED
+
+Overridden from base_ranged since we don't use clips. Just returns true if there is ammo.
+]]--
+function ITEM:TakeAmmo(amt,clip)
+	return self:GetAmmo(clip)!=nil;
+end
+
+--[[
+* SHARED
+
 Chucks an item in the inventory at the given speed.
 Clientside, this function does nothing; items have to be sent to world on the server.
 If something is killed by the flying object...
@@ -213,6 +242,11 @@ local fFunnelWideRadius=3000;
 local fA=math.pow(fFunnelWideRadius-fInnerRadius,fFunnelLengthInv);
 local BoxBounds=Vector(fFunnelWideRadius,fFunnelWideRadius,fFunnelWideRadius)
 
+--[[
+* SHARED
+
+Applies a suction force to the area in a cone in front of the Rock-It-Launcher
+]]--
 function ITEM:Suction(vOrigin,vDir)
 	--[[
 	--We'll start by eliminating any entities that definitely aren't in the funnel by detecting entities in a box around the funnel

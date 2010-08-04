@@ -69,9 +69,9 @@ end
 * Event
 Play a fleshy hit sound if we chopped into flesh, or the standard sound if we didn't
 ]]--
-function ITEM:HitSound(traceRes)
+function ITEM:HitSound(vShootPos,vAim,traceRes,bIndirectHit)
 	if self.FleshyMatTypes[traceRes.MatType] == true then
 		return self:EmitSound(self.FleshyImpactSounds,true);
 	end
-	return self:InheritedEvent("HitSound","base_melee",false,traceRes);
+	return self:BaseEvent("HitSound",false,traceRes);
 end
