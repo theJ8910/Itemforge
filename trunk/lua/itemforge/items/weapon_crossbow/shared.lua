@@ -50,7 +50,7 @@ ITEM.ReloadSounds={
 }
 
 function ITEM:OnSWEPPrimaryAttack()
-	if !self["base_ranged"].OnSWEPPrimaryAttack(self) then return false end
+	if !self:BaseEvent("OnSWEPPrimaryAttack",false) then return false end
 	
 end
 

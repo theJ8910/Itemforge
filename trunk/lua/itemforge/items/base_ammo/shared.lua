@@ -35,7 +35,7 @@ function ITEM:OnUse(pl)
 	end
 	
 	--We couldn't load whatever the player was carrying, so just do the default OnUse
-	return self["base_item"].OnUse(self,pl);
+	return self:BaseEvent("OnUse",false,pl);
 end
 
 if CLIENT then
@@ -47,7 +47,7 @@ if CLIENT then
 If the player has a base_ranged weapon out, we'll give him the option to load his weapon with this ammo
 ]]--
 function ITEM:OnPopulateMenu(pMenu)
-	self["base_item"].OnPopulateMenu(self,pMenu);
+	self:BaseEvent("OnPopulateMenu",nil,pMenu);
 	
 	--TODO more than one clip
 	local wep=LocalPlayer():GetActiveWeapon();

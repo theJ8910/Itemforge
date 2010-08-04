@@ -53,7 +53,7 @@ When a player is holding it and tries to secondary attack
 ]]--
 function ITEM:OnSWEPSecondaryAttack()
 	--This does all the base ranged stuff - determine if we can fire, do cooldown, consume ammo, play sounds/animations, etc
-	if !self["base_firearm"].OnSWEPSecondaryAttack(self) then return false end
+	if !self:BaseEvent("OnSWEPSecondaryAttack",self) then return false end
 	
 	self:FireGrenade(1000);
 	return true;

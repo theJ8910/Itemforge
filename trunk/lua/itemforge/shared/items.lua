@@ -19,12 +19,14 @@ BUG  Sometimes players see bullets fired from other players... wierd!
 BUG  Debug module is reporting message -114 is undefined for some clients
 BUG  Okay, WTF? The pumpkin was both inside and outside of an inventory at the same time...
 BUG  Hitting ammo results in serverside bugs
-BUG  The melee weapons' bullet effects are still giving me shit, maybe I need to direct the bullets or something.
+BUG  when item model changes it doesn't update on the "hold" icon.
 
 theJ89's Giant TODO list
 This is why the system hasn't been released yet:
 
-TODO Cache results for faster lookups
+TODO Wire-neutral interface for third-party "wiremods"
+TODO Megadeath409 wants reloading of items serverside/clientside
+TODO When I get around to the networking update I need to use the Base64 code to encode binary to improve the client -> server networking.
 TODO Ebayle's suggestion of numbering dynamically generated weapons (hash code?).
 TODO You can dragdrop stuff to/from another player's inventory... fix this
 TODO code maintainence... make sure that multi-line comments are used for function descriptions, check arguments, do cleanup code (for items listed in an inventory for example), for collections check to see if something being inserted still exists, check events to make sure they are all being pcalled, consider putting base item's events into their own lua file.
@@ -41,6 +43,7 @@ TODO base_ranged needs to have "Load" renamed to "FillClip"; StartReload needs t
 
 Item Ideas
 TODO Wearable gear as suggested by Mr. Bix
+TODO Flare gun as suggested by Mr. Bix
 
 Events related
 TODO consider rewriting events so "true" overrides and false/nil doesn't (garry does this already so lazy/ignorant coders don't accidentilly break something and spend hours trying to find what went wrong)
@@ -54,7 +57,6 @@ TODO OnLeftClick/OnRightClick event for world entity & item icon??
 TODO If OnInit returns false, remove the item
 
 UI related
-TODO when item model changes it doesn't update on the "hold" icon.
 TODO The UI needs to be able to mouse-capture entities as intended
 TODO If drags are enabled on any slots in ItemforgeInventorySlots they stay on even if an item is no longer occupying the slot.
 TODO Need to come up with good looking Item Card
@@ -93,13 +95,19 @@ MODULE.ExtensionsDirectory="extend"							--What folder are extensions for item 
 MODULE.BaseEntityClassName="itemforge_item";				--What is the classname of the base entity that Itemforge uses? This is the entity that allows an item to exist in the world. 
 MODULE.BaseWeaponClassName="itemforge_item_held";			--What is the classname of the base SWEP that Itemforge SWEPs are based off of? This is the SWEP that allows us to hold items.
 
-if CLIENT then
+if SERVER then
 
 
-MODULE.FullUpInProgress=false;								--If this is true a full update is being recieved from the server
-MODULE.FullUpTarget=0;										--Whenever a full update starts, this is how many items need to be sent from the server.
-MODULE.FullUpCount=0;										--Every time an item is created while a full update is being recieved, this number is increased by 1.
-MODULE.FullUpItemsUpdated={};								--Every time an item is created while a full update is being recieved, FullUpItemsUpdated[Item ID] is set to true.
+MODULE.TaskQueue = nil;										--A task queue for sending files
+
+
+else
+
+
+MODULE.FullUpInProgress = false;							--If this is true a full update is being recieved from the server
+MODULE.FullUpTarget = 0;									--Whenever a full update starts, this is how many items need to be sent from the server.
+MODULE.FullUpCount = 0;										--Every time an item is created while a full update is being recieved, this number is increased by 1.
+MODULE.FullUpItemsUpdated = {};								--Every time an item is created while a full update is being recieved, FullUpItemsUpdated[Item ID] is set to true.
 															--Whenever the full update finishes, we'll check to make sure all clientside items have been updated.
 															--Any non-updated items are assumed to be removed on the server (since no update was recieved), and will be removed clientside.
 end
@@ -117,17 +125,35 @@ local ProtectedKeys={};										--This is a table of protected keys in the base
 local AllowProtect=false;									--If this is true, we can protect keys (in other words, we're loading the base item-type while this is true)
 
 --Lookup table for CreateNWVar. Used to convert a datatype string to a datatype ID.
-local DatatypeStrToID = {
+local NWVDatatypeStrToID = {
 	["int"]=1, ["integer"]=1, ["long"]=1, ["char"]=1, ["short"]=1, ["uchar"]=1, ["uint"]=1, ["uinteger"]=1, ["ulong"]=1, ["ushort"]=1,
 	["float"]=2,
 	["bool"]=3, ["boolean"]=3,
 	["str"]=4, ["string"]=4,
-	["ent"]=5, ["entity"]=5,
-	["pl"]=5, ["ply"]=5, ["player"]=5, ["vec"]=6, ["vector"]=6,
+	["ent"]=5, ["entity"]=5, ["pl"]=5, ["ply"]=5, ["player"]=5,
+	["vec"]=6, ["vector"]=6,
 	["ang"]=7, ["angle"]=7,
 	["item"]=8,
 	["inventory"]=9, ["inv"]=9,
 	["color"]=10,
+};
+
+--Lookup table for CreateNWCommand. Used to convert a datatype string to a datatype ID.
+local NWCDatatypeStrToID = {
+	["int"]=1, ["integer"]=1, ["long"]=1,
+	["char"]=2,
+	["short"]=3, 
+	["float"]=4,
+	["bool"]=5, ["boolean"]=5,
+	["str"]=6, ["string"]=6,
+	["ent"]=7, ["entity"]=7, ["pl"]=7, ["ply"]=7, ["player"]=7,
+	["vec"]=8, ["vector"]=8,
+	["ang"]=9, ["angle"]=9,
+	["item"]=10,
+	["inventory"]=11, ["inv"]=11,
+	["uchar"]=12,
+	["uint"]=13, ["uinteger"]=13, ["ulong"]=13,
+	["ushort"]=14,
 };
 
 --Itemforge Item (IFI) Message (-128 to 127. Uses char in usermessage).
@@ -160,6 +186,7 @@ IFI_MSG_CREATEININV		=	-103;	--(Server > Client) Macro; Create item in inventory
 IFI_MSG_MERGE			=	-102;	--(Server > Client) Macro; Merge two items (change amount of an item and remove another, saves bandwidth)
 IFI_MSG_PARTIALMERGE	=	-101;	--(Server > Client) Macro; Merge two items partially (change amount of two items, saves bandwidth)
 IFI_MSG_SPLIT			=	-100;	--(Server > Client) Macro; Split an item (saves bandwidth)
+IFI_MSG_RELOAD			=	-99;	--(Server > Client) Server tells client to reload an itemtype
 
 --[[
 * SHARED
@@ -173,6 +200,10 @@ local function DoesLuaFileExist(LuaPath)
 	else
 		return file.Exists("../lua_temp/"..LuaPath) or file.Exists("../lua/"..LuaPath);
 	end
+end
+
+local function DoesLuaFileExistCached(LuaPath)
+	return IF.Util:FileIsCached("lua/"..LuaPath);
 end
 
 --[[
@@ -220,11 +251,6 @@ function MODULE:Cleanup()
 	end
 	
 	self:StopTick();
-	
-	ItemTypes=nil;
-	ItemRefs=nil;
-	ItemsByType=nil;
-	ProtectedKeys=nil;
 end
 
 --[[
@@ -234,192 +260,298 @@ Load itemtypes.
 This loads the items' scripts and can be used to refresh a changed item.
 ]]--
 function MODULE:LoadItemTypes()
-	if ItemTypes then ItemTypes={}; end				--Clear this table in case it has been loaded before (in the case we're refreshing it).
+	if ItemTypes then ItemTypes={}; end
 	
 	--List of all items in the items directory
 	local itemFolders=file.FindInLua(self.ItemsDirectory.."*");		--itemforge/items/*
 	
-	--Take a look at each folder, load init.lua, cl_init.lua, or shared.lua.
+	--Each folder is considered an item type. We'll try to load each one.
 	for k,v in pairs(itemFolders) do
-		
-		local path=self.ItemsDirectory..v;							--itemforge/items/base_item
-		if v!=".svn" && v!=".." && v!="." && IsLuaFolder(path) then
-			if string.lower(v)==BaseType then AllowProtect=true end
-			
-			--Create a temporary ITEM table at global
-			ITEM={};
-			
-			
-			
-			
-			--[[
-			Lets load an item type! (loads init if on the server, or cl_init if on the client.
-			If either init or cl_init is missing, shared will be loaded if shared exists.
-			If shared doesn't exist, nothing will be loaded.)
-			AddCSLuaFile must be done manually. I try to make item scripts resemble entity/swep/effect scripts as much as possible.
-			]]--
-			if SERVER then
-				
-				if DoesLuaFileExist(path.."/init.lua")	then
-					local s,r=pcall(include,path.."/init.lua");
-					if !s then ErrorNoHalt(r.."\n") end
-				elseif DoesLuaFileExist(path.."/shared.lua") then
-					local s,r=pcall(include,path.."/shared.lua");
-					if !s then ErrorNoHalt(r.."\n") end
-				end
-				
-			else
-				
-				if DoesLuaFileExist(path.."/cl_init.lua") then
-					local s,r=pcall(include,path.."/cl_init.lua");
-					if !s then ErrorNoHalt(r.."\n") end
-				elseif DoesLuaFileExist(path.."/shared.lua") then
-					local s,r=pcall(include,path.."/shared.lua");
-					if !s then ErrorNoHalt(r.."\n") end
-				end
-				
-			end
-			
-			
-			--Load extensions to this item if available (in the case that a scripter wants to add onto an existing item-type for his own purposes - such as adding "temperature" to the base item-type to give all items a temperature rating).
-			local extfolder=path.."/"..self.ExtensionsDirectory;		--itemforge/items/base_item/extend
-			if IsLuaFolder(extfolder) then
-				--List of all extensions in this item's extension folder
-				local extensionFolders=file.FindInLua(extfolder.."/*");	--itemforge/items/item/extend/*
-				
-				--We sort these because they need to load in the same order serverside and clientside
-				table.sort(extensionFolders);
-				
-				for i=1,table.getn(extensionFolders) do
-					local v=extensionFolders[i];
-					local extpath=extfolder..v;							--itemforge/items/item/extend/temperature
-					if v!=".svn" && v!=".." && v!="." && IsLuaFolder(extpath) then
-						--Load init serverside, cl_init clientside. In the abscence of either, load shared in it's place if it exists.
-						if SERVER then
-							
-							if DoesLuaFileExist(extpath.."/init.lua")	then
-								local s,r=pcall(include,extpath.."/init.lua");
-								if !s then ErrorNoHalt(r.."\n") end
-							elseif DoesLuaFileExist(extpath.."/shared.lua") then
-								local s,r=pcall(include,extpath.."/shared.lua");
-								if !s then ErrorNoHalt(r.."\n") end
-							end
-							
-						else
-							
-							if DoesLuaFileExist(extpath.."/cl_init.lua") then
-								local s,r=pcall(include,extpath.."/cl_init.lua");
-								if !s then ErrorNoHalt(r.."\n") end
-							elseif DoesLuaFileExist(extpath.."/shared.lua") then
-								local s,r=pcall(include,extpath.."/shared.lua");
-								if !s then ErrorNoHalt(r.."\n") end
-							end
-							
-						end
-					end
-				end
-			end
-			
-			
-			local type=string.lower(v);
-			
-			--If a base was not given, the base is set to the base item-type. Additionally we fix up any other missing data here.
-			if ITEM.Base==nil				then	ITEM.Base=BaseType end
-			
-			if ITEM.NWVarsByName==nil		then	ITEM.NWVarsByName={} end
-			if ITEM.NWVarsByID==nil			then	ITEM.NWVarsByID={} end
-			if ITEM.NWCommandsByName==nil	then	ITEM.NWCommandsByName={} end
-			if ITEM.NWCommandsByID==nil		then	ITEM.NWCommandsByID={} end
-			
-			--Register class; The type is set to the name of the folder.
-			local tClass=IF.Base:RegisterClass(ITEM,type);
-			if tClass != nil then
-				--Store the item type just loaded
-				ItemTypes[type]=tClass;
-				
-				--Create an Items by Type table to store any items spawned of this type
-				if ItemsByType[type]==nil then ItemsByType[type]={}; end
-				
-				--Pool this string (increases network efficiency by substituting a smaller placeholder for this string when networked)
-				if SERVER then umsg.PoolString(type); end
-			end
-			
-			ITEM=nil;								--Get rid of the temporary ITEM table
-			AllowProtect=false;
-		end
+		self:LoadItemType(v);
 	end
+end
+
+local OldInclude=include;
+
+--[[
+* SHARED
+
+Includes a file, generates an error and returns false if it can't be
+opened and executed successfully.
+
+Returns true otherwise.
+]]--
+local function PCallInclude(strFilepath)
+	--TODO use file.Read and CompileString when addon/ bug in file.Read is fixed 
+	local s,r=pcall(OldInclude,strFilepath);
+	if !s then ErrorNoHalt("Itemforge Items: Couldn't include file \""..strFilepath.."\": "..r.."\n"); return false end
+	return true;
 end
 
 --[[
 * SHARED
 
-Set network command and network var ID numbers...
-We take hierarchy into consideration with this function.
-For example, if Item A has NWVars "VarString" and "VarInt",
-and,            Item B has NWVars "VarString" and "VarFloat",
-Item A will assign an ID of 1 to VarString and an ID to 2 to VarInt.
-Item B will assign an ID of 1 to VarString and an ID of 2 to VarFloat.
-BUT...
-If Item B inherits from Item A, that means Item B now has "VarString", "VarInt" (from A) and "VarString", "VarFloat" (from B)
-Or in other words, we have network vars with IDs 1, 2, 1, and 2. So, how do we deal with this now? The IDs have to be unique!
-This is what this function is created for. It assigns unique IDs to networked vars and commands.
-Now, since Item B inherits from A, Item B will get everything that A has, BUT if B already has something A has, B overrides A.
-First we go through B... we assign a 1 to VarString and a 2 to VarFloat.
-Next we go through B's base... we already have a VarString, so we don't need to give another ID for that.
-We assign a 3 to VarInt.
+Includes a file from the file cache.
 
-Voila! Problem solved!
+Generates an error and returns false if it can't be opened and
+executed successfully.
+
+Returns true otherwise.
 ]]--
-function MODULE:SetItemTypeNWVarAndCommandIDs()
-	for k,v in pairs(ItemTypes) do
-		local NWVarNames={};
-		local NWCommandNames={};
-		
-		local NWVarIDs={};
-		local NWCommandIDs={};
-		
-		local b=v;
+local		   PCallIncludeFileCachePath="";
+local function PCallIncludeFileCache(strFilepath)
+	local OldDir=PCallIncludeFileCachePath;
+	strFilepath = OldDir..strFilepath;
+	PCallIncludeFileCachePath = string.GetPathFromFilename(strFilepath);
+	
+	local bSuccess=true;
+	
+	local LuaPath="lua/"..strFilepath;
+	local strContents = IF.Util:FileCacheGet(LuaPath);
+	if strContents then
+		local s,r=pcall(CompileString,strContents,LuaPath);
+		if s then
+			local s,r=pcall(r);
+			if !s then
+				ErrorNoHalt("Itemforge Items: Error executing included file \""..LuaPath.."\": "..r.."\n");
+				bSuccess=false
+			end
+		else
+			ErrorNoHalt("Itemforge Items: Couldn't include file \""..LuaPath.."\": "..r.."\n");
+			bSuccess=false;
+		end
+	else
+		ErrorNoHalt("Itemforge Items: Couldn't include file \""..LuaPath.."\", file could not be found in file cache.\n");
+		bSuccess=false;
+	end
+	
+	PCallIncludeFileCachePath = OldDir;
+	return bSuccess;
+end
 
-		while b!=nil do
-			if b.NWVarsByID then
-				for i=1,table.getn(b.NWVarsByID) do
-					--If our itemtype doesn't have a var by this name yet then make a copy of it
-					if NWVarNames[b.NWVarsByID[i].Name]==nil then
-						local NWVarCopy={};
-						NWVarCopy.Name=b.NWVarsByID[i].Name;
-						NWVarCopy.Default=b.NWVarsByID[i].Default;
-						NWVarCopy.Predicted=b.NWVarsByID[i].Predicted;
-						NWVarCopy.HoldFromUpdate=b.NWVarsByID[i].HoldFromUpdate;
-						NWVarCopy.Save=b.NWVarsByID[i].Save;
-						NWVarCopy.Type=b.NWVarsByID[i].Type;
-						NWVarCopy.ID=table.insert(NWVarIDs,NWVarCopy);
-						NWVarNames[NWVarCopy.Name]=NWVarCopy;
-					end
-				end
-			end
-			
-			if b.NWCommandsByID then
-				for i=1,table.getn(b.NWCommandsByID) do
-					--If our itemtype doesn't have a command by this name yet then make a copy of it
-					if NWCommandNames[b.NWCommandsByID[i].Name]==nil then
-						local NWCommandCopy={};
-						NWCommandCopy.Name=b.NWCommandsByID[i].Name;
-						NWCommandCopy.Hook=b.NWCommandsByID[i].Hook;
-						NWCommandCopy.Datatypes=b.NWCommandsByID[i].Datatypes;
-						NWCommandCopy.ID=table.insert(NWCommandIDs,NWCommandCopy);
-						NWCommandNames[NWCommandCopy.Name]=NWCommandCopy;
-					end
-				end
-			end
-			
-			b=b.BaseClass;
+--[[
+* SHARED
+
+Loads and registers the requested itemtype.
+
+strType is the name of the itemtype to load.
+bDynamic is an optional true/false that's used in reloading changed itemtypes.
+	It's use varies on server/client:
+	On the server, if bDynamic is:
+		false or not given, the file is just loaded on the server.
+		true, then in addition we send the clientside files to the client then tell
+			the client to reload.
+	On the client, if bDynamic is:
+		false or not given, then we load the file normally
+			(from the lua cache he downloaded when he joined the server).
+		true, then we load it from the sendfile cache.
+			(stuff the server sent us after we joined)
+]]--
+function MODULE:LoadItemType(strType,bDynamic)
+	if !IF.Util:IsString(strType) then ErrorNoHalt("Itemforge Items: Couldn't load item type, type to load wasn't given / wasn't a string.\n"); return false end
+	strType=string.lower(strType);
+	if IF.Util:IsBadFolder(strType) then return false end
+	
+	local path;
+	path=self.ItemsDirectory..strType;						--itemforge/items/base_item
+	
+	include = PCallInclude;
+	
+	local Exists = DoesLuaFileExist;
+	local tIncludeList;
+	
+	--If we use the dynamic approach we expect the file to be in the file cache.
+	if bDynamic then
+		if CLIENT then
+			include = PCallIncludeFileCache;
+			Exists = DoesLuaFileExistCached;
+		else
+			tIncludeList={};
+		end
+	else
+		if !IsLuaFolder(path) then ErrorNoHalt("Itemforge Items: Couldn't load item type \""..strType.."\", itemtype couldn't be located in lua/ folder."); return false end
+		
+	end
+	
+	if strType==BaseType then AllowProtect=true end
+	
+	--Create a temporary ITEM table at global
+	ITEM={};
+	
+	--[[
+	Lets load an item type! (loads init if on the server, or cl_init if on the client.
+	If either init or cl_init is missing, shared will be loaded if shared exists.
+	If shared doesn't exist, nothing will be loaded.)
+	AddCSLuaFile must be done manually. I try to make item scripts resemble entity/swep/effect scripts as much as possible.
+	]]--
+	local ServerPath=path.."/init.lua";
+	local SharedPath=path.."/shared.lua";
+	local ClientPath=path.."/cl_init.lua";
+	if SERVER then
+		
+		if Exists(ServerPath)	then
+			include(ServerPath);
+		elseif Exists(SharedPath) then
+			include(SharedPath);
 		end
 		
-		rawset(v,"NWVarsByName",NWVarNames);
-		rawset(v,"NWCommandsByName",NWCommandNames);
-		rawset(v,"NWVarsByID",NWVarIDs);
-		rawset(v,"NWCommandsByID",NWCommandIDs);
+		if bDynamic then
+			if Exists(ClientPath) then
+				IF.Util:BuildIncludeList("lua/"..ClientPath,tIncludeList);
+			elseif Exists(SharedPath) then
+				IF.Util:BuildIncludeList("lua/"..SharedPath,tIncludeList);
+			end
+		end
+		
+	else
+		
+		if Exists(ClientPath) then
+			include(ClientPath);
+		elseif Exists(SharedPath) then
+			include(SharedPath);
+		end
+		
 	end
+	
+	--Load extensions to this item if available (in the case that a scripter wants to add onto an existing item-type for his own purposes - such as adding "temperature" to the base item-type to give all items a temperature rating).
+	--TODO reload support for extensions
+	local extfolder=path.."/"..self.ExtensionsDirectory;		--itemforge/items/base_item/extend
+	if !bDynamic && IsLuaFolder(extfolder) then
+		--List of all extensions in this item's extension folder
+		local extensionFolders=file.FindInLua(extfolder.."/*");	--itemforge/items/item/extend/*
+		
+		--We sort these because they need to load in the same order serverside and clientside
+		table.sort(extensionFolders);
+		
+		for i=1,#extensionFolders do
+			local v=extensionFolders[i];
+			if !IF.Util:IsBadFolder(v) then
+				--Load init serverside, cl_init clientside. In the abscence of either, load shared in it's place if it exists.
+				local extpath=extfolder..v;							--itemforge/items/item/extend/temperature
+				local ServerPath=extpath.."/init.lua";
+				local SharedPath=extpath.."/shared.lua";
+				local ClientPath=extpath.."/cl_init.lua";
+				if SERVER then
+					
+					if Exists(ServerPath)	then
+						include(ServerPath);
+					elseif Exists(SharedPath) then
+						include(SharedPath);
+					end
+					
+				else
+					
+					if Exists(ClientPath) then
+						include(ClientPath);
+					elseif DoesLuaFileExist(SharedPath) then
+						include(SharedPath);
+					end
+					
+				end
+			end
+		end
+	end
+	
+	include = OldInclude;
+	
+	--If a base was not given, the base is set to the base item-type.
+	--Additionally we fix up any other missing data here.
+	if ITEM.Base==nil				then	ITEM.Base=BaseType end
+	
+	if ITEM.NWVarsByName==nil		then	ITEM.NWVarsByName={} end
+	if ITEM.NWVarsByID==nil			then	ITEM.NWVarsByID={} end
+	if ITEM.NWCommandsByName==nil	then	ITEM.NWCommandsByName={} end
+	if ITEM.NWCommandsByID==nil		then	ITEM.NWCommandsByID={} end
+	
+	--Register class; The type is set to the name of the folder.
+	local tClass=IF.Base:RegisterClass(ITEM,strType);
+	
+	ITEM=nil;								--Get rid of the temporary ITEM table
+	AllowProtect=false;
+	
+	if SERVER && bDynamic then
+		self:StartTaskQueue();
+		for i=1,#tIncludeList do
+			self.TaskQueue:Add(function()
+				if IF.Util:FileSendStart(tIncludeList[i],pl) then return true end
+				return IF.Util:FileSendTick();
+			end);
+		end
+		
+		self.TaskQueue:Add(function() self:ReloadItemType(strType); return false end);
+	end
+	
+	return true;
+end
+
+--[[
+* SHARED
+
+After a class has been inherited we register it as an item type,
+create a collection of Items By Type, register an SWEP for it,
+and create a network var / network command table for it.
+]]--
+function MODULE:ClassInherited(strType,tClass)
+	--Store the item type just loaded
+	ItemTypes[strType]=tClass;
+	
+	--Create an Items by Type table to store any items spawned of this type
+	if ItemsByType[strType]==nil then ItemsByType[strType]={}; end
+	
+	--Pool this string (increases network efficiency by substituting a smaller placeholder for this string when networked)
+	if SERVER then umsg.PoolString(strType); end
+	
+	--Register the SWEP this type of item uses.
+	--I'd rather make all the items use one weapon but can't because of the goddamn viewmodel animations!!
+	self:RegisterSWEP(tClass);
+	
+	local NWVarNames={};
+	local NWCommandNames={};
+	
+	local NWVarIDs={};
+	local NWCommandIDs={};
+	
+	local b=tClass;
+
+	while b!=nil do
+		if b.NWVarsByID then
+			for i=1,table.getn(b.NWVarsByID) do
+				--If our itemtype doesn't have a var by this name yet then make a copy of it
+				if NWVarNames[b.NWVarsByID[i].Name]==nil then
+					local NWVarCopy={};
+					NWVarCopy.Name=b.NWVarsByID[i].Name;
+					NWVarCopy.Default=b.NWVarsByID[i].Default;
+					NWVarCopy.Predicted=b.NWVarsByID[i].Predicted;
+					NWVarCopy.HoldFromUpdate=b.NWVarsByID[i].HoldFromUpdate;
+					NWVarCopy.Save=b.NWVarsByID[i].Save;
+					NWVarCopy.Type=b.NWVarsByID[i].Type;
+					NWVarCopy.ID=table.insert(NWVarIDs,NWVarCopy);
+					NWVarNames[NWVarCopy.Name]=NWVarCopy;
+				end
+			end
+		end
+		
+		if b.NWCommandsByID then
+			for i=1,table.getn(b.NWCommandsByID) do
+				--If our itemtype doesn't have a command by this name yet then make a copy of it
+				if NWCommandNames[b.NWCommandsByID[i].Name]==nil then
+					local NWCommandCopy={};
+					NWCommandCopy.Name=b.NWCommandsByID[i].Name;
+					NWCommandCopy.Hook=b.NWCommandsByID[i].Hook;
+					NWCommandCopy.Datatypes=b.NWCommandsByID[i].Datatypes;
+					NWCommandCopy.ID=table.insert(NWCommandIDs,NWCommandCopy);
+					NWCommandNames[NWCommandCopy.Name]=NWCommandCopy;
+				end
+			end
+		end
+		
+		b=b.BaseClass;
+	end
+	
+	rawset(tClass,"NWVarsByName",NWVarNames);
+	rawset(tClass,"NWCommandsByName",NWCommandNames);
+	rawset(tClass,"NWVarsByID",NWVarIDs);
+	rawset(tClass,"NWCommandsByID",NWCommandIDs);
 end
 
 --[[
@@ -483,15 +615,15 @@ function MODULE:CreateNWVar(itemtype,sName,sDatatype,vDefaultValue,bPredicted,bH
 	NewNWVar.Predicted=bPredicted or false;
 	NewNWVar.HoldFromUpdate=bHoldFromUpdate or false;
 	NewNWVar.Save=bNoSave or false;
-	NewNWVar.Type=DatatypeStrToID[string.lower(sDatatype)];
+	NewNWVar.Type=NWVDatatypeStrToID[string.lower(sDatatype)];
 	if NewNWVar.Type == nil then
 		ErrorNoHalt("Itemforge Items: Bad datatype for NWVar \""..sName.."\". \""..string.lower(sDatatype).."\" is invalid; valid types are:\n");
 		
-		local l=#DatatypeStrToID;
+		local l=#NWVDatatypeStrToID;
 		for i=1,l-1 do
-			ErrorNoHalt(DatatypeStrToID[i]..", ");
+			ErrorNoHalt(NWVDatatypeStrToID[i]..", ");
 		end
-		ErrorNoHalt(" and "..DatatypeStrToID[l]..".\n");
+		ErrorNoHalt(" and "..NWVDatatypeStrToID[l]..".\n");
 		
 		NewNWVar.Type=0;
 	end
@@ -554,39 +686,19 @@ function MODULE:CreateNWCommand(itemtype,sName,fHook,tDatatypes)
 	if type(tDatatypes)=="table" then
 		for i=1,table.maxn(tDatatypes) do
 			local t=string.lower(tDatatypes[i]);
-			
-			if t=="int" || t=="integer" || t=="long" then
-				table.insert(newNWCommand.Datatypes,1);
-			elseif t=="char" then
-				table.insert(newNWCommand.Datatypes,2);
-			elseif t=="short" then
-				table.insert(newNWCommand.Datatypes,3);
-			elseif t=="float" then
-				table.insert(newNWCommand.Datatypes,4);
-			elseif t=="bool" || t=="boolean" then
-				table.insert(newNWCommand.Datatypes,5);
-			elseif t=="str" || t=="string" then
-				table.insert(newNWCommand.Datatypes,6);
-			elseif t=="ent" || t=="entity" || t=="pl" || t=="ply" || t=="player" then
-				table.insert(newNWCommand.Datatypes,7);
-			elseif t=="vec" || t=="vector" then
-				table.insert(newNWCommand.Datatypes,8);
-			elseif t=="ang" || t=="angle" then
-				table.insert(newNWCommand.Datatypes,9);
-			elseif t=="item" then
-				table.insert(newNWCommand.Datatypes,10);
-			elseif t=="inventory" || t=="inv" then
-				table.insert(newNWCommand.Datatypes,11);
-			elseif t=="uchar" then
-				table.insert(newNWCommand.Datatypes,12);
-			elseif t=="ulong" then
-				table.insert(newNWCommand.Datatypes,13);
-			elseif t=="ushort" then
-				table.insert(newNWCommand.Datatypes,14);
-			else
-				ErrorNoHalt("Itemforge Items: CreateNWCommand (\""..sName.."\") given unrecognized datatype "..t.."; valid types are:\n int,integer,long,char,short,float,bool,boolean,str,string,ent,entity,pl,ply,player,vec,vector,ang,angle,item,inv,inventory,uchar,ushort, and ulong\n");
-				table.insert(newNWCommand.Datatypes,0);
+			local id=NWCDatatypeStrToID[t];
+			if id == nil then
+				ErrorNoHalt("Itemforge Items: Bad datatype for NWCommand \""..sName.."\". \""..string.lower(t).."\" is invalid; valid types are:\n");
+				
+				local l=#NWCDatatypeStrToID;
+				for i=1,l-1 do
+					ErrorNoHalt(NWCDatatypeStrToID[i]..", ");
+				end
+				ErrorNoHalt(" and "..NWCDatatypeStrToID[l]..".\n");
+				
+				id=0;
 			end
+			table.insert(newNWCommand.Datatypes,id);
 		end
 	elseif tDatatypes!=nil then
 		ErrorNoHalt("Itemforge Items: CreateNWCommand's (\""..sName.."\") fourth argument, tDatatypes, takes a table, not a "..type(tDatatypes).."!\n");
@@ -607,14 +719,16 @@ Registers a scripted weapon for the given itemtype.
 tItem should be the item-type table.
 ]]--
 function MODULE:RegisterSWEP(tItemClass)
-	if string.len(tItemClass.ClassName) > 30 then ErrorNoHalt("Itemforge Items: Warning! \""..tItemClass.ClassName.."\"'s name is too long to register a SWEP for. Expect errors when trying to hold this item!\n") end
+	local ClassName = tItemClass.ClassName;
+	if string.len(ClassName) > 30 then ErrorNoHalt("Itemforge Items: Warning! \""..ClassName.."\"'s name is too long to register a SWEP for. Expect errors when trying to hold this item!\n") end
+	
 	--Make a copy of the base weapon
 	local copy={
 		Base		=	self.BaseWeaponClassName,
-		ViewModel	=	tItemClass.ViewModel,
+		ViewModel	=	IF.Base:InheritedLookup(tItemClass,"ViewModel"),
 	};
 	
-	local sClass="if_"..tItemClass.ClassName;
+	local sClass="if_"..ClassName;
 	if CLIENT then language.Add(sClass,"Item (held)"); end
 	weapons.Register(copy,sClass,true);
 end
@@ -652,7 +766,7 @@ end
 Starts Itemforge Item's tick
 ]]--
 function MODULE:StartTick()
-	hook.Add("Tick","itemforge_tick", function(...) self:Tick(...) end)
+	hook.Add("Tick","itemforge_items_tick", function(...) self:Tick(...) end)
 end
 
 --[[
@@ -661,8 +775,13 @@ end
 This runs the Tick() function on every active item on the server (Serverside and Clientside)
 ]]--
 function MODULE:Tick()
+	--TODO: Use list of changed items
 	for k,v in pairs(ItemRefs) do
 		v:Tick();
+	end
+	
+	if SERVER && self.FileSendInProgress then
+		self:FileSendTick();
 	end
 end
 
@@ -672,7 +791,7 @@ end
 Stops Itemforge Item's tick
 ]]--
 function MODULE:StopTick()
-	hook.Remove("Tick","itemforge_tick");
+	hook.Remove("Tick","itemforge_items_tick");
 end
 
 --[[
@@ -825,7 +944,8 @@ Creates an item and then places it in the world at the given position and angles
 type is the type of item you want to create.
 vWhere is an optional position you want to create the item at in the world. This defaults to Vector(0,0,0).
 aAngles is an optional Angle() you want to rotate the item to. This defaults to Angle(0,0,0).
-bPredict is an
+bPredict is an optional boolean that, instead of actually creating the item,
+	lets you predict whether or not this will succeed.
 
 If the creation succeeds, the item created is returned. Otherwise, nil is returned.
 ]]--
@@ -1202,8 +1322,59 @@ end
 --Server only
 if SERVER then
 
+--[[
+* SERVER
 
+Tells the client to reload an item type.
+]]--
+function MODULE:ReloadItemType(strType,pl)
+	--Validate player
+	if pl!=nil then
+		if !pl:IsValid() then ErrorNoHalt("Itemforge Items: Couldn't Reload Type - The player to reload \""..strType.."\" to isn't valid!\n"); return false;
+		elseif !pl:IsPlayer() then ErrorNoHalt("Itemforge Items: Couldn't Reload Type - The player to send \""..strType.."\" to isn't a player!\n"); return false;
+		end
+	else
+		local allSuccess=true;
+		for k,v in pairs(player.GetAll()) do
+			if !self:ReloadItemType(strType,v) then allSuccess=false end
+		end
+		return allSuccess;
+	end
+	
+	self:IFIStart(pl,IFI_MSG_RELOAD,0);
+	self:IFIString(strType);
+	self:IFIEnd();
+end
 
+--[[
+* SHARED
+
+Creates a task queue and a Think to process it
+]]--
+function MODULE:StartTaskQueue()
+	self.TaskQueue = IF.Base:CreateObject("TaskQueue");
+	hook.Add("Think","itemforge_taskqueue_think",function(...) self:TaskQueueThink(...) end);
+end
+
+--[[
+* SHARED
+
+Called every frame to process the tasks while there are tasks
+]]--
+function MODULE:TaskQueueThink()
+	self.TaskQueue:Process();
+	if self.TaskQueue:IsEmpty() then self:StopTaskQueue(); end
+end
+
+--[[
+* SHARED
+
+Removes the taskqueue think and deletes the task queue
+]]--
+function MODULE:StopTaskQueue()
+	self.TaskQueue = nil;
+	hook.Remove("Think","itemforge_taskqueue_think");
+end
 
 --[[
 * SERVER
@@ -1504,7 +1675,6 @@ function MODULE:EndFullUpdateAll(pl)
 	return true;
 end
 
-
 --[[
 * SERVER
 
@@ -1744,6 +1914,9 @@ function MODULE:HandleIFIMessages(msg)
 		self:OnStartFullUpdateAll(id);
 	elseif msgType==IFI_MSG_ENDFULLUPALL then
 		self:OnEndFullUpdateAll();
+	elseif msgType==IFI_MSG_RELOAD then
+		local strType=msg:ReadString();
+		self:LoadItemType(strType,true);
 	else
 		ErrorNoHalt("Itemforge Items: Unhandled IFI message \""..msgType.."\"\n");
 	end

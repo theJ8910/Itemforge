@@ -78,7 +78,6 @@ function ITEM:OnPhysicsCollide(entity,CollisionData,HitPhysObj)
 	end
 end
 
---TODO changing to single breaks physics; fix by re-sending or re-initing physics
 function ITEM:OnSetNWVar(sName,vVal)
 	if sName=="Amount" then
 		if vVal >= self.TurnsBoxAt then			self:SetWorldModel(self.WorldModelBox);
@@ -86,7 +85,7 @@ function ITEM:OnSetNWVar(sName,vVal)
 		end
 	end
 	
-	return self["base_ammo"].OnSetNWVar(self,sName,vVal);
+	return self:BaseEvent("OnSetNWVar",nil,sName,vVal);
 end
 
 --[[

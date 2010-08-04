@@ -52,14 +52,14 @@ ITEM.DeploySounds={
 }
 
 function ITEM:OnSWEPDeploy()
-	if !self["base_melee"].OnSWEPDeploy(self) then return false end
+	if !self:BaseEvent("OnSWEPDeploy",false) then return false end
 	self:EmitSound(self.DeploySounds,true);
 	
 	return true;
 end
 
 function ITEM:OnSWEPHolster()
-	if !self["base_melee"].OnSWEPHolster(self) then return false end
+	if !self:BaseEvent("OnSWEPHolster",false) then return false end
 	
 	--This isn't a mistake. The holster sounds are the same as the deploy sounds.
 	self:EmitSound(self.DeploySounds,true);

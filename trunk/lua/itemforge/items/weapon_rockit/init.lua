@@ -7,6 +7,7 @@ A gun that fires random crap from it's inventory.
 
 AddCSLuaFile("shared.lua");
 AddCSLuaFile("cl_init.lua");
+AddCSLuaFile("inv_rockit.lua")
 
 include("shared.lua");
 
@@ -18,18 +19,18 @@ ITEM.EjectFrom=Vector(9.2274,0.3052,5.4279);
 ITEM.Spindown=nil;
 
 --[[
+* SERVER
+* Event
+
 Create an inventory for our gun
 ]]--
 function ITEM:OnInit()
 	--Do everything the base ranged does on init too
-	self["base_ranged"].OnInit(self);
+	self:BaseEvent("OnInit");
 	
 	--Create an inventory or stop here if we couldn't
-	local inv=IF.Inv:Create();
+	local inv=IF.Inv:Create("inv_rockit");
 	if !inv || !inv:IsValid() then return false end
-	
-	--Mark that we want to remove any items in the inventory when this inventory gets removed
-	inv.RemovalAction=IFINV_RMVACT_REMOVEITEMS;
 	
 	--Connect the inventory to this item	 
 	inv:ConnectItem(self);
@@ -38,20 +39,29 @@ function ITEM:OnInit()
 end
 
 --[[
+* SERVER
+* Event
+
 We have an auto-unload feature.
 ]]--
 function ITEM:OnThink()
-	self["base_ranged"].OnThink(self);
+	self:BaseEvent("OnThink");
+	
 	if self:GetNWBool("Unloading") then self:UnloadLoop() end
+	
+	--[[
 	local pl=self:GetWOwner();
 	if pl && pl:GetActiveWeapon()==self:GetWeapon() && pl:KeyDown(IN_RELOAD) then
 		self:Suction(pl:EyePos(),pl:EyeAngles():Forward());
 	end
+	]]--
 end
 
 --[[
+* SERVER
+
 Overridden from base_ranged.
-When this function is called, instead of instantly unloading the item in a clip, we turn on auto-unloading.
+When this function is called, instead of instantly unloading an item, we turn on auto-unloading.
 ]]--
 function ITEM:Unload(clip)
 	if self:GetNWBool("Unloading")==true then return false end
@@ -63,6 +73,8 @@ function ITEM:Unload(clip)
 end
 
 --[[
+* SERVER
+
 This function is called every frame that we are auto-unloading.
 It will unload one item and cool the weapon down for a short time.
 It can't unload while the weapon is cooling down.
@@ -103,14 +115,9 @@ function ITEM:UnloadLoop()
 end
 
 --[[
-Overridden from base_ranged.
-We don't use clips, which means we don't subtract ammo from them.
-This function does nothing.
-]]--
-function ITEM:TakeAmmo(clip,amt)
-end
+* SERVER
+* Event
 
---[[
 Overridden from base_ranged. We don't use clips so don't remove ammo from them.
 When the rock-it launcher is removed, items in it's inventory will be removed automatically.
 ]]--
@@ -118,6 +125,9 @@ function ITEM:OnRemove()
 end
 
 --[[
+* SERVER
+* Event
+
 Overridden from base_ranged. Instead of having "Clip 1", "Clip 2", etc, we only have the "Items" output.
 Tells Wiremod that our gun can report how much ammo we have.
 ]]--
@@ -126,6 +136,8 @@ function ITEM:GetWireOutputs(entity)
 end
 
 --[[
+* SERVER
+
 Overridden from base_ranged. Instead of grabbing the amount of ammo from the clip we grab the number of items from the inventory.
 Triggers the ammo-in-clip wire outputs; updates them with the correct ammo counts
 ]]--

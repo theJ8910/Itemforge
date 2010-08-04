@@ -161,8 +161,10 @@ Throws the item oriented horizontally.
 This override is necessary because base_thrown only cooldowns the primary attack. This cooldowns the secondary too.
 ]]--
 function ITEM:OnSWEPPrimaryAttack()
-	if !self["base_thrown"].OnSWEPPrimaryAttack(self) then return false end
+	if !self:BaseEvent("OnSWEPPrimaryAttack",false) then return false end
 	if CLIENT then self:OrientHorizontal() end
+	
+	--We want it to delay both the primary AND secondary attacks (BaseEvent takes care of the primary)
 	self:SetNextSecondary(CurTime()+self:GetPrimaryDelay(),CurTime()+self:GetPrimaryDelayAuto());
 	
 	return true;
@@ -171,20 +173,17 @@ end
 
 --[[
 * SHARED
+* Event
 
 Throws the item oriented vertically.
 ]]--
 function ITEM:OnSWEPSecondaryAttack()
-	if !self["base_weapon"].OnSWEPSecondaryAttack(self) then return false end
+	if !self:BaseEvent("OnSWEPSecondaryAttack",false) then return false end
 	if CLIENT then self:OrientVertical() end
-	self:SetNextPrimary(CurTime()+self:GetSecondaryDelay(),CurTime()+self:GetSecondaryDelayAuto());
 	
-	self:ThrowEffects();
-	if self.ThrowDelay then
-		self:CreateTimer("ThrowTimer",self.ThrowDelay,1,self.Throw,self:GetWOwner(),nil,nil,Angle(0,0,90));
-	else
-		self:Throw(self:GetWOwner(),nil,nil,Angle(0,0,90));
-	end
+	--We want it to delay both the secondary AND primary attacks (BaseEvent takes care of the secondary)
+	self:SetNextPrimary(CurTime()+self:GetSecondaryDelay(),CurTime()+self:GetSecondaryDelayAuto());
+	self:BeginThrow(self:GetWOwner(),nil,nil,Angle(0,0,90));
 	
 	return true;
 end
@@ -207,7 +206,7 @@ function ITEM:OnUse(pl)
 		self:Unstick(pl);
 		return true;
 	end
-	return self:InheritedEvent("OnUse","base_thrown",false,pl);
+	return self:BaseEvent("OnUse",false,pl);
 end
 
 --[[

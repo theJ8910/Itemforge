@@ -105,7 +105,7 @@ ITEM.ZoomOutSound=Sound("weapons/sniper/sniper_zoomout.wav");
 When a player is holding it and tries to secondary attack
 ]]--
 function ITEM:OnSWEPSecondaryAttack()
-	if !self["base_weapon"].OnSWEPSecondaryAttack(self) then return false end
+	if !self:InheritedEvent("OnSWEPSecondaryAttack","base_weapon",false) then return false end
 	
 	--Zoom in
 	local iZL=self:GetNWInt("ZoomLevel");
@@ -252,7 +252,7 @@ function ITEM:GetLaserVMAP(eEnt)
 end
 
 function ITEM:OnDraw3D(eEntity,bTranslucent)
-	self["base_firearm"].OnDraw3D(self,eEntity,bTranslucent);
+	self:BaseEvent("OnDraw3D",nil,eEntity,bTranslucent);
 	if self:GetNWInt("ZoomLevel")<1 then return end
 	
 	local ap=self:GetLaserWorldAP(eEntity);
@@ -293,7 +293,7 @@ function ITEM:ZoomTo(ZoomLevel)
 end
 
 function ITEM:OnThink()
-	self["base_firearm"].OnThink(self);
+	self:BaseEvent("OnThink");
 	if !self:IsHeld() || self:GetNWInt("ZoomLevel")<2 then return false end
 	
 	if !self.LastThinkAt then self.LastThinkAt=CurTime() end
@@ -311,7 +311,7 @@ end
 function ITEM:OnSWEPDrawViewmodel()
 	if self:GetNWInt("ZoomLevel")==0 then return end
 	
-	self["base_firearm"].OnSWEPDrawViewmodel(self);
+	self:BaseEvent("OnSWEPDrawViewmodel");
 	local pl=LocalPlayer();
 	local vm=pl:GetViewModel();
 	local ap=self:GetLaserVMAP(vm);
@@ -375,7 +375,7 @@ function ITEM:OnSWEPAdjustMouseSensitivity()
 end
 
 function ITEM:OnSetNWVar(k,v)
-	self["base_ranged"].OnSetNWVar(self,k,v);
+	self:BaseEvent("OnSetNWVar",nil,k,v);
 	if k=="ZoomLevel" then
 		if v==0 then self.CurrentZoom=0; end
 		self:ZoomTo(self.ZoomLevels[v+1]);

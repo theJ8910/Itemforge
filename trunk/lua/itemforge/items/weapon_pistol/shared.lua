@@ -52,7 +52,7 @@ ITEM.BulletSpreadMax=Vector(0.05234,0.05234,0.05234);			--Taken directly from mo
 
 function ITEM:OnSWEPPrimaryAttack()
 	--This does all the base ranged stuff - determine if we can fire, do cooldown, consume ammo, play sounds, etc
-	if !self["base_ranged"].OnSWEPPrimaryAttack(self) then return false end
+	if !self:InheritedEvent("OnSWEPPrimaryAttack","base_ranged",false) then return false end
 	
 	local pAmmo=self:GetAmmo(self.PrimaryClip);
 	if !pAmmo then return false end
@@ -73,7 +73,7 @@ end
 
 --The pistol loses it's accuracy penalty over time
 function ITEM:OnThink()
-	self["base_firearm"].OnThink(self);
+	self:BaseEvent("OnThink");
 	if self:CanPrimaryAttack() then self:AddPenalty(-FrameTime()) end
 end
 

@@ -57,7 +57,7 @@ end
 
 --Called when a model associated with this item needs to be drawn
 function ITEM:OnDraw3D(eEntity,bTranslucent)
-	self["base_lock"].OnDraw3D(self,eEntity,bTranslucent);
+	self:BaseEvent("OnDraw3D",nil,eEntity,bTranslucent);
 	if !self:GetAttachedEnt() then self:DrawBack(eEntity); end
 end
 
@@ -66,7 +66,7 @@ The lock can have it's password set through it's right-click menu.
 Likewise it also has all the options the base_lock has.
 ]]--
 function ITEM:OnPopulateMenu(pMenu)
-	self["base_lock"].OnPopulateMenu(self,pMenu);
+	self:BaseEvent("OnPopulateMenu",nil,pMenu);
 	pMenu:AddOption("Set Password",function(panel) self:SendNWCommand("SetPassword") end);
 end
 

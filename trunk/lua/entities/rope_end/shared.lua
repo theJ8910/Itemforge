@@ -40,7 +40,7 @@ Initializes the rope-end as a basic 4x4x4 cube
 function ENT:Initialize()
 	self.Entity:SetModel("models/props_junk/cardboard_box004a.mdl");
 	self.Entity:PhysicsInitBox(Vector(-2,-2,-2),Vector(2,2,2));
-	self.Entity:SetCollisionGroup(COLLISION_GROUP_INTERACTIVE);
+	self.Entity:SetCollisionGroup(COLLISION_GROUP_WEAPON);
 	self.Entity:DrawShadow(false);
 	
 	if SERVER then self.Entity:SetUseType(SIMPLE_USE); end

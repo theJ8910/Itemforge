@@ -88,7 +88,7 @@ function ITEM:OnSWEPPrimaryAttack()
 	end
 	
 	--Can't attack if we need to pump the shotgun
-	if self:GetNWBool("NeedsPump") || !self["base_firearm"].OnSWEPPrimaryAttack(self) then return false end
+	if self:GetNWBool("NeedsPump") || !self:BaseEvent("OnSWEPPrimaryAttack",false) then return false end
 	
 	self:SetNWBool("NeedsPump",true);
 	return true;
@@ -115,7 +115,7 @@ function ITEM:OnSWEPSecondaryAttack()
 	end
 	
 	--Can't attack if we need to pump the shotgun
-	if self:GetNWBool("NeedsPump") || !self["base_firearm"].OnSWEPSecondaryAttack(self) then return false end
+	if self:GetNWBool("NeedsPump") || !self:BaseEvent("OnSWEPSecondaryAttack",false) then return false end
 	
 	self:ShootBullets(self.BulletsPerShotSec,self.BulletDamage,1,self:GetBulletSpread());
 	self:MuzzleFlash();
@@ -127,7 +127,7 @@ end
 
 --If the shotgun needs to be pumped we'll do that
 function ITEM:OnThink()
-	self["base_firearm"].OnThink(self);
+	self:BaseEvent("OnThink");
 	if self:GetNWBool("NeedsPump") then
 		local pOwner=self:GetWOwner();
 		
@@ -141,18 +141,18 @@ function ITEM:OnThink()
 end
 
 --Start reloading shells
-function ITEM:StartReload()
-	if !self["base_firearm"].StartReload(self) then return false end
-	if self:IsHeld() then
-		self:GetWeapon():SendWeaponAnim(ACT_SHOTGUN_RELOAD_START);
-	end
+function ITEM:StartReload(pl)
+	if !self:BaseEvent("StartReload",false,pl) then return false end
+	
+	local wep=self:GetWeapon();
+	if wep then wep:SendWeaponAnim(ACT_SHOTGUN_RELOAD_START); end
 	
 	return true;
 end
 
 --Stop reloading shells
 function ITEM:FinishReload()
-	if !self["base_firearm"].FinishReload(self) then return false end
+	if !self:BaseEvent("FinishReload",false) then return false end
 	if self:IsHeld() then
 		self:GetWeapon():SendWeaponAnim(ACT_SHOTGUN_RELOAD_FINISH);
 	end
@@ -170,7 +170,7 @@ function ITEM:Pump()
 	
 	if self:GetNWBool("DelayedReload") then
 		self:SetNWBool("DelayedReload",false);
-		self:StartReload();
+		self:Event("StartReload",false);
 	end
 	
 	self:EmitSound(self.PumpSound,true);

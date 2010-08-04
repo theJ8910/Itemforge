@@ -40,10 +40,10 @@ ITEM.Length=2*ITEM.Width;										--This is actually related more to the textur
 
 --Returns the length of the ammo belt.
 function ITEM:GetDescription()
-	--Length of ammo belt
-	local len=self:GetAmount()*0.01905;
-	if len > 1 then		return self.Description.."It is "..len.." meters long.";
-	else				return self.Description.."It is "..(len*100).." centimeters long."
+	--Length of ammo belt in meters
+	local len=math.floor(IF.Util:InchesToCM(self:GetAmount()))*0.01;
+	if len >= 1 then	return self.Description.."It is "..len..IF.Util:Pluralize(" meter",len).." long.";
+	else				return self.Description.."It is "..(len*100)..IF.Util:Pluralize(" centimeter",len).." long."
 	end
 end
 
@@ -147,7 +147,7 @@ end
 
 --Called when a model associated with this item needs to be drawn
 function ITEM:OnDraw3D(eEntity,bTranslucent)
-	--self["base_item"].OnDraw3D(self,eEntity,bTranslucent);
+	--self:BaseEvent("OnDraw3D",nil,eEntity,bTranslucent);
 	self:DrawMesh(eEntity);
 end
 

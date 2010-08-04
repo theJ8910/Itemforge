@@ -1008,7 +1008,7 @@ IF.Items:ProtectKey("OnExitWorldSafe");
 Run this to start the item's Think event. Think is off by default.
 ]]--
 function ITEM:StartThink()
-	timer.Create("if_itemthink_"..self:GetID(),self.ThinkRate,0,self.OnThink,self);
+	timer.Create("if_itemthink_"..self:GetID(),self.ThinkRate,0,self.Event,self,"OnThink");
 end
 IF.Items:ProtectKey("StartThink");
 
@@ -1039,6 +1039,29 @@ function ITEM:StopThink()
 	if timer.IsTimer(n) then timer.Remove(n) end
 end
 IF.Items:ProtectKey("StopThink");
+
+--[[
+* SHARED
+* Protected
+
+Run this function to request that a player move the item to a given inventory.
+False is returned if the item is unable to be moved for any reason.
+]]--
+function ITEM:PlayerSendToInventory(pl,inv,iSlot)
+	if !pl || !pl:IsValid() || !pl:IsPlayer() || !self:Event("CanPlayerInteract",false,pl) then return false end
+	if !inv || !inv:IsValid()	then return self:Error("Couldn't move to inventory as requested by "..tostring(pl)..", inventory given was not valid!\n") end
+	if iSlot==0 then iSlot=nil end
+	
+	--Predict whether or not the item can be inserted clientside,
+	--or actually attempt an insertion serverside
+	if !self:ToInventory(inv,iSlot,nil,true) then return false end
+	
+	--Clientside, if we've predicted it will succeed then we'll attempt an insertion serverside.
+	if CLIENT then
+		self:SendNWCommand("PlayerSendToInventory",inv,iSlot);
+	end
+end
+IF.Items:ProtectKey("PlayerSendToInventory");
 
 
 

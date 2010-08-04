@@ -48,7 +48,7 @@ ITEM.ViewKickMin=Angle(-8,-2,0);						--Taken directly from modcode. The view ki
 ITEM.ViewKickMax=Angle(-8,2,0);
 
 function ITEM:OnSWEPPrimaryAttack()
-	if !self["base_firearm"].OnSWEPPrimaryAttack(self) then return false end
+	if !self:BaseEvent("OnSWEPPrimaryAttack",false) then return false end
 	
 	--We need to snap the holding player's eyes on the server;
 	--if we can't do that for some reason just return true to indicate everything else went as planned

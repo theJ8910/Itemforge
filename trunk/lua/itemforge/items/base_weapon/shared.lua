@@ -217,14 +217,14 @@ function ITEM:SetNextBoth(fNext,fNextAuto)
 end
 
 function ITEM:OnHold(pl,wep)
-	self:InheritedEvent("OnHold","base_item",nil,pl,wep);
+	self:BaseEvent("OnHold",nil,pl,wep);
 	
 	wep:SetNextPrimaryFire(self.NextPrimary);
 	wep:SetNextSecondaryFire(self.NextSecondary);
 end
 
 function ITEM:OnRelease(pl,forced)
-	self:InheritedEvent("OnRelease","base_item",nil,pl,forced);
+	self:BaseEvent("OnRelease",nil,pl,forced);
 	
 	self:SetNWFloat("PrimaryNext",self.NextPrimary);
 	self:SetNWFloat("SecondaryNext",self.NextSecondary);
@@ -246,7 +246,7 @@ the primary attack's colldown. I haven't quite figured out how to account both f
 and secondary in a way that wasn't completely retarded.
 ]]--
 function ITEM:OnDraw2D(width,height)
-	self["base_item"].OnDraw2D(self,width,height);
+	self:BaseEvent("OnDraw2D",nil,width,height);
 	
 	local remaining=self:GetNextPrimary()-CurTime();
 	local delay=self:GetNWFloat("LastPrimaryDelay");

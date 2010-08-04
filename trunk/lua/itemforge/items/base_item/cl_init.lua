@@ -17,6 +17,8 @@ ITEM.ItemSlot=nil;									--When the item is held, this will be a panel display
 ITEM.WorldModelAttach=nil;							--When the item is held, this will be an attached model (a GearAttach object specifically) attached to the player's right hand.
 ITEM.OverrideMaterialMat=nil;						--On the client this is a Material() whose path is the item's override material (item:GetOverrideMaterial()). Use item:GetOverrideMaterialMat() to get this.
 
+local vZero=Vector(0,0,0);
+
 --[[
 * CLIENT
 * Protected
@@ -330,6 +332,25 @@ function ITEM:Tick()
 end
 IF.Items:ProtectKey("Tick");
 
+--[[
+* CLIENT
+Pose function.
+
+You can run this in an item's Pose3D function to pose the item's model in an
+item slot a certain way.
+
+eEntity is the ClientsideModel to rotate (should be passed from the event).
+speed is the speed that the model rotates (defaults to 20 degrees per second).
+	Negative values make the item rotate in the opposite direction.
+]]--
+function ITEM:PoseUprightRotate(eEntity,speed)
+	if !speed then speed=20 end
+	
+	local min,max=eEntity:GetRenderBounds();
+	local center=max-((max-min)*.5);			--Center, used to position 
+	eEntity:SetAngles(Angle(0,(RealTime()+self:GetRand())*speed,0));
+	eEntity:SetPos(vZero-(eEntity:LocalToWorld(center)-eEntity:GetPos()));
+end
 
 local NIL="%%00";		--If a command isn't given, this is substituted. It means we want to send nil (nothing).
 local SPACE="%%20";		--If a space is given in a string, this is substituted. It means " ".

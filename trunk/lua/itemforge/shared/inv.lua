@@ -1653,11 +1653,18 @@ INVENTORY EVENTS
 
 
 --[[
+* SHARED
+* Event
+
 Returns the title of the inventory.
 This is displayed on the GUI when the inventory is opened on-screen.
+
 By default, the inventory title is the name of the first connected object found.
 You can override this to return whatever you like (as long as it's a string).
-The advantage of doing this is when you have two or more inventories on a single item (for example, a vending machine), you can give each inventory a different title ("Products" and "Profits", for example).
+
+The advantage of doing this is when you have two or more inventories on a single
+item (for example, a vending machine), you can give each inventory a different
+title ("Products" and "Profits", for example).
 ]]--
 function _INV:GetTitle()
 	for k,v in pairs(self.ConnectedObjects) do
@@ -1669,6 +1676,9 @@ function _INV:GetTitle()
 end
 
 --[[
+* SHARED
+* Event
+
 Called when moving an item in this inventory from one slot to another.
 item is the item being moved.
 oldslot is the slot the item is currently in.
@@ -1680,6 +1690,9 @@ function _INV:CanMoveItem(item,oldslot,newslot)
 end
 
 --[[
+* SHARED
+* Event
+
 Called after an item in this inventory has been moved from one slot to another.
 item is the item being moved.
 oldslot was the slot the item was occupying before.
@@ -1690,6 +1703,9 @@ function _INV:OnMoveItem(item,oldslot,newslot)
 end
 
 --[[
+* SHARED
+* Event
+
 Called when inserting an item into the inventory.
 This can be used to stop an item from entering this inventory.
 item is the item being inserted.
@@ -1701,6 +1717,9 @@ function _INV:CanInsertItem(item,slot)
 end
 
 --[[
+* SHARED
+* Event
+
 Called after an item has been inserted.
 item is the item being inserted.
 slot is the slot in the inventory that the item was placed in.
@@ -1709,6 +1728,9 @@ function _INV:OnInsertItem(item,slot)
 end
 
 --[[
+* SHARED
+* Event
+
 Called when taking an item out of the inventory.
 item is the item that wants to be taken out.
 slot is the slot this item is occupying in this inventory.
@@ -1719,6 +1741,9 @@ function _INV:CanRemoveItem(item,slot)
 end
 
 --[[
+* SHARED
+* Event
+
 Called after an item has been taken out of the inventory.
 item is the item that was taken out.
 slot is the slot this item was in.
@@ -1730,39 +1755,55 @@ function _INV:OnRemoveItem(item,slot,forced)
 end
 
 --[[
+* SHARED
+* Event
+
 Called after the inventory has been locked.
 ]]--
 function _INV:OnLock()
 end
 
 --[[
+* SHARED
+* Event
+
 Called after the inventory has been unlocked.
 ]]--
 function _INV:OnUnlock()
 end
 
 --[[
-Can a player interact with an item in this inventory?
-When an item's CanPlayerInteract event is called, this function lets it's container have a say in whether or not we can interact with it.
+* SHARED
+* Event
 
-player is the player who wants to interact with an item in this inventory.
+Can a player interact with an item in this inventory?
+When an item's CanPlayerInteract event is called, this function lets it's container
+have a say in whether or not we can interact with it.
+
+pl is the player who wants to interact with an item in this inventory.
 item is the item being interacted with.
 
 Return true to allow the player to interact with items in this inventory,
 or false to stop players from interacting with items in this inventory.
 ]]--
-function _INV:CanPlayerInteract(player,item)
+function _INV:CanPlayerInteract(pl,item)
 	--Can't interact with this inventory if the player doesn't own it
-	if SERVER && !self:CanSendInventoryData(player) then return false end
+	if SERVER && !self:CanSendInventoryData(pl) then return false end
 	
-	--Can't interact with this inventory if we can't interact with the inventory's connected objects
+	--Can't interact with this inventory if we can't interact with the inventory's
+	--connected objects
 	for k,v in pairs(self:GetConnectedItems()) do
-		if !v:Event("CanPlayerInteract",false,player) then return false end
+		if !v:Event("CanPlayerInteract",false,pl) then return false end
 	end
 	return !self.Locked;
 end
 
---Called prior to the inventory being removed
+--[[
+* SHARED
+* Event
+
+Called prior to the inventory being removed
+]]--
 function _INV:OnRemove(lastConnection)
 	--Deal with items in this inventory at the time of removal
 	--Items will be taken care of serverside AND clientside (rather than just removing them serverside and individually removing each one clientside, we roll it all into one function here to save bandwidth/reduce lag)

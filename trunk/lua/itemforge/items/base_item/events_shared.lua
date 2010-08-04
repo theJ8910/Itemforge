@@ -271,8 +271,7 @@ Ex:		"Object [invalid]" (used to be some kind of object, invalid/has been remove
 Ex:		"Inventory 2" (Is inventory 2)
 ]]--
 function ITEM:ToString()
-	if self:GetMaxAmount()!=1 then	return "Item "..self:GetID().." ["..self:GetType().." x "..self:GetAmount().."]";
-	else							return "Item "..self:GetID().." ["..self:GetType().."]"; end
+	return "Item "..self:GetID().." ["..self:GetType().."]";
 end
 
 --[[
@@ -313,7 +312,6 @@ On the server:
 	Return false if the item doesn't have a specific use, or the player can't use it
 	for some other reason. This will output a failure message to the player ("I can't use this!")
 	and make the player complain verbally.
-
 ]]--
 function ITEM:OnUse(pl)
 	if CLIENT then
@@ -363,27 +361,28 @@ function ITEM:CanPlayerInteract(pl)
 	
 	--If the item is in an inventory, will the inventory let the players interact with it?
 	local c=self:GetContainer();
-	if c && !c:Event("CanPlayerInteract",false,pl,self) then return false end
+	local wo=self:GetWOwner();
+	if c then
+		if c:Event("CanPlayerInteract",false,pl,self) then return true end
 	
 	--If the item is held, only the player holding it can interact with it.
-	if self:IsHeld() && self:GetWOwner()!=pl then
+	elseif wo!=nil && wo==pl then
 		return true;
+	
 	--Otherwise, the player must be nearby the item in order to interact with it
 	else
 		local pos=self:GetPos();
-		local postype=type(pos);
-		if postype=="Vector" then
+		if IF.Util:IsVector(pos) then
 			if pos:Distance(pl:GetPos())<=256 then return true end
 			
 		--If we're in several locations we have to be nearby at least one (this happens when an item is in an inventory connected to several objects)
-		elseif postype=="table" then
+		elseif IF.Util:IsTable(pos) then
 			for k,v in pairs(pos) do
 				if v:Distance(pl:GetPos())<=256 then return true end
 			end
-		else
-			return false;
 		end
 	end
+	return false;
 end
 
 --[[
@@ -487,8 +486,6 @@ aAng is the angle it's trying to be inserted at.
 bTeleport will be true if the item was already in the world and was just teleported to the given position instead. If this is false, it means that a new entity was created for the item.
 ]]--
 function ITEM:OnEnterWorld(eEnt,vPos,aAng,bTeleport)
-	--DEBUG
-	Msg("Entered world: "..tostring(eEnt).." at "..tostring(vPos)..", "..tostring(aAng).." - Teleported? "..tostring(bTeleport).."\n");
 end
 
 --[[
@@ -603,7 +600,6 @@ function ITEM:OnHold(pl,weapon)
 			
 			--Hide if we're not out
 			if bNotOut then self.WMAttach:Hide() end
-			Msg("Out when held: "..tostring(bNotOut).."\n")
 			
 			--We try to bone-merge first and if that fails we try to attach to the right-hand attachment point instead
 			if !self.WMAttach:BoneMerge("ValveBiped.Bip01_R_Hand") && !self.WMAttach:ToAP("anim_attachment_RH") then
@@ -888,9 +884,24 @@ Since this is after inheritence, it runs on any class based off of base_item (al
 unless someone overrides it on purpose.
 
 This function creates the SWEP items of this class will use.
+
+Additionally, it inherits networked commands and networked ids.
+
+For example, if Item A has NWVars "VarString" and "VarInt",
+and,            Item B has NWVars "VarString" and "VarFloat",
+Item A will assign an ID of 1 to VarString and an ID to 2 to VarInt.
+Item B will assign an ID of 1 to VarString and an ID of 2 to VarFloat.
+BUT...
+If Item B inherits from Item A, that means Item B now has "VarString", "VarInt" (from A) and "VarString", "VarFloat" (from B)
+Or in other words, we have network vars with IDs 1, 2, 1, and 2. So, how do we deal with this now? The IDs have to be unique!
+This is what this function is created for. It assigns unique IDs to networked vars and commands.
+Now, since Item B inherits from A, Item B will get everything that A has, BUT if B already has something A has, B overrides A.
+First we go through B... we assign a 1 to VarString and a 2 to VarFloat.
+Next we go through B's base... we already have a VarString, so we don't need to give another ID for that.
+We assign a 3 to VarInt.
+
+Voila! Problem solved!
 ]]--
 function ITEM:OnClassInherited()
-	--Register the SWEP this type of item uses.
-	--I'd rather make all the items use one weapon but can't because of the goddamn viewmodel animations!!
-	IF.Items:RegisterSWEP(self);
+	IF.Items:ClassInherited(self.ClassName,self);
 end

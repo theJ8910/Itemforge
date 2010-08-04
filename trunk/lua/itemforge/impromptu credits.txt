@@ -1,14 +1,16 @@
 theJ89: Well duh, I made the system
 Azui-Sleet:  His world model correction code eventually lead me to a final solution to the itemforge_item_held_* world model issues. This code forms the foundation of bone-merged gear attachments.
+CapsAdmin: Using SetOwner on the locks to stop them from bugging out the doors, suggested using a different collision group for rope ends
 Doctor Communism: Suggested ammo belts (in concept, not in name) that allow guns to use linked containers for ammo sources.
 Ebayle: Let me use his server and suggested a numbering system for the SWEP names.
 Night-Eagle: Solved my problem with drawing a texture in a circle in the inventory.
-MegaDeath409: Suggested caching nil values that are indexed in the items to improve speeds. Suggested using a table to represent a nil lookup. Suggested a lookup table in items.lua. Suggested reloading item types.
+MegaDeath409: Suggested caching classes as necessary to improve speeds. Kicked my ass to finally make item-types reloadable. Suggested wire-neutral system.
 thomasfn: Gave me a snippet of code used to register several copies of itemforge_item_held so I didn't have to have so many physical copies
 Josh: Suggested the use of networking macros (that pass minimal information)
 Karolis O.: Created the Item Magnet icon.
 Mr. Bix: Many, many suggestions for ways to improve the items and system in general. Dedicated playtester.
 NeoDement: Created the viewmodel for the sawblade (for a "Sawblade Thrower" SWEP)
 Gbps: I use his DrawPoly method for tiling the background of the Itemforge Inventory window
+grea$emonkey: Reminded me to decomment lua files before checking for include statements.
 Random people that come into my server
 Other people I have forgot at the moment

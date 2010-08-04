@@ -132,7 +132,7 @@ end
 
 --Called when a model associated with this item needs to be drawn
 function ITEM:OnDraw3D(eEntity,bTranslucent)
-	self["base_item"].OnDraw3D(self,eEntity,bTranslucent);
+	self:BaseEvent("OnDraw3D",nil,eEntity,bTranslucent);
 	self:DrawGlow(eEntity);
 end
 
@@ -149,7 +149,7 @@ function ITEM:OnPopulateMenu(pMenu)
 			return x,y;
 		end
 	pMenu:AddPanel(Slider);
-	self["base_item"].OnPopulateMenu(self,pMenu);
+	self:BaseEvent("OnPopulateMenu",nil,pMenu);
 end
 
 IF.Items:CreateNWCommand(ITEM,"PlayerSetStrength",nil,{"int"});

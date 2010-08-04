@@ -52,7 +52,11 @@ ITEM.ThrowSpread=Vector(0,0,0);
 ITEM.ThrowSpinMin=Angle(-50,-50,-50);
 ITEM.ThrowSpinMax=Angle(50,50,50)
 
+--This is how long it takes to actually fire the sawblade after an attack is issued
 ITEM.ThrowDelay=0;
+
+--After a player throws an item, kills from this item are credited towards this player for this many seconds
+ITEM.KillCreditTime = 5;
 
 if SERVER then
 	ITEM.KillCredit=nil;
@@ -64,13 +68,8 @@ end
 Throws the item.
 ]]--
 function ITEM:OnSWEPPrimaryAttack()
-	if !self["base_weapon"].OnSWEPPrimaryAttack(self) then return false end
-	self:ThrowEffects();
-	if self.ThrowDelay then
-		self:CreateTimer("ThrowTimer",self.ThrowDelay,1,self.Throw,self:GetWOwner());
-	else
-		self:Throw(self:GetWOwner());
-	end
+	if !self:BaseEvent("OnSWEPPrimaryAttack",false) then return false end
+	self:BeginThrow(self:GetWOwner());
 	
 	return true;
 end
@@ -78,14 +77,21 @@ end
 --[[
 * SHARED
 
-Secondary attack doesn't do anything
+Begins a throw (throw effects, throw timer if there is a delay).
+Any arguments that should be passed to Throw should be given to this function.
 ]]--
-function ITEM:OnSWEPSecondaryAttack()
-	return true;
+function ITEM:BeginThrow(...)
+	self:ThrowEffects();
+	if self.ThrowDelay then
+		self:CreateTimer("ThrowTimer",self.ThrowDelay,1,self.Throw,...);
+	else
+		self:Throw(...);
+	end
 end
 
 --[[
 * SHARED
+* Event
 
 This event is called by Throw() to determine how fast to throw the item.
 ]]--
@@ -95,6 +101,7 @@ end
 
 --[[
 * SHARED
+* Event
 
 This event is called by Throw() to determine the initial angle the thrown item is at.
 ]]--
@@ -104,6 +111,7 @@ end
 
 --[[
 * SHARED
+* Event
 
 This event is called by Throw() to determine the deviation of the thrown item's path.
 ]]--
@@ -113,6 +121,7 @@ end
 
 --[[
 * SHARED
+* Event
 
 This event is called by Throw() to determine how fast the thrown item's pitch/yaw/roll spins.
 ]]--
@@ -122,6 +131,7 @@ end
 
 --[[
 * SHARED
+
 Throws an item from this stack.
 
 iCount items are split off from this stack, sent to the world nearby the player, and then thrown.
@@ -146,8 +156,10 @@ Clientside it just predicts whether or not the item can be thrown. A temporary i
 nil is returned otherwise.
 ]]--
 function ITEM:Throw(pl,iCount,fSpeed,aThrowAng,vSpread,aSpin,vOffset)
-	local pl=self:GetWOwner();
 	if !pl || !pl:IsValid() then return nil end
+	
+	local wep=self:GetWeapon();
+	if (wep && pl:GetActiveWeapon()!=wep) || !self:Event("CanPlayerInteract",false,pl) then return nil end
 	
 	if iCount==nil then iCount=1 end
 	
@@ -186,26 +198,32 @@ function ITEM:Throw(pl,iCount,fSpeed,aThrowAng,vSpread,aSpin,vOffset)
 		if aSpin==nil then aSpin=self:Event("GetThrowSpin",zero_angle) end
 		phys:AddAngleVelocity(aSpin);
 		
-		self:SetKillCredit(pl);
+		self:SetKillCredit(pl,self.KillCreditTime);
 	end
 	
 	return itemToThrow;
 end
 
 --[[
+* SHARED
+
 Plays a random sound when the item is thrown.
 Also plays the attack animation, both on the weapon and player himself
 ]]--
 function ITEM:ThrowEffects()
 	if #self.ThrowSounds>0 then self:EmitSound(self.ThrowSounds,true); end
 	
-	if self:IsHeld() then
-		self:GetWOwner():SetAnimation(PLAYER_ATTACK1);
-		self:GetWeapon():SendWeaponAnim(self:GetThrowActivity());
+	local pl=self:GetWOwner();
+	if pl then
+						pl:SetAnimation(PLAYER_ATTACK1);
+		  self:GetWeapon():SendWeaponAnim(self:Event("GetThrowActivity"));
 	end
 end
 
 --[[
+* SHARED
+* Event
+
 Returns the viewmodel activity to play when the item is thrown
 ]]--
 function ITEM:GetThrowActivity()
@@ -213,13 +231,35 @@ function ITEM:GetThrowActivity()
 end
 
 if SERVER then
-	function ITEM:SetKillCredit(pl)
-		self.KillCredit=pl;
-		if pl==nil then return end
-		self:CreateTimer("RemoveKillCredit",5,1,self.SetKillCredit,nil);
-	end
-	
-	function ITEM:GetKillCredit()
-		return self.KillCredit;
-	end
+
+
+
+
+--[[
+* SERVER
+
+This function credits kills the item is responsible for to the given player for
+"time" seconds.
+
+If the player is nil, the kill credits are cleared.
+]]--
+function ITEM:SetKillCredit(pl,time)
+	self.KillCredit=pl;
+	if pl==nil then return end
+	self:CreateTimer("BaseThrownRemoveKillCredit",time,1,self.SetKillCredit,nil);
+end
+
+--[[
+* SERVER
+
+Returns the player who should be credited with kills this item is responsible for.
+This can be a player or nil.
+]]--
+function ITEM:GetKillCredit()
+	return self.KillCredit;
+end
+
+
+
+
 end

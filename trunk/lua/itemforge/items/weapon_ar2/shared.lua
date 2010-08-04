@@ -61,7 +61,7 @@ ITEM.ViewKickMax=Angle(0,0,0);
 
 
 function ITEM:OnSWEPPrimaryAttack()
-	if !self["base_firearm"].OnSWEPPrimaryAttack(self) then return false end
+	if !self:BaseEvent("OnSWEPPrimaryAttack",false) then return false end
 end
 
 function ITEM:OnSWEPSecondaryAttack()

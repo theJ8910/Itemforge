@@ -188,7 +188,8 @@ function ITEM:SwapToHip()
 end
 
 function ITEM:OnHold(pl,weapon)	
-	self:InheritedEvent("OnHold","base_item",nil,pl,weapon);
+	self:BaseEvent("OnHold",nil,pl,weapon);
+	--self:InheritedEvent("OnHold","base_item",nil,pl,weapon);
 	--self["base_item"].OnHold(self,pl,weapon);
 	
 	if pl:GetActiveWeapon()==weapon then	self:SwapToHand();
@@ -217,7 +218,7 @@ end
 
 --Called when a model associated with this item needs to be drawn
 function ITEM:OnDraw3D(eEntity,bTranslucent)
-	self["base_item"].OnDraw3D(self,eEntity,bTranslucent);
+	self:BaseEvent("OnDraw3D",nil,eEntity,bTranslucent);
 	self:DrawGlow(eEntity);
 end
 
