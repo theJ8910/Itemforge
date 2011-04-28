@@ -52,7 +52,7 @@ ITEM.ThrowSpread=Vector(0,0,0);
 ITEM.ThrowSpinMin=Angle(-50,-50,-50);
 ITEM.ThrowSpinMax=Angle(50,50,50)
 
---This is how long it takes to actually fire the sawblade after an attack is issued
+--This is how long it takes to actually throw the weapon after an attack is issued
 ITEM.ThrowDelay=0;
 
 --After a player throws an item, kills from this item are credited towards this player for this many seconds
@@ -64,6 +64,7 @@ end
 
 --[[
 * SHARED
+* Event
 
 Throws the item.
 ]]--
@@ -87,6 +88,21 @@ function ITEM:BeginThrow(...)
 	else
 		self:Throw(...);
 	end
+end
+
+--[[
+* SHARED
+* Event
+
+Immediately after an item is thrown, this event is called on the thrown item.
+
+To clarify, if you called Throw() on a stack of items, it splits off 1 item,
+and then this event runs on the 1 item that was split off - NOT the stack it was originally from.
+
+pl should be the player who threw the item.
+]]--
+function ITEM:OnThrow(pl)
+	
 end
 
 --[[
@@ -201,6 +217,7 @@ function ITEM:Throw(pl,iCount,fSpeed,aThrowAng,vSpread,aSpin,vOffset)
 		self:SetKillCredit(pl,self.KillCreditTime);
 	end
 	
+	itemToThrow:Event("OnThrow",nil,pl);
 	return itemToThrow;
 end
 

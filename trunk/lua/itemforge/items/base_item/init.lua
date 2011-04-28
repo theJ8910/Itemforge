@@ -237,16 +237,13 @@ Returns false if Wiremod v843 or better is not installed or if the item is not i
 WIRE
 ]]--
 function ITEM:WireOutput(outputName,value)
-	--This only works if Wire is present
-	local wvType = type(WireVersion);
-	
-	if wvType=="nil" || (wvType=="number" && WireVersion<843) || (wvType=="string" && tonumber(string.sub(WireVersion,1,string.find(WireVersion,"[^%d]")-1))<843) then
-		return false;
-	end
 	--This only works if we are in the world
 	local entity=self:GetEntity();
 	if !entity then return false end
 	
+	--This only works if we have wire
+	if !entity.IsWire then return false end
+
 	Wire_TriggerOutput(entity,outputName,value)
 	return true;
 end

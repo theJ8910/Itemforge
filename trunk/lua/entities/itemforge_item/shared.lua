@@ -90,14 +90,25 @@ function ENT:GiveWire()
 	if self.IsWire then return true end
 	
 	local wvType = type(WireVersion);
-	
+
+	--Wiremod is such a mess. WireVersion can be a string, it can be a number, it can be a string with no numbers, it can be a string with something other than numbers... ugh...
 	if wvType=="nil" then
 		self.IsWire = false;
 	elseif wvType=="number" then
 		self.IsWire = WireVersion>=843;
 	elseif wvType=="string" then
-		local wv = tonumber(string.sub(WireVersion,1,string.find(WireVersion,"[^%d]")-1));
-		self.IsWire = wv>=843
+	    local delim = string.find(WireVersion,"[^%d]");
+
+		local wv;
+		if delim != nil then	wv = tonumber( string.sub( WireVersion, 1, delim-1 ) );
+	    else					wv = tonumber( string.sub( WireVersion, 1, string.len( WireVersion ) ) );
+		end
+
+		if wv == nil then
+			wv = 0;
+		end
+
+		self.IsWire = wv>=843;
 	end
 	
 	if self.IsWire then self["BaseWireEntity"]=scripted_ents.Get("base_wire_entity"); end
