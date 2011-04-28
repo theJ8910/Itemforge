@@ -146,6 +146,8 @@ function ITEM:SetHealth(hp,who)
 		--TODO this old code needs to be reworked slightly
 		self:Event("OnBreak",nil,totalLoss,(totalLoss==self:GetAmount()),who);
 		
+		if !self:IsValid() then return end
+
 		shouldUp=self:SetAmount(math.max(0,self:GetAmount()+SubtractHowMany));
 	elseif hp>self:GetMaxHealth() then
 		hp=self:GetMaxHealth();
