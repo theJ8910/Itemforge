@@ -78,6 +78,9 @@ IF.Items:CreateNWVar(ITEM,"WorldModel","string",function(self) return self.World
 --What is this item's view model? The player sees himself holding this while he is wielding the item as an SWEP in first person.
 IF.Items:CreateNWVar(ITEM,"ViewModel","string",function(self) return self.ViewModel end);
 
+--When the item is held, is the view model flipped?
+IF.Items:CreateNWVar(ITEM,"SWEPViewModelFlip","bool",function(self) return self.SWEPViewModelFlip end);
+
 --When the item is held, what slot # and position does it occupy in the weapon selection menu?
 IF.Items:CreateNWVar(ITEM,"SWEPSlot","int",function(self) return self.SWEPSlot end);
 IF.Items:CreateNWVar(ITEM,"SWEPSlotPos","int",function(self) return self.SWEPSlotPos end);

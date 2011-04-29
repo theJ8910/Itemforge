@@ -19,6 +19,8 @@ SWEP.SwayScale			= 1.0;
 SWEP.BobScale			= 1.0;
 SWEP.RenderGroup 		= RENDERGROUP_OPAQUE;
 
+SWEP.ViewModelFlip		= false;
+
 --[[
 * CLIENT
 

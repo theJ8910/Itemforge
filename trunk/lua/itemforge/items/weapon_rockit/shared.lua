@@ -158,6 +158,11 @@ Clientside, this function does nothing; items have to be sent to world on the se
 If something is killed by the flying object...
 	If this gun is held, kill credit goes to the player holding this gun.
 	If this gun is in the world, kill credit goes to the gun entity.
+
+This function calls the OnRockItLaunch event on the chucked item (if the event even exists on the item).
+You can write an OnRockItLaunch event in your items to control what happens to an item after it's been fired from a Rock-It Launcher.
+e.g. you can activate grenades, you could make ammo fire as bullets, a spray of fletchettes could get fired as if from a shotgun, etc.
+
 This returns true if an item was sent to world and fired.
 False is returned otherwise.
 ]]--
@@ -188,6 +193,8 @@ function ITEM:Chuck(speed)
 			phys:AddAngleVelocity(Angle(math.Rand(-200,200),math.Rand(-200,200),math.Rand(-200,200)));
 		end
 		ent:SetPhysicsAttacker(pOwner);
+
+		if IF.Util:IsFunction(item.OnRockItLaunch) then item:Event("OnRockItLaunch",nil,self,pOwner); end
 		
 		return true;
 	elseif self:InWorld() then
@@ -203,13 +210,20 @@ function ITEM:Chuck(speed)
 			phys:AddAngleVelocity(Angle(math.Rand(-200,200),math.Rand(-200,200),math.Rand(-200,200)));
 		end
 		ent:SetPhysicsAttacker(eEnt);
+
+		if IF.Util:IsFunction(item.OnRockItLaunch) then item:Event("OnRockItLaunch",nil,self); end
 		
 		return true;
 	elseif self:InInventory() then
 		local inv=self:GetContainer();
 		item:ToInv(inv);
+
+		if IF.Util:IsFunction(item.OnRockItLaunch) then item:Event("OnRockItLaunch",nil,self); end
+
+		return true;
 	end
-	return false;
+
+	
 end
 
 --[[

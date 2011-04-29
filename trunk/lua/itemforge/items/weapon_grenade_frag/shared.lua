@@ -16,6 +16,7 @@ ITEM.MaxAmount=15;
 
 ITEM.WorldModel="models/weapons/w_eq_fraggrenade.mdl";
 ITEM.ViewModel="models/weapons/v_eq_fraggrenade.mdl";
+ITEM.ViewModelFlip = true;								--CS view models need to be flipped
 
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
@@ -85,6 +86,16 @@ function ITEM:PullPin(pl)
 	return true;
 end
 
+--[[
+* SHARED
+* Event
+
+Active grenades cannot be merged (you can still have a stack of active grenades, though).
+]]--
+function ITEM:CanMerge(otherItem,bToHere)
+	return !self:GetNWBool("Live");
+end
+
 if SERVER then
 
 
@@ -124,6 +135,19 @@ end
 * SERVER
 * Event
 
+If a grenade is launched from a Rock-It launcher, it activates.
+
+iRockitLauncher is the rock-it launcher the grenade was fired from.
+pl is the player who fired it.
+]]--
+function ITEM:OnRockItLaunch(iRockitLauncher,pl)
+	self:PullPin(pl);
+end
+
+--[[
+* SERVER
+* Event
+
 This event tells Wiremod that our grenades can have their pins pulled or they can explode
 ]]--
 function ITEM:GetWireInputs(entity)
@@ -156,14 +180,14 @@ else
 
 When grenades are active, the background flashes red
 ]]--
-function ITEM:OnDraw2D(width,height)
+function ITEM:OnDraw2DBack(width,height)
 	if self:GetNWBool("Live") == true then
 		surface.SetDrawColor(255,0,0, 114.75 + 63.75 * math.sin( CurTime() * 30 ) );
 		surface.DrawRect(0,0,width,height);
 	end
 	self:BaseEvent("OnDraw2D",nil,width,height);
 end
-	
+
 
 
 

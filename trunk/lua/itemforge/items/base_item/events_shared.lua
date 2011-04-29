@@ -37,9 +37,10 @@ function ITEM:OnSWEPInit(SWEP,eWeapon)
 	SWEP.Secondary.Automatic=self.SecondaryAuto;
 	
 	if CLIENT then
-		SWEP.PrintName	=	self:Event("GetName","Itemforge Item");
-		SWEP.Slot		=	self:GetSWEPSlot();
-		SWEP.SlotPos	=	self:GetSWEPSlotPos();
+		SWEP.PrintName		=	self:Event("GetName","Itemforge Item");
+		SWEP.Slot			=	self:GetSWEPSlot();
+		SWEP.SlotPos		=	self:GetSWEPSlotPos();
+		SWEP.ViewModelFlip	=	self:GetSWEPViewModelFlip();
 	end
 	
 	SWEP:SetWeaponHoldType(self.HoldType);
