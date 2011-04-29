@@ -40,6 +40,7 @@ ITEM.SecondaryAuto=false;								--If this item is held as a weapon, is it's sec
 ITEM.HoldType="pistol";									--How does a player hold this item when he is holding it as a weapon? Valid values: "pistol","smg","grenade","ar2","shotgun","rpg","physgun","crossbow","melee","slam","normal"
 ITEM.SWEPSlot=0;										--What slot # is this item categorized under in the weapon menu? (where 0 is slot #1, 1 is slot #2, etc)
 ITEM.SWEPSlotPos=0;										--When you're selecting weapons from that slot, what order does this weapon come in? (where 0 means the weapon comes first, 1 means weapon comes second, etc. This is more of a suggestion than a hardline rule to the game; several items can have the same order.)
+ITEM.SWEPViewModelFlip=false;							--Should we flip the viewmodel? If this is true, it makes left-handed viewmodels righthanded, and makes right-handed viewmodels lefthanded.
 
 --Don't modify/override these. They're either set automatically, don't need to be changed, or are listed here so I can keep track of them.
 --Belongs to item-type
@@ -594,6 +595,26 @@ IF.Items:ProtectKey("SetSize");
 * SHARED
 * Protected
 
+This sets whether or not the viewmodel is flipped when holding this item.
+
+Running this on the server will apply the viewmodel flip to any player who holds this item.
+Running this on the client will only apply the viewmodel flip for that player, however.
+
+bShouldFlip should be true or false:
+    If this is true, the viewmodel is flipped (left handed viewmodels become right handed viewmodels, and right handed viewmodels become left handed viewmodels)
+	If this is false, no viewmodel flipping is performed
+]]--
+function ITEM:SetSWEPViewModelFlip(bShouldFlip)
+	if bShouldFlip == nil then return self:Error("Couldn't set viewmodel flip; true/false value was expected but was not delivered.") end
+	
+	return self:SetNWBool("SWEPViewModelFlip",bShouldFlip);
+end
+IF.Items:ProtectKey("SetSWEPViewModelFlip");
+
+--[[
+* SHARED
+* Protected
+
 This sets the weapon menu slot and it's position in that slot that the item uses
 when it's being held as a weapon.
 
@@ -716,6 +737,18 @@ function ITEM:GetSWEPSlot()
 	return self:GetNWInt("SWEPSlot");
 end
 IF.Items:ProtectKey("GetSWEPSlot");
+
+--[[
+* SHARED
+* Protected
+
+This returns whether or not the viewmodel is flipped
+when it's being held as a weapon.
+]]--
+function ITEM:GetSWEPViewModelFlip()
+	return self:GetNWBool("SWEPViewModelFlip");
+end
+IF.Items:ProtectKey("GetSWEPViewModelFlip");
 
 --[[
 * SHARED

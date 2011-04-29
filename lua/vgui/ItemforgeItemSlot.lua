@@ -358,6 +358,7 @@ function PANEL:Paint()
 		
 		--Draw item in both 3D and 2D
 		if item then
+			item:Event("OnDraw2DBack",nil,self:GetWide(),self:GetTall());
 			if self.ModelPanel && self.ModelPanel:IsValid() then self.ModelPanel:Paint(item) end
 			item:Event("OnDraw2D",nil,self:GetWide(),self:GetTall());
 		end

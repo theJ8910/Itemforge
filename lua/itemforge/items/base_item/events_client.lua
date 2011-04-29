@@ -408,6 +408,19 @@ end
 * Event
 
 This function is run when an item slot (most likely the ItemforgeItemSlot VGUI control) is displaying this item and needs to draw.
+This function runs BEFORE OnDraw3D, so anything taking place in the background of the item can be carried out here (for instance, you could make the background for a stolen item red)
+Width is the size of the slot the item is being drawn in,
+and height is the height of the slot the item is being drawn in.
+]]--
+function ITEM:OnDraw2DBack(width,height)
+	
+end
+
+--[[
+* CLIENT
+* Event
+
+This function is run when an item slot (most likely the ItemforgeItemSlot VGUI control) is displaying this item and needs to draw.
 This function runs AFTER OnDraw3D, so any 2D overlays can be carried out here (ammo meters, item amounts, etc)
 Width is the size of the slot the item is being drawn in,
 and height is the height of the slot the item is being drawn in.
@@ -454,6 +467,10 @@ function ITEM:OnSetNWVar(sName,vValue)
 		if vValue!=nil then self.OverrideMaterialMat=Material(vValue);
 		else				self.OverrideMaterialMat=nil;
 		end
+	elseif sName == "SWEPViewModelFlip" then
+		--If we're currently holding this item as a weapon we need to update it's viewmodel flip status
+		local wep = self:GetWeapon();
+		if wep then wep.ViewModelFlip = vValue end
 	elseif sName == "SWEPSlot" then
 		--If we're currently holding this item as a weapon we need to update it's slot
 		local wep = self:GetWeapon();
