@@ -16,7 +16,7 @@ ITEM.MaxAmount=15;
 
 ITEM.WorldModel="models/weapons/w_eq_fraggrenade.mdl";
 ITEM.ViewModel="models/weapons/v_eq_fraggrenade.mdl";
-ITEM.ViewModelFlip = true;								--CS view models need to be flipped
+ITEM.SWEPViewModelFlip = true;								--CS view models need to be flipped
 
 ITEM.Spawnable=true;
 ITEM.AdminSpawnable=true;
@@ -93,6 +93,16 @@ end
 Active grenades cannot be merged (you can still have a stack of active grenades, though).
 ]]--
 function ITEM:CanMerge(otherItem,bToHere)
+	return !self:GetNWBool("Live");
+end
+
+--[[
+* SHARED
+* Event
+
+Active grenades cannot be split (you can still have a stack of active grenades, though).
+]]--
+function ITEM:CanSplit(howMany)
 	return !self:GetNWBool("Live");
 end
 
