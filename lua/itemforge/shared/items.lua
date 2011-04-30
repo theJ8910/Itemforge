@@ -18,14 +18,12 @@ BUG  Possibly PVS related or something - players will often see other players ho
 BUG  Sometimes players see bullets fired from other players... wierd!
 BUG  Debug module is reporting message -114 is undefined for some clients
 BUG  Okay, WTF? The pumpkin was both inside and outside of an inventory at the same time...
-BUG  Hitting ammo results in serverside bugs
 BUG  when item model changes it doesn't update on the "hold" icon.
 
 theJ89's Giant TODO list
 This is why the system hasn't been released yet:
 
 TODO Wire-neutral interface for third-party "wiremods"
-TODO Megadeath409 wants reloading of items serverside/clientside
 TODO When I get around to the networking update I need to use the Base64 code to encode binary to improve the client -> server networking.
 TODO Ebayle's suggestion of numbering dynamically generated weapons (hash code?).
 TODO You can dragdrop stuff to/from another player's inventory... fix this
@@ -418,7 +416,7 @@ function MODULE:LoadItemType(strType,bDynamic)
 	local extfolder=path.."/"..self.ExtensionsDirectory;		--itemforge/items/base_item/extend
 	if !bDynamic && IsLuaFolder(extfolder) then
 		--List of all extensions in this item's extension folder
-		local extensionFolders=file.FindInLua(extfolder.."/*");	--itemforge/items/item/extend/*
+		local extensionFolders=file.FindInLua(extfolder.."/*");	--itemforge/items/base_item/extend/*
 		
 		--We sort these because they need to load in the same order serverside and clientside
 		table.sort(extensionFolders);
@@ -427,13 +425,13 @@ function MODULE:LoadItemType(strType,bDynamic)
 			local v=extensionFolders[i];
 			if !IF.Util:IsBadFolder(v) then
 				--Load init serverside, cl_init clientside. In the abscence of either, load shared in it's place if it exists.
-				local extpath=extfolder..v;							--itemforge/items/item/extend/temperature
+				local extpath=extfolder.."/"..v;							--itemforge/items/base_item/extend/temperature
 				local ServerPath=extpath.."/init.lua";
 				local SharedPath=extpath.."/shared.lua";
 				local ClientPath=extpath.."/cl_init.lua";
 				if SERVER then
 					
-					if Exists(ServerPath)	then
+					if Exists(ServerPath) then
 						include(ServerPath);
 					elseif Exists(SharedPath) then
 						include(SharedPath);
@@ -443,7 +441,7 @@ function MODULE:LoadItemType(strType,bDynamic)
 					
 					if Exists(ClientPath) then
 						include(ClientPath);
-					elseif DoesLuaFileExist(SharedPath) then
+					elseif Exists(SharedPath) then
 						include(SharedPath);
 					end
 					
