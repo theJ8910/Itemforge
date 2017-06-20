@@ -4,16 +4,35 @@ SHARED
 
 This SWEP is an 'avatar' of an item. When an item is held, this weapon represents that item.
 ]]--
-SWEP.Author			= "theJ89"
-SWEP.Contact		= "theJ89@charter.net"
-SWEP.Purpose		= "This SWEP is a part of Itemforge. When an item is held, this weapon turns into the item you're holding."
-SWEP.Instructions	= "This will be spawned by the game when an item is held by a player. You can interact with the item by switching to this weapon then using left mouse, right mouse, etc."
 
-SWEP.Spawnable = false;
-SWEP.AdminSpawnable = false;
+--[[
+SWEPs need a lot of reworking.
+	Rather than using a polling model (GetItem in everything) lets control the state a little more efficiently.
+	Have two tables of SWEP events. One containing events for when no item is loaded, another containing events for when an item is loaded.
+	Have the weapon register itself as itemless if it doesn't have an item (first time initialization, removal). This will make the entity use the itemless events.
+	Each Think, have it try to acquire the items for Itemless weapons.
+	Have the weapon unregister itself as itemless when it acquires the item.
+	Lets apply this same model to itemforge_item entity.
 
-SWEP.ViewModel		= "models/weapons/v_crowbar.mdl";
-SWEP.WorldModel		= "models/weapons/w_crowbar.mdl";
+	We need to come up with a better way of handling failed SWEP pickups.
+	Current idea is to implement a delayed hold. Calling :Hold() creates an itemforge_item_held, registers it as a potential failed pickup,
+	and keeps trying to make the intended owner pick it up.
+	When the weapon is picked up, it compares the owner to the intended owner.
+	If it matches, THEN the item is bound to the weapon.
+	If not, the weapon is removed.
+	This will require a significant rewrite of the weapon model will take a lot of time, so we'll save this for later.
+]]--
+
+SWEP.Author					= "theJ89"
+SWEP.Contact				= "theJ89@charter.net"
+SWEP.Purpose				= "This SWEP is a part of Itemforge. When an item is held, this weapon turns into the item you're holding."
+SWEP.Instructions			= "This will be spawned by the game when an item is held by a player. You can interact with the item by switching to this weapon then using left mouse, right mouse, etc."
+
+SWEP.Spawnable				= false;
+SWEP.AdminSpawnable			= false;
+
+SWEP.ViewModel				= "models/weapons/v_crowbar.mdl";
+SWEP.WorldModel				= "models/weapons/w_crowbar.mdl";
 
 SWEP.Primary.ClipSize		= 0;
 SWEP.Primary.DefaultClip	= 0;
@@ -25,45 +44,66 @@ SWEP.Secondary.DefaultClip	= 0;
 SWEP.Secondary.Automatic	= false;
 SWEP.Secondary.Ammo			= "none";
 
---May change
-SWEP.ViewModelFOV	= 62;
-SWEP.ViewModelFlip	= false;
-
-SWEP.BeingRemoved=false;
+SWEP.BeingRemoved			= false;
 
 --[[
 * SHARED
+* Event
 
 Set up the first DT int to be the item ID.
+
 This is good because when the weapon gets created the item ID goes with it!
 This pretty much fixes the HUD reporting a pickup of "Itemforge Item" whenever you hold the
 weapon, although it's still possible (e.g. given the weapon before the item is created on
 the client, in the case that an item is created held by a player).
 ]]--
 function SWEP:SetupDataTables()
-	self:DTVar("Int",0,"i");
+	self:DTVar( "Int", 0, "i" );
 end
 
 --[[
 * SHARED
 
-Set item this is associated with
+Sets the item this weapon is associated with.
 ]]--
-function SWEP:SetItem(item)
-	if self.BeingRemoved || !item then return false end
-	self.Item=item;
+function SWEP:SetItem( item )
+	if item then
+		self.Item = item;
 	
-	--Initialize the SWEP - take care of some basic things like setting the world+view models, whether or not the weapon is automatic, setting the display name, etc
-	item:Event("OnSWEPInit",nil,self,self.Weapon);
+		--Serverside, SetItem is only called once, when the weapon is created.
+		if SERVER then
+		
+			item:Event( "OnSWEPInit", nil, self.Weapon );
+
+			--Inform this entity what item ID to look for when pairing clientside
+			self.Weapon:SetDTInt( "i", item:GetID() );
+
+		--Clientside, SetItem is called after it is acquired by a player. It may also be called after a lag spike to reconnect the item.
+		else
+
+			--If the item already initialized clientside, this is an indication of a lag spike reconnect.
+			if self.HasInitialized then
+				self.BeingRemoved = false;
+			else
+				item:Event( "OnSWEPInit", nil, self.Weapon );
+				self.HasInitialized = true;
+			end
+		
+			item:Hold( self.Owner, nil, self.Weapon, false );
+			self:UnregisterAsItemless();
+			self:SwapToItemEvents();
+
+		end
 	
-	if SERVER then
-		--Inform this entity what item ID to look for when pairing clientside
-		self.Weapon:SetDTInt("i",item:GetID());
+		--HACK
+		self:Register();
 	else
-		item:Hold(self.Owner,nil,self.Weapon,false);
-		self:UpdateViewmodel();
+		self.Item = nil;
+		if CLIENT then
+			self:RegisterAsItemless();
+			self:SwapToItemlessEvents();
+		end
 	end
-	return true;
 end
 
 --[[
@@ -72,23 +112,9 @@ end
 Returns the item that is piloting this SWEP.
 ]]--
 function SWEP:GetItem()
-	--Don't have an item yet, lets try to acquire it
-	if !self.Item then	
-		if CLIENT then
-			local item=IF.Items:Get(self.Weapon:GetDTInt("i"));
-			if self:HasOwner() && !self:IsBeingRemoved() && !self:SetItem(item) then
-				return nil;
-			elseif item then
-				--Proper initialization requires that the weapon already has been picked up,
-				--but in order for the name to appear correctly we can set the item's
-				--name here.
-				self.PrintName = item:Event("GetName","Itemforge Item");
-			end
-		end
-	
 	--We had an item set but it's not valid any more
-	elseif !self.Item:IsValid() then
-		self.Item=nil;
+	if self.Item && !self.Item:IsValid() then
+		self.Item = nil;
 	end
 	
 	return self.Item;
@@ -101,7 +127,7 @@ Returns true if the SWEP has a valid owner, false otherwise
 If the item hasn't been picked up yet this is nil
 ]]--
 function SWEP:HasOwner()
-	return self.Owner && self.Owner:IsValid();
+	return self.Owner:IsValid();
 end
 
 --[[
@@ -115,98 +141,76 @@ end
 
 --[[
 * SHARED
-
-Updates the viewmodel to the one the item says the weapon should use
-]]--
-function SWEP:UpdateViewmodel()
-	local pl=self.Owner;
-	if !pl || self.Weapon!=pl:GetActiveWeapon() then return false end
-	
-	if SERVER || pl==LocalPlayer() then
-		local vm=pl:GetViewModel();
-		vm:SetModel(self.ViewModel);
-		vm:ResetSequenceInfo();
-	end
-	
-	return true;
-end
-
---[[
-* SHARED
+* Event
 
 Weapon initilization is carried out at link time
 ]]--
 function SWEP:Initialize()
-	--HACK
-	self:Register();
-	
+	if CLIENT then self:RegisterAsItemless() end
+
 	--Attempt to acquire at initialization time
-	self:GetItem();
+	--self:GetItem();
 end
 
 --[[
 * SHARED
+* Event
 
 Itemforge-based holster event
 A different weapon is being swapped to
 ]]--
-function SWEP:IFHolster(wep)
-	local item=self:GetItem();
+function SWEP:IFHolster()
+	local item = self:GetItem();
 	if !item then return true end
 		
-	return item:Event("OnSWEPHolsterIF",true);
+	return item:Event( "OnSWEPHolsterIF", true );
 end
 
 --[[
 * SHARED
+* Event
 
 Source-based holster event
-This weapon is being swapped to
+A different weapon is being swapped to
 ]]--
 function SWEP:Holster()
-	local item=self:GetItem();
+	local item = self:GetItem();
 	if !item then return true end
 	
-	return item:Event("OnSWEPHolster",true);
+	return item:Event( "OnSWEPHolster", true );
 end
 
 --[[
 * SHARED
-
-Source-based deploy event
-This weapon is being deployed
-]]--
-function SWEP:Deploy()
-	if SERVER then
-		self:UpdateViewmodel();
-		--self.Owner:DrawViewModel(false);
-	end
-	
-	local item=self:GetItem();
-	if !item then return true end
-	
-	item:Event("OnSWEPDeploy",true);
-end
-
---[[
-* SHARED
+* Event
 
 Itemforge-based deploy event
 This weapon is being swapped to
 ]]--
 function SWEP:IFDeploy()
-	if SERVER then
-		--self.Owner:DrawViewModel(false);
-	end
-	
-	local item=self:GetItem();
+	local item = self:GetItem();
 	if !item then return true end
 	
-	return item:Event("OnSWEPDeployIF",true);
+	return item:Event( "OnSWEPDeployIF", true );
 end
 
 --[[
 * SHARED
+* Event
+
+Source-based deploy event
+This weapon is being deployed
+]]--
+function SWEP:Deploy()
+	local item = self:GetItem();
+	if !item then return true end
+	
+	item:Event( "OnSWEPDeploy", true );
+end
+
+--[[
+* SHARED
+* Event
 
 Do we need to precache anything?
 ]]--
@@ -215,64 +219,66 @@ end
 
 --[[
 * SHARED
+* Event
 
 Reroute to item's OnSWEPPrimaryAttack
 ]]--
 function SWEP:PrimaryAttack()
-	local item=self:GetItem();
-	if !item then return false end
-	
-	return item:Event("OnSWEPPrimaryAttack");
+	return self:GetItem():Event( "OnSWEPPrimaryAttack" );
 end
 
 --[[
 * SHARED
+* Event
 
 Reroute to item's OnSWEPSecondaryAttack
 ]]--
 function SWEP:SecondaryAttack()
-	local item=self:GetItem();
-	if !item then return false end
-	
-	return item:Event("OnSWEPSecondaryAttack");
+	return self:GetItem():Event( "OnSWEPSecondaryAttack" );
 end
 
 --[[
 * SHARED
+* Event
 
 ?? Can reload?
 ]]--
 function SWEP:CheckReload()
-	local item=self:GetItem();
-	if !item then return false end
-	
-	return item:Event("OnSWEPCheckReload");
+	return self:GetItem():Event( "OnSWEPCheckReload" );
 end
 
 --[[
 * SHARED
+* Event
 
 Being reloaded
 TODO: This has no way to know if the weapon is done reloading since we don't do
 DefaultReload like most SWEPs do; need to figure out a solution for this
 ]]--
 function SWEP:Reload()
-	local item=self:GetItem();
-	if !item then return false end
-	
-	return item:Event("OnSWEPReload");
+	return self:GetItem():Event( "OnSWEPReload" );
 end
 
 --[[
 * SHARED
+* Event
 
-May allow items to override later
+Being reloaded
+TODO: This has no way to know if the weapon is done reloading since we don't do
+DefaultReload like most SWEPs do; need to figure out a solution for this
 ]]--
-function SWEP:ContextScreenClick( aimvec, mousecode, pressed, ply )
-	local item=self:GetItem();
-	if !item then return false end
-	
-	return item:Event("OnSWEPContextScreenClick",nil,aimvec,mousecode,pressed,ply);
+function SWEP:Think()
+	return self:GetItem():Event( "OnSWEPThink" );
+end
+
+--[[
+* SHARED
+* Event
+
+Runs when the player clicks the screen while holding c with this weapon out 
+]]--
+function SWEP:ContextScreenClick( vAimVec, eMouseCode, bPressed, pl )
+	return self:GetItem():Event( "OnSWEPContextScreenClick", nil, vAimVec, eMouseCode, bPressed, pl );
 end
 
 --[[
@@ -284,23 +290,10 @@ function SWEP:IsBeingRemoved()
 	return self.BeingRemoved;
 end
 
---[[
-* HACK
 
-I hate hate HATE having to do this!
-This hook checks the active weapons of each player every frame.
+--RegWeapons is a table of all current Itemforge SWEPs.
+local RegWeapons = {};
 
-If the player has changed weapons we check to see if his new weapon was an itemforge weapon.
-If it is, we IFDeploy it.
-
-Then, we check to see if his old weapon was an itemforge weapon.
-If it was, we IFHolster it.
-
-RegWeapons is a table of all current Itemforge SWEPs deployed.
-
-EntityRemoved removes the player from the PlayerWeapons registry when the player leaves.
-]]--
-local RegWeapons={};
 
 --[[
 * SHARED
@@ -309,7 +302,7 @@ local RegWeapons={};
 Registers the weapon with Itemforge
 ]]--
 function SWEP:Register()
-	RegWeapons[self]=self;
+	RegWeapons[self] = self;
 end
 
 --[[
@@ -319,25 +312,150 @@ end
 Unregisters the weapon with Itemforge
 ]]--
 function SWEP:Unregister()
-	RegWeapons[self]=nil;
+	RegWeapons[self] = nil;
 end
 
-hook.Add("Think","itemforge_holster_deploy_think",function()
-	local players = player.GetAll();
-	local wep, oldwep;
-	for k,v in pairs(players) do
-		newwep=v:GetActiveWeapon();
-		oldwep=v.ItemforgeLastWeapon;
+local FailedPickupWeapons;
+local ItemlessWeapons;
+
+if SERVER then
+
+
+
+
+--FailedPickupWeapons is a table of Itemforge SWEPs that haven't been picked up yet.
+FailedPickupWeapons = {};
+
+--[[
+* SHARED
+* HACK
+
+Registers this weapon as a potential failed pickup.
+
+pl should be the player who was intended to pick it up.
+]]--
+function SWEP:RegisterFailedPickup( pl )
+	FailedPickupWeapons[self] = self;
+	self.IntendedOwner = pl;
+end
+
+--[[
+* SHARED
+* HACK
+
+The weapon is no longer considered a potential failed pickup.
+Should be called when it's confirmed the intended player has picked it up.
+]]--
+function SWEP:UnregisterFailedPickup()
+	self.IntendedOwner = nil;
+	FailedPickupWeapons[self] = nil;
+end
+
+
+
+
+else
+
+
+
+
+--ItemlessWeapons is a table of Itemforge SWEPs that haven't been bound to an item clientside yet.
+ItemlessWeapons = {};
+
+--[[
+* SHARED
+
+Registers this weapon as having no item.
+]]--
+function SWEP:RegisterAsItemless()
+	ItemlessWeapons[self] = self;
+end
+
+--[[
+* SHARED
+
+Unregisters the weapon as having no item.
+]]--
+function SWEP:UnregisterAsItemless()
+	ItemlessWeapons[self] = nil;
+end
+
+
+
+
+end
+
+--[[
+* HACK
+
+I hate hate HATE having to do this!
+This hook checks the active weapons of each player every frame.
+
+If the player has changed weapons we check to see if his old weapon was an Itemforge weapon.
+If it was, we IFHolster it.
+
+Then, we check to see if his new weapon is an Itemforge weapon.
+If it is, we IFDeploy it.
+
+Additionally, serverside potential failed pickups are moved to the respective intended players.
+Clientside, the hook searches for any Itemless SWEP's items.
+]]--
+hook.Add( "Think", "itemforge_swep_think", function()
+	local eNewWep, eOldWep;
+	for k, v in pairs( player.GetAll() ) do
+		eNewWep = v:GetActiveWeapon();
+		eOldWep = v.ItemforgeLastWeapon;
 		
-		if newwep!=oldwep then
-			if IsValid(oldwep) && RegWeapons[oldwep] then
-				oldwep:IFHolster();
-			end
-			if IsValid(newwep) && RegWeapons[newwep] then
-				newwep:IFDeploy();
-			end			
+		if eNewWep != eOldWep then
+			if IsValid( eOldWep ) && RegWeapons[eOldWep] then		eOldWep:IFHolster()		end
+			if IsValid( eNewWep ) && RegWeapons[eNewWep] then		eNewWep:IFDeploy()		end
 		end
 		
-		v.ItemforgeLastWeapon=newwep;
+		v.ItemforgeLastWeapon = eNewWep;
 	end
-end);
+	
+	if SERVER then
+
+		for k, v in pairs( FailedPickupWeapons ) do
+			if IsValid( v.IntendedOwner ) then
+				if		v.Owner == v.IntendedOwner	then	v:UnregisterFailedPickup();
+				elseif	v.Owner:IsValid() 			then	v:GetItem():HoldFailed();				--Owner doesn't match intended owner
+				else										v:SetPos( IF.Util:RandomVectorInAABB( v.IntendedOwner:WorldSpaceAABB() ) );
+				end
+			else
+				v:GetItem():HoldFailed();	--Intended owner is no longer valid (player left)
+			end
+		
+		end
+
+	else
+		local item;
+		for k, v in pairs( ItemlessWeapons ) do
+			
+			if k:IsValid() then
+				item = IF.Items:Get( v:GetDTInt( "i" ) );
+				if item then
+					if v:HasOwner() then
+						v:SetItem( item )
+					else
+
+						--[[
+						Proper initialization requires that the weapon already has been picked up,
+						but in order for the name to appear correctly on pickup we have to set the weapon's
+						printname here.
+						]]--
+						v.PrintName = item:Event( "GetName", "Itemforge Item" );
+					end
+				end
+
+			--This is a necessary cleanup check because unfortunately SWEP:Remove() does not indicate the final removal of a weapon.
+			--SWEPs become Itemless on removal, and unintentionally remain in the ItemlessWeapons table in the event of real removal.
+			else
+				ItemlessWeapons[k] = nil;
+			end
+
+			
+		end
+
+	end
+end );

@@ -5,9 +5,9 @@ SERVER
 This module manages and defines item combinations.
 ]]--
 
-MODULE.Name="Combo";											--Our module will be stored at IF.Combo
-MODULE.Disabled=false;											--Our module will be loaded
-MODULE.RegisteredCombos={};
+MODULE.Name				= "Combo";									--Our module will be stored at IF.Combo
+MODULE.Disabled			= false;									--Our module will be loaded
+MODULE.RegisteredCombos	= {};
 
 --[[
 * SHARED
@@ -20,7 +20,7 @@ end
 --[[
 * SHARED
 
-Cleanup player inventory module
+Cleanup combo module
 ]]--
 function MODULE:Cleanup()
 end
@@ -29,7 +29,7 @@ end
 * SHARED
 
 ]]--
-function MODULE:SimpleCombo(sName,tIngredients,sResult)
+function MODULE:SimpleCombo( strName, tIngredients, strResult )
 
 end
 
@@ -37,6 +37,6 @@ end
 * SHARED
 
 ]]--
-function MODULE:DefineCombo(sName,fIsComboValid,fPerformCombo)
+function MODULE:DefineCombo( strName, fIsComboValid, fPerformCombo )
 
 end

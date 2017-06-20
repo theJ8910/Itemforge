@@ -2,42 +2,47 @@
 Itemforge Base Module
 SERVER
 
-This module creates a base class that contains functionality used by both items and inventories.
+This module forms the foundation for Itemforge's class system.
+It also creates a base class that contains functionality used by all classes, including items and inventories.
 ]]--
 
-MODULE.Name="Base";										--Our module will be stored at IF.Base
-MODULE.Disabled=false;									--Our module will be loaded
-MODULE.PostLoad=false;									--Have all the classes been loaded and registered yet?
+MODULE.Name				= "Base";							--Our module will be stored at IF.Base
+MODULE.Disabled			= false;							--Our module will be loaded
+MODULE.PostLoad			= false;							--Have all the classes been loaded and registered yet?
 
-local BaseClassName="base";								--The name of the base for all Itemforge objects
+local BaseClassName		= "base";							--The name of the base for all Itemforge objects
 
-local _CLASSES={};				--Cached class tables sorted by name are stored here.
-local _ORIGINALCLASSES={};		--For every class there is an original class table. This contains everything unique to that class, is recorded when you register the class, and is used during a reload of that class.
-local _DERIVED={};				--For every class there is a list of classes that derive from (are based off of) it. These are stored here sorted by name. The values are the class tables themselves.
-local _FUNCTOCLASS={};			--A table that ties class methods to the classes they're defined in
+local _CLASSES			= {};								--Cached class tables sorted by name are stored here.
+local _ORIGINALCLASSES	= {};								--For every class there is an original class table. This contains everything unique to that class, is recorded when you register the class, and is used during a reload of that class.
+local _DERIVED			= {};								--For every class there is a list of classes that derive from (are based off of) it. These are stored here sorted by name. The values are the class tables themselves.
+local _FUNCTOCLASS		= {};								--A table that ties class methods to the classes they're defined in
 
-local _CACHEmt={};				--If a class hasn't had cached any data from its base classes, it has this metatable. The first time you index something from this class the data is cached and it's metatable swaps over to _CLASSmt.
-local _CLASSmt={};				--Itemforge class metatable; protects keys in the class.
+local _CACHEmt			= {};								--If a class hasn't had cached any data from its base classes, it has this metatable. The first time you index something from this class the data is cached and it's metatable swaps over to _CLASSmt.
+local _CLASSmt			= {};								--Itemforge class metatable; protects keys in the class.
 
-local _BASE={};					--Base Itemforge Object class
+local _BASE				= {};								--Base Itemforge Object class
 
 --[[
 Rather than making a copy of these strings every time an object is created,
 we just store them here and reference as needed.
 ]]--
+
 --On new index event
-local IFB_ONI = "OnNewIndex";
+local IFB_ONI			= "OnNewIndex";
+
 --If an object is invalid this is what is displayed
-local IFB_TSI="Object [invalid]";
+local IFB_TSI			= "Object [invalid]";
+
 --Error with get table
-local IFB_EGT = "Itemforge Base: Couldn't grab object table from removed object.\n";
+local IFB_EGT			= "Itemforge Base: Couldn't grab object table from removed object.\n";
+
 --Error with index
-local IFB_EI = {
+local IFB_EI			= {
 	"Itemforge Base: Couldn't reference \"",
 	"\" on removed object.\n",
 };
 --Error with new index
-local IFB_ENI = {
+local IFB_ENI			= {
 	"WARNING! \"",
 	"\" tried to override \"",
 	"\", a protected function or value in the \"",
@@ -47,8 +52,9 @@ local IFB_ENI = {
 	"\" to \"",
 	"\" on removed object.\n",
 };
+
 --Error with To String
-local IFB_ETS="ToString error: ";
+local IFB_ETS			= "ToString error: ";
 
 --[[
 * SHARED
@@ -56,7 +62,7 @@ local IFB_ETS="ToString error: ";
 Initilize base module
 ]]--
 function MODULE:Initialize()
-	self:RegisterClass(_BASE,BaseClassName);
+	self:RegisterClass( _BASE, BaseClassName );
 end
 
 --[[
@@ -73,8 +79,8 @@ end
 Creates a new cache table; basically new table + _CACHEmt metatable applied.
 ]]--
 local function CacheTable()
-	local t={};
-	setmetatable(t,_CACHEmt);
+	local t = {};
+	setmetatable( t, _CACHEmt );
 	return t;
 end
 
@@ -84,8 +90,8 @@ end
 Used after the cache has been built.
 Turns off future cache builds on the cached class table by changing the metatable to _CLASSmt
 ]]--
-local function NoCache(tClass)
-	setmetatable(tClass,_CLASSmt);
+local function NoCache( tClass )
+	setmetatable( tClass, _CLASSmt );
 end
 
 --[[
@@ -94,9 +100,9 @@ end
 Clears the given cache table and sets it's metatable back to _CACHEmt to indicate
 the cache needs to be rebuilt
 ]]--
-local function ClearCache(tClass)
-	for k,v in pairs(tClass) do rawset(tClass,k,nil) end
-	setmetatable(tClass,_CACHEmt);
+local function ClearCache( tClass )
+	for k,v in pairs( tClass ) do rawset( tClass, k, nil ) end
+	setmetatable( tClass, _CACHEmt );
 end
 
 --[[
@@ -104,9 +110,9 @@ end
 
 Builds the cache for the given cached class table.
 ]]--
-local function CacheBuild(tClass)
+local function CacheBuild( tClass )
 	--To build the cache we at least need to be inherited first
-	local bc=rawget(tClass,"BaseClass");
+	local bc = rawget( tClass, "BaseClass" );
 	if !bc then return end
 	
 	--[[
@@ -117,17 +123,17 @@ local function CacheBuild(tClass)
 	depending on how many classes in it's inheritence chain that hadn't been cached there were.
 	]]--
 	repeat
-		for k,v in pairs(bc) do if rawget(tClass,k)==nil then rawset(tClass,k,v); end end
+		for k,v in pairs( bc ) do if rawget( tClass, k ) == nil then rawset( tClass, k, v ); end end
 		--[[
 		In the case that we inherited everything from a cached base-class (which would happen if someone had already spawned an object of the base class),
 		we can just end the loop because we know we have everything at that point.
 		]]--
-		if bc._NeedsCache!=true then break end
-		bc=bc.BaseClass;
-	until bc==nil
+		if bc._NeedsCache != true then break end
+		bc = bc.BaseClass;
+	until bc == nil
 	
 	--Inheritence complete; turn off cache-related functions
-	NoCache(tClass);
+	NoCache( tClass );
 end
 
 --[[
@@ -142,18 +148,18 @@ f should be the method that you're wrapping.
 Returns a function that should replace the given function.
 ]]--
 --[[
-local function WrapMethod(t,f)
-	return function(o,...)
-		if type(o)=="table" then
-			local tO=rawget(o,"BaseClass");
-			rawset(o,"BaseClass",rawget(t,"BaseClass"));
+local function WrapMethod( t, f )
+	return function( o, ... )
+		if type( o ) == "table" then
+			local tO = rawget( o, "BaseClass" );
+			rawset( o, "BaseClass", rawget( t, "BaseClass" ) );
 			
-			local r={f(o,...)};
+			local r = { f( o, ... ) };
 			
-			rawset(o,"BaseClass",tO);
-			return unpack(r);
+			rawset( o, "BaseClass", tO );
+			return unpack( r );
 		else
-			return f(o,...);
+			return f( o, ... );
 		end
 	end	
 end
@@ -168,7 +174,7 @@ Classes are templates that are used to create objects.
 		The nice thing about this is that you can easily create objects with one or two lines of code,
 		rather than creating blank objects and then writing code that sets them up manually every time.
 
-After a class has been registered, you can instantiate objects of that class by using IF.Base:CreateObject(strName).
+After a class has been registered, you can instantiate objects of that class by using IF.Base:CreateObject( strName ).
 
 You can also create classes that are based off of other classes. This is called "inheritence".
 	If a class is based off of another class, this means that the first class has everything it's base does,
@@ -198,31 +204,31 @@ NOTE:
 The returned class table is not tClass. It's a cached class table, which has everything you specified in tClass,
 and after inheritence is performed, will have everything it's base class has.
 ]]--
-function MODULE:RegisterClass(tClass,strName)
-	if !IF.Util:IsTable(tClass)		then ErrorNoHalt("Itemforge Base: Couldn't register class. Given class table was invalid.\n"); return nil; end
-	if !IF.Util:IsString(strName)	then ErrorNoHalt("Itemforge Base: Couldn't register class. The given class name was invalid.\n"); return nil; end
-	strName=string.lower(strName);
+function MODULE:RegisterClass( tClass, strName )
+	if !IF.Util:IsTable( tClass )		then ErrorNoHalt( "Itemforge Base: Couldn't register class. Given class table was invalid.\n" ); return nil; end
+	if !IF.Util:IsString( strName )		then ErrorNoHalt( "Itemforge Base: Couldn't register class. The given class name was invalid.\n" ); return nil; end
+	strName = string.lower( strName );
 	
-	tClass.ClassName=strName;
-	tClass.Classname=strName;
+	tClass.ClassName = strName;
+	tClass.Classname = strName;
 	
-	local t=_CLASSES[strName];
-	local bOverride = (t!=nil);
+	local t = _CLASSES[strName];
+	local bOverride = (t != nil);
 	if bOverride then
 		
-		--Since we're overriding an existing class, The old functions are no longer valid.
-		for k,v in pairs(_ORIGINALCLASSES[strName]) do _FUNCTOCLASS[v]=nil end
+		--Since we're overriding an existing class, the old functions are no longer valid.
+		for k, v in pairs( _ORIGINALCLASSES[strName] ) do _FUNCTOCLASS[v] = nil end
 		
 		--There's a good chance the new class doesn't inherit from the old one's base
-		local strOldBase=t.Base;
-		if strOldBase then _DERIVED[strOldBase][t]=nil end
+		local strOldBase = t.Base;
+		if strOldBase then _DERIVED[strOldBase][t] = nil end
 		
 		--We empty out the existing cached class table so existing objects of this class can
 		--take advantage of the new contents.
-		ClearCache(t);
+		ClearCache( t );
 	else
 		--Otherwise, we create a new cached class table for this class.
-		t=CacheTable();
+		t = CacheTable();
 	end
 	
 	--[[
@@ -231,43 +237,43 @@ function MODULE:RegisterClass(tClass,strName)
 	you can access it's class by doing myObj["item_crowbar"].
 	
 	Additionally, because of how inheritence works, you can access any of item_crowbar's base classes
-	from an object of that type (e.g. myObj["base_melee"]) or from any class
+	from an object of that type (e.g. myObj["base_melee"]) or from
 	the item_crowbar class itself (e.g. myObj["item_crowbar"]["base_melee"]).
 	]]--
-	rawset(t,strName,t);
+	rawset( t, strName, t );
 	
 	--The cached class table starts out with everything the given table has,
 	--and afterwords will cache things from it's base classes as necessary.
-	for k,v in pairs(tClass) do
-		rawset(t,k,v);
-		if IF.Util:IsFunction(v) then _FUNCTOCLASS[v]=t end
+	for k,v in pairs( tClass ) do
+		rawset( t, k, v );
+		if IF.Util:IsFunction( v ) then _FUNCTOCLASS[v] = t end
 	end
 	
 	--Register class offically
 	_CLASSES[strName] = t;
-	_ORIGINALCLASSES[strName]=tClass;
+	_ORIGINALCLASSES[strName] = tClass;
 	
 	--If the class has a post-register function set up we run it here
-	local fClassReg=t.OnClassRegister;
-	if IF.Util:IsFunction(fClassReg) then
-		local s,r=pcall(fClassReg,t);
-		if !s then ErrorNoHalt("Itemforge Base: OnClassRegister event for class \""..strName.."\" failed: "..r.."\n") end
+	local fClassReg = t.OnClassRegister;
+	if IF.Util:IsFunction( fClassReg ) then
+		local s, r = pcall( fClassReg, t );
+		if !s then ErrorNoHalt( "Itemforge Base: OnClassRegister event for class \""..strName.."\" failed: "..r.."\n" ) end
 	end
 	
-	--If this was an override any derived classes are reloaded.
+	--If this was an override, any derived classes are reloaded.
 	--Otherwise we create a blank DERIVED table to record future derived classes.
 	if bOverride then
-		for k,v in pairs(_DERIVED[strName]) do
-			local strDCName=k.ClassName;
-			self:RegisterClass(_ORIGINALCLASSES[strDCName],strDCName);
+		for k,v in pairs( _DERIVED[strName] ) do
+			local strDCName = k.ClassName;
+			self:RegisterClass( _ORIGINALCLASSES[strDCName], strDCName );
 		end
 	else
-		_DERIVED[strName]={};
+		_DERIVED[strName] = {};
 	end
 	
 	--If this class was created after initialization (all classes loaded then inherited) we can just perform the inheritence now
-	if self.PostLoad==true then
-		self:Inherit(t);
+	if self.PostLoad == true then
+		self:Inherit( t );
 	end
 	
 	return t;
@@ -278,67 +284,70 @@ end
 
 This is done automatically. There should be no reason for a scripter to call this.
 Makes the given class inherit from it's base.
+
+tClass should be the cached class table for the class that needs to be inherited.
+
 Returns true if the class has fully inherited from it's base.
 ]]--
-function MODULE:Inherit(tClass)
+function MODULE:Inherit( tClass )
 	--If we've already inherited we're done
 	if tClass.BaseClass != nil then return true end
 	
 	--The absolute base class does not inherit from anything, therefore it has no need to cache or inherit
-	local ClassName=tClass.ClassName;
-	if ClassName==BaseClassName then NoCache(tClass); return true end
+	local ClassName = tClass.ClassName;
+	if ClassName == BaseClassName then NoCache( tClass ); return true end
 	
 	--Locate the class's requested base class
-	local strRequestedBase=tClass.Base;
-	if IF.Util:IsString(strRequestedBase) then
-		strRequestedBase=string.lower(strRequestedBase);
+	local strRequestedBase = tClass.Base;
+	if IF.Util:IsString( strRequestedBase ) then
+		strRequestedBase = string.lower( strRequestedBase );
 		
 		--Make sure we're not trying to inherit from ourselves
-		if strRequestedBase!=ClassName then
+		if strRequestedBase != ClassName then
 			--Direct reference to class's base-class
-			local tBaseClass=_CLASSES[strRequestedBase];
+			local tBaseClass = _CLASSES[strRequestedBase];
 			
 			if tBaseClass!=nil then
-				rawset(tClass,"Base",strRequestedBase);
-				rawset(tClass,"BaseClass",tBaseClass);
+				rawset( tClass, "Base", strRequestedBase );
+				rawset( tClass, "BaseClass", tBaseClass );
 			
 			--Couldn't find the base-class (note that all classes are loaded before bases are set,
 			--so the only reason this would happen is if the requested base-class isn't loaded or couldn't be loaded)
 			else
-				ErrorNoHalt("Itemforge Base: Class \""..ClassName.."\" could not inherit from class \""..strRequestedBase.."\". \""..strRequestedBase.."\" could not be found.\n");
+				ErrorNoHalt( "Itemforge Base: Class \""..ClassName.."\" could not inherit from class \""..strRequestedBase.."\". \""..strRequestedBase.."\" could not be found.\n" );
 			end
 		else
-			ErrorNoHalt("Itemforge Base: Class \""..ClassName.."\" was based off of itself; classes cannot inherit from themselves.\n");
+			ErrorNoHalt( "Itemforge Base: Class \""..ClassName.."\" was based off of itself; classes cannot inherit from themselves.\n" );
 		end
 	end
 	
 	--If BaseClass still hasn't been set, then we'll set it's base to the absolute base class
-	if tClass.BaseClass==nil then
-		rawset(tClass,"Base",BaseClassName);
-		rawset(tClass,"BaseClass",_CLASSES[BaseClassName]);
+	if tClass.BaseClass == nil then
+		rawset( tClass, "Base", BaseClassName );
+		rawset( tClass, "BaseClass", _CLASSES[BaseClassName] );
 	end
 	
 	--Make sure this class's base class is fully inherited; this will recursively inherit the entire chain
-	self:Inherit(tClass.BaseClass);
+	self:Inherit( tClass.BaseClass );
 	
 	--Make sure that this class isn't overriding anything protected in the base classes.
-	for k,v in pairs(tClass) do
-		local pc=IF.Base:IsProtectedKey(tClass.BaseClass,k);
-		if pc then ErrorNoHalt("Itemforge Base: WARNING! "..ClassName.." tried to override \""..tostring(k).."\", a protected function or value in the \""..pc.ClassName.."\" class.\n");
-			rawset(tClass,k,nil);
+	for k,v in pairs( tClass ) do
+		local pc = IF.Base:IsProtectedKey( tClass.BaseClass, k );
+		if pc then ErrorNoHalt( "Itemforge Base: WARNING! "..ClassName.." tried to override \""..tostring(k).."\", a protected function or value in the \""..pc.ClassName.."\" class.\n" );
+			rawset( tClass, k, nil );
 			
 			--We also clear from the original class so if we reload the error isn't unnecessarily repeated
-			_ORIGINALCLASSES[ClassName][k]=nil;
+			_ORIGINALCLASSES[ClassName][k] = nil;
 		end
 	end
 	
 	--Following a successful inherit we mark this as an inherited class of the base class
-	_DERIVED[tClass.Base][tClass]=true;
+	_DERIVED[tClass.Base][tClass] = true;
 	
 	--Then we run the post inherit event for this class
-	local fOnClassInherit = IF.Base:InheritedLookup(tClass,"OnClassInherited");
-	local s,r=pcall(fOnClassInherit,tClass);
-	if !s then ErrorNoHalt("Itemforge Base: OnClassInherited event for class \""..ClassName.."\" failed: "..r.."\n") end
+	local fOnClassInherit = IF.Base:InheritedLookup( tClass, "OnClassInherited" );
+	local s, r = pcall( fOnClassInherit, tClass );
+	if !s then ErrorNoHalt( "Itemforge Base: OnClassInherited event for class \""..ClassName.."\" failed: "..r.."\n" ) end
 	
 	return true;
 end
@@ -352,8 +361,8 @@ This function performs the inheritence for every class and should typically
 be done after all classes are loaded, but before any class has been inherited.
 ]]--
 function MODULE:DoInheritance()
-	for k,v in pairs(_CLASSES) do
-		self:Inherit(v);
+	for k, v in pairs( _CLASSES ) do
+		self:Inherit( v );
 	end
 	self.PostLoad = true;
 end
@@ -362,26 +371,31 @@ end
 * SHARED
 
 Returns true if a class with the given name is registered.
+
+strName should be the name of the class.
+
+Returns true if the class exists,
+or false otherwise.
 ]]--
-function MODULE:ClassExists(sName)
-	return (_CLASSES[string.lower(sName)]!=nil);
+function MODULE:ClassExists( strName )
+	return ( _CLASSES[string.lower( strName )] != nil );
 end
 
 --[[
 * SHARED
 
 Given a class table and a key, this function will check to see if the key is protected and
-therefore can't (more like shouldn't) be overriden.
+therefore can't (more like shouldn't) be overridden.
 
 tClass should be a class table.
-k should be the key you want to check.
+vK should be the key you want to check.
 
 If the key is protected, the cached class table of the class protecting the key is returned.
 nil is returned otherwise.
 ]]--
-function MODULE:IsProtectedKey(tClass,k)
+function MODULE:IsProtectedKey( tClass, vK )
 	local pk;
-	while tClass!=nil do
+	while tClass != nil do
 		--[[
 		We use rawget because inheritance would sometimes make us look at the same _ProtectedKeys more than once.
 		e.g: Lets say this is the inheritance of weapon_smg:
@@ -392,10 +406,10 @@ function MODULE:IsProtectedKey(tClass,k)
 		
 		Besides that, rawget doesn't trigger the cache build in unbuilt classes.
 		]]--
-		pk=rawget(tClass,"_ProtectedKeys");
-		if pk && pk[k] then return tClass end
+		pk = rawget( tClass, "_ProtectedKeys" );
+		if pk && pk[vK] then return tClass end
 		
-		tClass=tClass.BaseClass;
+		tClass = tClass.BaseClass;
 	end
 	return nil;
 end
@@ -415,18 +429,18 @@ than use this function. That being said there are only a few occasions where thi
 	* In the OnClassInherited event
 
 tClass should be a cached class table.
-k should be the key to look up.
+vK should be the key to look up.
 
 If a value is found in the given class or a class it inherits from, that value is returned.
 If the value can't be found, nil is returned.
 Additionally, if tClass is nil, nil is returned.
 ]]--
-function MODULE:InheritedLookup(tClass,k)
-	while tClass!=nil do
-		local v=rawget(tClass,k);
-		if v then return v end
+function MODULE:InheritedLookup( tClass, vK )
+	while tClass != nil do
+		local vV = rawget( tClass, vK );
+		if vV then return vV end
 		
-		tClass=tClass.BaseClass;
+		tClass = tClass.BaseClass;
 	end
 	return nil;
 end
@@ -437,13 +451,15 @@ end
 Creates an object (an instance of a class).
 Generates an error message and returns nil if the object cannot be created.
 
+strClass should be the classname for the kind of object you want to create.
+
 This function returns a reference to the newly created object.
 Calling ref:Invalidate() or garbage-collecting the reference will delete the actual object it points to.
 ]]--
-function MODULE:CreateObject(strClass)
-	if !IF.Util:IsString(strClass) then ErrorNoHalt("Itemforge Base: Could not create object. Class given wasn't valid.\n"); return nil; end
-	strClass=string.lower(strClass);
-	local t=_CLASSES[strClass];
+function MODULE:CreateObject( strClass )
+	if !IF.Util:IsString( strClass ) then ErrorNoHalt( "Itemforge Base: Could not create object. Class given wasn't valid.\n" ); return nil; end
+	strClass = string.lower( strClass );
+	local t = _CLASSES[strClass];
 	
 	--[[
 	Make sure the class we want is valid (has loaded succesfully)
@@ -455,33 +471,33 @@ function MODULE:CreateObject(strClass)
 				If there are parsing errors dealing with clientside files, this may be what is wrong.
 	]]--
 	if !t then
-		if SERVER then	ErrorNoHalt("Itemforge Base: Could not create object, \""..strClass.."\" is not a valid class. Check for parsing errors in console or mis-spelled class name.\n");
-		else			ErrorNoHalt("Itemforge Base: Could not create object, \""..strClass.."\" is not a valid class. Check for scripts not being sent!\n");
+		if SERVER then	ErrorNoHalt( "Itemforge Base: Could not create object, \""..strClass.."\" is not a valid class. Check for parsing errors in console or mis-spelled class name.\n" );
+		else			ErrorNoHalt( "Itemforge Base: Could not create object, \""..strClass.."\" is not a valid class. Check for scripts not being sent!\n" );
 		end
 		return nil;
 	end
 	
 	--Object
-	local o={};
+	local o = {};
 	
 	--Table of functions created specifically for this reference (lookup from table is faster than a string comparison)
-	local f={
+	local f = {
 		--Returns true if the reference is valid (the object it points to hasn't been deleted)
-		["IsValid"]			=	function() return (o!=nil); end,
+		["IsValid"]			=	function() return ( o != nil ); end,
 		
 		--Invalidates the object (basically deletes it)
-		["Invalidate"]		=	function() o=nil; end,
+		["Invalidate"]		=	function() o = nil; end,
 		
 		--Returns a copy of everything unique to the object, so long as it's valid
 		["GetTable"]		=	function()
-									if !o then ErrorNoHalt(IFB_EGT); return nil; end
-									local tC={};
-									for k,v in pairs(o) do tC[k]=v; end
+									if !o then ErrorNoHalt( IFB_EGT ); return nil; end
+									local tC = {};
+									for k, v in pairs( o ) do tC[k] = v; end
 									return tC;
 								end,
 	};
 	
-	local mt={};
+	local mt = {};
 	
 	--[[
 	Objects draw their functions/data from three sources (checked in first to last order as listed here):
@@ -489,34 +505,34 @@ function MODULE:CreateObject(strClass)
 	  2. (o) is the object itself. Anything unique to that individual object is stored here.
 	  3. (t) is the object's cached class table. This is the last stop; lookups are cached here for speed.
 	]]--
-	function mt:__index(k)
-		if f[k] then		return f[k];
+	function mt:__index( k )
+		if f[ k ] then		return f[ k ];
 		elseif o then
-			if o[k] then return o[k];
-			else		 return t[k];
+			if o[ k ] then	return o[ k ];
+			else			return t[ k ];
 			end
-		else				ErrorNoHalt(IFB_EI[1]..tostring(k)..IFB_EI[2]);
+		else				ErrorNoHalt( IFB_EI[1]..tostring( k )..IFB_EI[2] );
 		end
 	end
 	
 	--We want to forward writes to the object, so long as it's valid
-	function mt:__newindex(k,v)
+	function mt:__newindex( k, v )
 		if o then
 			--Is the key protected? If so, on what class?
-			local pc=IF.Base:IsProtectedKey(t,k);
-			if pc then return self:Error(IFB_ENI[1]..tostring(self)..IFB_ENI[2]..tostring(k)..IFB_ENI[3]..pc.ClassName..IFB_ENI[4]); end
+			local pc = IF.Base:IsProtectedKey( t, k );
+			if pc then return self:Error( IFB_ENI[1]..tostring( self )..IFB_ENI[2]..tostring( k )..IFB_ENI[3]..pc.ClassName..IFB_ENI[4] ); end
 			
-			if self:Event(IFB_ONI,true,k,v)==true then o[k]=v; end
+			if self:Event( IFB_ONI, true, k, v ) == true then o[k] = v; end
 		else
-			ErrorNoHalt(IFB_ENI[5]..tostring(k)..IFB_ENI[6]..tostring(v)..IFB_ENI[7]);
+			ErrorNoHalt( IFB_ENI[5]..tostring( k )..IFB_ENI[6]..tostring( v )..IFB_ENI[7] );
 			return false;
 		end
 	end
 	
 	--Objects' tostring function get to decide what happens
 	function mt:__tostring()
-		if o!=nil then
-			local s,r=pcall(self.ToString,self);
+		if o != nil then
+			local s, r = pcall( self.ToString, self );
 			if s then return r
 			else	  return IFB_ETS..r..")"; end
 		else
@@ -524,8 +540,8 @@ function MODULE:CreateObject(strClass)
 		end
 	end
 	
-	local r={};		--Reference
-	setmetatable(r,mt);
+	local r = {};		--Reference
+	setmetatable( r, mt );
 	
 	return r;
 end
@@ -533,8 +549,8 @@ end
 
 
 --These vars can be accessed through an uncached cache table
-local _CACHEmtlookups={
-	["_NeedsCache"]=true
+local _CACHEmtlookups = {
+	["_NeedsCache"] = true
 };
 
 --[[
@@ -544,11 +560,11 @@ The first time we index a cached class table, we want to build the cache so futu
 This may generate a slight load spike (which takes longer depending on how many keys need to be cached),
 but it's worth the effort for faster lookups.
 ]]--
-function _CACHEmt:__index(k)
+function _CACHEmt:__index( k )
 	if _CACHEmtlookups[k] then return _CACHEmtlookups[k] end
-	CacheBuild(self);
+	CacheBuild( self );
 	
-	return rawget(self,k);
+	return rawget( self, k );
 end
 
 --[[
@@ -557,12 +573,13 @@ end
 After a class is loaded, it shouldn't be modified by a scripter accidentilly. This can be bypassed, but it's here as a safeguard.
 If a class is accidentally modified, a warning message will be generated and no changes will occur.
 ]]--
-function _CACHEmt:__newindex(k,v)
+function _CACHEmt:__newindex( k, v )
 	ErrorNoHalt("Itemforge Base: WARNING! Override blocked on class \""..self.ClassName.."\": Tried to set \""..tostring(k).."\" to \""..tostring(v).."\".\n");
 end
 
 --[[
 * SHARED
+
 This metatable is the same as _CACHEmt except it doesn't rebuild the cache when it can't find a key.
 ]]--
 _CLASSmt.__newindex = _CACHEmt.__newindex;
@@ -585,7 +602,7 @@ Individual objects may also override any function/value from their class.
 
 If base is nil or not given, the class inherits from the absolute base class (this class).
 ]]--
-_BASE.Base=nil;
+_BASE.Base = nil;
 
 --[[
 * SHARED
@@ -594,13 +611,13 @@ _BASE.Base=nil;
 Protected keys cannot be overridden by objects or classes that are based off this class.
 Every class can have it's own set of protected keys.
 To protect a key, first, make sure your class has a protected keys table:
-	CLASS._ProtectedKeys={}
+	CLASS._ProtectedKeys = {}
 Then for every key you want to protect, do:
-	CLASS._ProtectedKeys["NameOfKeyToProtect"]=true;
+	CLASS._ProtectedKeys["NameOfKeyToProtect"] = true;
 
 Where CLASS is the name of your class table, of course.
 ]]--
-_BASE._ProtectedKeys={};
+_BASE._ProtectedKeys = {};
 
 --[[
 * SHARED
@@ -612,22 +629,24 @@ It is always lowercase, even if you give uppercase characters when registering t
 
 Classname is an alias of ClassName.
 ]]--
-_BASE.ClassName="";
-_BASE.Classname="";
+_BASE.ClassName = "";
+_BASE.Classname = "";
 
 --[[
 * SHARED
 * Protected
 
 Generates a non-halting error message.
-sErrorMsg is the message to display.
+
+strErrorMsg is the message to display.
+
 Always returns false.
 ]]--
-function _BASE:Error(sErrorMsg)
-	ErrorNoHalt(tostring(self)..": "..sErrorMsg.."\n");
+function _BASE:Error( strErrorMsg )
+	ErrorNoHalt( tostring( self )..": "..strErrorMsg.."\n" );
 	return false;
 end
-_BASE._ProtectedKeys["Error"]=true;
+_BASE._ProtectedKeys["Error"] = true;
 
 --[[
 * SHARED
@@ -639,9 +658,9 @@ This includes if the item _IS_ what you're checking to see if it's based off of.
 	
 	Another example: lets say we want to determine if a given object is an item or an inventory.
 		The base item is base_item, so we can do:
-			if object:InheritsFrom("base_item")	then ... end
+			if object:InheritsFrom( "base_item" )	then ... end
 		The base inventory is base_inv, so we can do:
-			if object:InheritsFrom("base_inv")	then ... end
+			if object:InheritsFrom( "base_inv" )	then ... end
 	
 	Another example, lets say we have three item types:
 		base_weapon, base_melee, and item_sword.
@@ -651,16 +670,16 @@ This includes if the item _IS_ what you're checking to see if it's based off of.
 	
 		Lets say we have a weapons salesman who will only buy weapons.
 		We could check that the item we're trying to sell him is a weapon by doing:
-		item:InheritsFrom("base_weapon")
+		item:InheritsFrom( "base_weapon" )
 		It would return true, because a sword is a melee weapon, and a melee weapon is a weapon.
 
 sClass is the name of the class ("base_item", "base_container", "base_nw", etc.)
 This function returns true if the item inherits from this item type, or false if it doesn't.
 ]]--
-function _BASE:InheritsFrom(sClass)
-	return self[string.lower(sClass)]!=nil;
+function _BASE:InheritsFrom( strClass )
+	return self[string.lower( strClass )] != nil;
 end
-_BASE._ProtectedKeys["InheritsFrom"]=true;
+_BASE._ProtectedKeys["InheritsFrom"] = true;
 
 --[[
 * SHARED
@@ -673,31 +692,30 @@ strEventName is a string which should be the name of the event to call (EX: "OnD
 vDefaultReturn is what will be returned in case of errors calling the hook.
 ... - You can pass arguments to the event here. There's no need to pass "self", since it's automatically the first argument.
 
-This function returns several values: vReturn,bSuccess,vReturn2,vReturn3,...
+This function returns two values: vReturn, bSuccess
 	vReturn will be what the event returned, or if there were errors, then it will be vDefaultReturn.
 	bSuccess will be true if the event was called successfully, or false if there were errors.
-	vReturn2, vReturn3, ... will be any other values returned by the event.
 	
 Example: I want to call this object's CanEnterWorld event:
-	self:Event("CanEnterWorld",false,vPos,aAng);
+	self:Event( "CanEnterWorld", false, vPos, aAng );
 	This runs an object's CanEnterWorld and gives it vPos and aAng as arguments.
 	If there's a problem running the event, we want false to be returned.
 ]]--
-function _BASE:Event(strEventName,vDefaultReturn,...)
-	local f=self[strEventName];
-	if !f then			self:Error("\""..strEventName.."\" failed: This event does not exist."); return vDefaultReturn,false end
+function _BASE:Event( strEventName, vDefaultReturn, ... )
+	local f = self[strEventName];
+	if !f then			self:Error( "\""..strEventName.."\" failed: This event does not exist." ); return vDefaultReturn, false end
 	
 	local OldContext = self._ClassContext;
-	rawset(self,"_ClassContext",_FUNCTOCLASS[f]);
+	rawset( self, "_ClassContext", _FUNCTOCLASS[f] );
 	
-	local s,r=pcall(f,self,...);
-	if s==false then	self:Error("\""..strEventName.."\" failed: "..r); r = vDefaultReturn; end
+	local s, r = pcall( f, self, ... );
+	if s == false then	self:Error( "\""..strEventName.."\" failed: "..r ); r = vDefaultReturn; end
 	
-	rawset(self,"_ClassContext",OldContext);
+	rawset( self, "_ClassContext", OldContext );
 	
-	return r,s;
+	return r, s;
 end
-_BASE._ProtectedKeys["Event"]=true;
+_BASE._ProtectedKeys["Event"] = true;
 
 --[[
 * SHARED
@@ -711,10 +729,9 @@ strEventName is a string which should be the name of the event to call (EX: "OnD
 vDefaultReturn is what will be returned in case of errors calling the hook.
 ... - You can pass arguments to the event here. There's no need to pass "self", since it's automatically the first argument.
 
-This function returns several values: vReturn,bSuccess,vReturn2,vReturn3,...
+This function returns two values: vReturn, bSuccess
 	vReturn will be what the event returned, or if there were errors, then it will be vDefaultReturn.
 	bSuccess will be true if the event was called successfully, or false if there were errors.
-	vReturn2, vReturn3, ... will be any other values returned by the event.
 	
 Example:
 	Lets pretend we have a class of items called item_food, based off of base_item.
@@ -732,10 +749,10 @@ Example:
 	
 	Here's how I'd design item_food's OnUse:
 	
-	function ITEM:OnUse(pl)
-		if self:BaseEvent("OnUse",false,pl) then return true end
+	function ITEM:OnUse( pl )
+		if self:BaseEvent( "OnUse", false, pl ) then return true end
 		
-		if SERVER then self:Eat(pl) end
+		if SERVER then self:Eat( pl ) end
 		return true;
 	end
 	
@@ -754,24 +771,24 @@ Example:
 	
 	We return true to indicate that the event has been handled.
 ]]--
-function _BASE:BaseEvent(strEventName,vDefaultReturn,...)
-	if !self._ClassContext then			self:Error("\""..strEventName.."\" failed: BaseEvent cannot be called directly. Use :Event() or :InheritedEvent() instead."); return vDefaultReturn,false end
-	local p=self._ClassContext.BaseClass;
+function _BASE:BaseEvent( strEventName, vDefaultReturn, ... )
+	if !self._ClassContext then			self:Error( "\""..strEventName.."\" failed: BaseEvent cannot be called directly. Use :Event() or :InheritedEvent() instead." ); return vDefaultReturn, false end
+	local p = self._ClassContext.BaseClass;
 	
-	local f=p[strEventName];
-	if !f then			self:Error("\""..strEventName.."\" from base \""..p.ClassName.."\" failed: This event does not exist."); return vDefaultReturn,false end
+	local f = p[strEventName];
+	if !f then			self:Error( "\""..strEventName.."\" from base \""..p.ClassName.."\" failed: This event does not exist." ); return vDefaultReturn, false end
 	
 	local OldContext = self._ClassContext;
-	rawset(self,"_ClassContext",_FUNCTOCLASS[f]);
+	rawset( self, "_ClassContext", _FUNCTOCLASS[f] );
 	
-	local s,r=pcall(f,self,...);
-	if s==false then self:Error("\""..strEventName.."\" from base \""..p.ClassName.."\" failed: "..r); r = vDefaultReturn; end
+	local s, r = pcall( f, self, ... );
+	if s == false then self:Error( "\""..strEventName.."\" from base \""..p.ClassName.."\" failed: "..r ); r = vDefaultReturn; end
 	
-	rawset(self,"_ClassContext",OldContext);
+	rawset( self, "_ClassContext", OldContext );
 	
-	return r,s;
+	return r, s;
 end
-_BASE._ProtectedKeys["BaseEvent"]=true;
+_BASE._ProtectedKeys["BaseEvent"] = true;
 
 --[[
 * SHARED
@@ -783,43 +800,49 @@ plus something else you specify, and need to sidestep the parent entirely.
 
 strEventName is a string which should be the name of the event to call (EX: "OnDraw2D", "OnThink", etc)
 strParentName is a string indicating which parent to take the event from.
-	Don't use self.Base for this, or for that matter self.ANY_VARIABLE.
-	It will cause an infinite loop.
-	If this happens lua will likely report the error as "stack overflow" or "infinite loop detected".
+	Make sure you use the name of a class in quotes.
+	Example of valid values: "base_melee", "base_item", "base_inv", etc.
+
+	-----------------------------------------------------------------------------------------------------------------------------
+	WARNING: Don't ever use self.Base for this, or for that matter, any variable in self.
 	
 	If you were going to use self.Base as an argument in this function,
 	a better function to use would be to use self:BaseEvent above.
-	
-	Use the name of a class in quotes.
-	Example of valid values: "base_melee", "base_item", "base_inv", etc.
+
+	Situations can arise where this will unintentionally cause an infinite loop.
+	For example, if you had an object of class A, which is inherited from class B, which is inherited from class C,
+	and both class A and B had an OnUse that did self:InheritedEvent( self.Base ),
+	you'd expect that self.Base would be "B" in A's OnUse, and self.Base would be "C", in B's OnUse,
+	but instead BOTH have a self.Base of "B" (because self always refers to the object that has Class A, which has a base of B).
+	If this happens lua will likely report the error as "stack overflow" or "infinite loop detected".
+	-----------------------------------------------------------------------------------------------------------------------------
 	
 vDefaultReturn is what will be returned in case of errors calling the hook.
 ... - You can pass arguments to the event here. There's no need to pass "self", since it's automatically the first argument.
 
-This function returns several values: vReturn,bSuccess,vReturn2,vReturn3,...
+This function returns two values: vReturn, bSuccess, ...
 	vReturn will be what the event returned, or if there were errors, then it will be vDefaultReturn.
 	bSuccess will be true if the event was called successfully, or false if there were errors.
-	vReturn2, vReturn3, ... will be any other values returned by the event.
 ]]--
-function _BASE:InheritedEvent(strEventName,strParentName,vDefaultReturn,...)
-	strParentName = string.lower(strParentName);
-	local p=self[strParentName]
-	if !p then self:Error("\""..strEventName.."\" from base \""..strParentName.."\" failed: \""..self.ClassName.."\" is not based off of \""..strParentName.."\"."); return vDefaultReturn,false end
+function _BASE:InheritedEvent( strEventName, strParentName, vDefaultReturn, ... )
+	strParentName = string.lower( strParentName );
+	local p = self[strParentName]
+	if !p then self:Error( "\""..strEventName.."\" from base \""..strParentName.."\" failed: \""..self.ClassName.."\" is not based off of \""..strParentName.."\"." ); return vDefaultReturn, false end
 	
-	local f=p[strEventName];
-	if !f then self:Error("\""..strEventName.."\" from base \""..strParentName.."\" failed: This event does not exist on base class \""..strParentName.."\"."); return vDefaultReturn,false end
+	local f = p[strEventName];
+	if !f then self:Error( "\""..strEventName.."\" from base \""..strParentName.."\" failed: This event does not exist on base class \""..strParentName.."\"." ); return vDefaultReturn, false end
 	
 	local OldContext = self._ClassContext;
-	rawset(self,"_ClassContext",_FUNCTOCLASS[f]);
+	rawset( self, "_ClassContext", _FUNCTOCLASS[f] );
 	
-	local s,r=pcall(f,self,...);
-	if s==false then self:Error("\""..strEventName.."\" from base \""..strParentName.."\" failed: "..r); r=vDefaultReturn; end
+	local s, r = pcall( f, self, ... );
+	if s == false then self:Error( "\""..strEventName.."\" from base \""..strParentName.."\" failed: "..r ); r = vDefaultReturn; end
 	
-	rawset(self,"_ClassContext",OldContext);
+	rawset( self, "_ClassContext", OldContext );
 	
-	return r,s;
+	return r, s;
 end
-_BASE._ProtectedKeys["InheritedEvent"]=true;
+_BASE._ProtectedKeys["InheritedEvent"] = true;
 
 
 
@@ -864,7 +887,7 @@ end
 This function runs when a value has been set in this object.
 Returning true allows the change, and returning false stops the change from occuring.
 ]]--
-function _BASE:OnNewIndex(k,v)
+function _BASE:OnNewIndex( k, v )
 	return true;
 end
 

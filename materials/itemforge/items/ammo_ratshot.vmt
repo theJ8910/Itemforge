@@ -1,0 +1,8 @@
+"UnlitGeneric"
+{
+	"$basetexture" "itemforge/items/ammo_ratshot"
+	"$vertexalpha" 1
+	"$vertexcolor" 0
+	"$nolod" 1
+	"$ignorez" 1
+}

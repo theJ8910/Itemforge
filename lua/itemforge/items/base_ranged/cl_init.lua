@@ -1,6 +1,6 @@
 --[[
 base_ranged
-SHARED
+CLIENT
 
 base_ranged is a base. That means that other items borrow code from this so they can be created easier.
 Any item that inherits from this has everything this item has, and can override anything this item has.
@@ -27,115 +27,105 @@ Some features the base_ranged has:
 		You can set whether or not you want the gun's primary/secondary to work underwater
 ]]--
 
-include("shared.lua");
-
-local cDefaultBack=Color(200,150,0,255);
-local cDefaultBar =Color(255,204,0,255);
-local cDefaultLow =Color(255,0,0,255);
-
-function ITEM:OnThink()
-	if self:GetNWBool("InReload")==true then
-		self:Event("Reload");
-	end
-end
-
---Sets the ammo in the given clip to the given item no questions asked
-function ITEM:SetClip(item,clip)
-	self.Clip[clip]=item;
-	
-	return true;
-end
-
---Unloads the ammo in the given clip.
-function ITEM:Unload(clip)
-	self.Clip[clip]=nil;
-	
-	return true;
-end
+include( "shared.lua" );
 
 --[[
-Runs when a player wants to load this weapon with the given ammo (currently this is used when ammo is drag-dropped here).
-It doesn't actually load the ammo clientside; it requests the server to load the given ammo.
-There are a few checks here that can stop un-necessary requests from being sent:
-	We can make sure the player can interact with the gun
-	We can check if the given ammo is loadable into any clips clientside
-pl is the player who wants to load ammo; if this isn't the same as LocalPlayer() we fail (because it's this player who wants to load ammo, right?)
-ammo is the item we want to load.
-]]--
-function ITEM:PlayerLoadAmmo(pl,ammo)
-	if !self:Event("CanPlayerInteract",false,pl) then return false end
-	for i=1,table.getn(self.Clips) do
-		if self:CanLoadClipWith(ammo,i) then 
-			self:SendNWCommand("PlayerLoadAmmo",ammo);
-			return true;
-		end
-	end
-	return false;
-end
+* CLIENT
+* Event
 
---We have a nice menu for ranged weapons!
-function ITEM:OnPopulateMenu(pMenu)
+We have a nice menu for ranged weapons!
+]]--
+function ITEM:OnPopulateMenu( pnlMenu )
 	--We've got everything the base weapon has and more!
-	self:BaseEvent("OnPopulateMenu",nil,pMenu);
+	self:BaseEvent( "OnPopulateMenu", nil, pnlMenu );
 	
+
 	--Options to fire gun
-	pMenu:AddOption("Fire Primary",		function(panel)	self:SendNWCommand("PlayerFirePrimary")		end);
-	pMenu:AddOption("Fire Secondary",	function(panel)	self:SendNWCommand("PlayerFireSecondary")	end);
+								pnlMenu:AddOption( "Fire Primary",		function( pnl )	self:SendNWCommand( "PlayerFirePrimary" )	end );
+								pnlMenu:AddOption( "Fire Secondary",	function( pnl )	self:SendNWCommand( "PlayerFireSecondary" )	end );
 	
+
 	--Options to unload ammo
-	local hasEmptyClip=false;
-	for i=1,table.getn(self.Clips) do
-		local ammo=self:GetAmmo(i);
-		if ammo then
-			local amt=ammo:GetAmount();
-			if amt<self.Clips[i].Size then hasEmptyClip=true end
+	local bHasEmptyClip = false;
+	for i = 1, #self.Clips do
+		local itemCurAmmo = self:GetAmmoSource( i );
+		if itemCurAmmo then
+			local iAmt = itemCurAmmo:GetAmount();
+			if iAmt < self.Clips[i].Size then bHasEmptyClip = true end
 			
 			--Who says that gun ammo has to be a stack (e.g. bullets)? It could be a single item as far as we know (e.g. a battery, in the case of energy weapons)
-			local ammoStr=ammo:GetName();
-			if ammo:GetMaxAmount()!=1 then ammoStr=ammoStr.." x "..amt; end
+			local strAmmo = itemCurAmmo:Event( "GetName", "Unknown Ammo" );
+			if itemCurAmmo:IsStack() then strAmmo = strAmmo.." x "..iAmt end
 			
-			pMenu:AddOption("Unload "..ammoStr,function(panel)	self:SendNWCommand("PlayerUnloadAmmo",i)	end);
+								pnlMenu:AddOption( "Unload "..strAmmo,	function( pnl )	self:PlayerUnloadAmmo( LocalPlayer(), i )	end );
 		else
-			hasEmptyClip=true;
+			bHasEmptyClip = true;
 		end
 	end
 	
 	--If we're holding ammo, we can load it on the right click menu
 	--TODO more than one clip
-	local wep=LocalPlayer():GetActiveWeapon();
-	if wep:IsValid() then
-		local ammo=IF.Items:GetWeaponItem(wep);
-		if self:CanLoadClipWith(ammo,1) then
-			local ammoStr=ammo:GetName();
-			if ammo:IsStack() then ammoStr=ammoStr.." x "..ammo:GetAmount(); end
+	local itemHeldAmmo = IF.Items:GetWeaponItem( LocalPlayer():GetActiveWeapon() );
+	if self:CanLoadClipWith( itemHeldAmmo, 1 ) then
+		local strAmmo = IF.Util:LabelSanitize( itemHeldAmmo:Event( "GetName", "Unknown Ammo" ) );
+		if itemHeldAmmo:IsStack() then strAmmo = strAmmo.." x "..itemHeldAmmo:GetAmount() end
 			
-			pMenu:AddOption("Load "..ammoStr,function(panel) return self:SendNWCommand("PlayerLoadAmmo",ammo); end);
-		end
+								pnlMenu:AddOption( "Load "..strAmmo,	function( pnl ) self:PlayerLoadAmmo( LocalPlayer(), itemHeldAmmo, 1 ) end );
 	end
 	
 	--Option to reload an empty clip
-	if hasEmptyClip then pMenu:AddOption("Reload",	function(panel)	self:SendNWCommand("PlayerReload")			end); end
+	if bHasEmptyClip then		pnlMenu:AddOption( "Reload",			function( pnl )	self:PlayerReload( LocalPlayer() )		end ); end
 end
 
---If usable ammo is dragged here we ask the server to load it
-function ITEM:OnDragDropHere(otherItem)
-	return !self:PlayerLoadAmmo(LocalPlayer(),otherItem);
+--[[
+* CLIENT
+* Event
+
+If usable ammo is dragged here we ask the server to load it
+]]--
+function ITEM:OnDragDropHere( otherItem )
+	return !self:PlayerLoadAmmo( LocalPlayer(), otherItem );
 end
 
---Draw ammo bar(s)
-function ITEM:OnDraw2D(width,height)
-	self:BaseEvent("OnDraw2D",nil,width,height);
-	local c=0;
+--[[
+* CLIENT
+* Event
+
+Draw ammo bar(s)
+]]--
+function ITEM:OnDraw2D( fWidth, fHeight )
+	self:BaseEvent( "OnDraw2D", nil, fWidth, fHeight );
+	local c = 0;
 	
-	for i=table.getn(self.Clips),1,-1 do
-		local ammo=self:GetAmmo(i);
-		if self:DrawAmmoMeter(width-5-(2*c),4,2,height-8,((ammo&&ammo:GetAmount())||0),self.Clips[i].Size,self.Clips[i].BackColor||cDefaultBack,self.Clips[i].BarColor||cDefaultBar,self.Clips[i].LowColor||cDefaultLow) then
-			c=c+1;
+	if self.PrimaryClip != 0 then
+
+		local itemCurAmmo = self:GetAmmoSource( self.PrimaryClip );
+		if itemCurAmmo != nil then
+			itemCurAmmo:DrawIcon( fWidth - 26, fHeight - 20, 16, 16 );
+
+			surface.SetFont( "ConsoleText" );
+			local strAmt = tostring( self:GetAmmo( 1 ) );
+			
+			local c = self:GetClipBarColor( self.PrimaryClip );
+			surface.SetTextColor( c.r, c.g, c.b, c.a );
+			surface.SetTextPos( fWidth - 2 - surface.GetTextSize( strAmt ), fHeight - 12 );
+			surface.DrawText( strAmt );
+		end
+
+	end
+
+	for i = #self.Clips, 1, -1 do
+		local itemCurAmmo = self:GetAmmoSource( i );
+		--4, 2, h-8
+		if self:DrawAmmoMeter( fWidth - 5 - ( 2 * c ), 4, 2, fHeight - 16, self:GetAmmo( i ), self:GetMaxAmmo( i ), self:GetClipBackgroundColor( i ), self:GetClipBarColor( i ), self:GetClipLowColor( i ) ) then
+			c = c + 1;
 		end
 	end
 end
 
 --[[
+* CLIENT
+
 Draws an ammo meter whose top-left corner is at <x,y> and whose width/height is w,h respectively.
 This ammo meter "drains" from top to bottom.
 This function is intended for use in Draw2D but it probably works in any 2D drawing cycle
@@ -149,38 +139,42 @@ cBarLow is the color of the bar when we're low on ammo.
 Returns true if an ammo meter was drawn.
 Returns false if an ammo meter couldn't be drawn (probably because iMaxAmmo was 0; with unlimited ammo, how do you expect me to draw a bar showing how much has been used?)
 ]]--
-function ITEM:DrawAmmoMeter(x,y,w,h,iAmmo,iMaxAmmo,cBack,cBar,cBarLow)
+function ITEM:DrawAmmoMeter( x, y, w, h, iAmmo, iMaxAmmo, cBack, cBar, cBarLow )
 	--Ammo bars show how full a clip is; if a clip can hold limitless ammo don't bother drawing
-	if iMaxAmmo==0 then return false end
+	if iMaxAmmo == 0 then return false end
 	
 	--Draw the background for an ammo bar
-	surface.SetDrawColor(cBack.r,cBack.g,cBack.b,cBack.a);
-	surface.DrawRect(x,y,w,h);
+	surface.SetDrawColor( cBack.r, cBack.g, cBack.b, cBack.a );
+	surface.DrawRect( x, y, w, h );
 	
 	--If we don't have any ammo, don't draw an ammo bar; all we'll see is the background indicating the clip is empty
-	if iAmmo==0 then return true end
+	if iAmmo == 0 then return true end
 	
-	local r=(iAmmo/iMaxAmmo);
-	local f=math.Clamp(r*h,0,h);
+	local r = iAmmo / iMaxAmmo;
+	local f = math.Clamp( r * h, 0, h );
 	
 	--Blink like crazy if we're running low on ammo
-	if r<=0.2 then
-		local br=(math.sin(CurTime()*10)+1)*.5;
-		surface.SetDrawColor(cBar.r+((cBarLow.r-cBar.r)*br),cBar.g+((cBarLow.g-cBar.g)*br),cBar.b+((cBarLow.b-cBar.b)*br),cBar.a+((cBarLow.a-cBar.a)*br));
+	if r <= 0.2 then
+		local br = 0.5 * ( 1 + math.sin( 10 * CurTime() ) );
+		surface.SetDrawColor( cBar.r + br * ( cBarLow.r - cBar.r ),
+							  cBar.g + br * ( cBarLow.g - cBar.g ),
+							  cBar.b + br * ( cBarLow.b - cBar.b ),
+							  cBar.a + br * ( cBarLow.a - cBar.a )
+							);
 	else
-		surface.SetDrawColor(cBar.r,cBar.g,cBar.b,cBar.a);
+		surface.SetDrawColor( cBar.r, cBar.g, cBar.b, cBar.a );
 	end
 	
 	--Draw the ammo bar
-	surface.DrawRect(x,y+h-f,w,f);
+	surface.DrawRect( x, y + h - f, w, f );
 	
 	return true;
 end
 
-IF.Items:CreateNWCommand(ITEM,"SetClip",function(self,...) self:SetClip(...) end,{"item","int"});
-IF.Items:CreateNWCommand(ITEM,"Unload",function(self,...) self:Unload(...) end,{"int"});
-IF.Items:CreateNWCommand(ITEM,"PlayerFirePrimary",nil,{});
-IF.Items:CreateNWCommand(ITEM,"PlayerFireSecondary",nil,{});
-IF.Items:CreateNWCommand(ITEM,"PlayerReload",nil,{});
-IF.Items:CreateNWCommand(ITEM,"PlayerLoadAmmo",nil,{"item"});
-IF.Items:CreateNWCommand(ITEM,"PlayerUnloadAmmo",nil,{"int"});
+IF.Items:CreateNWCommand( ITEM, "SetAmmoSource",		function( self, ... ) self:SetAmmoSource( ... ) end,	{ "int", "item" }	);
+IF.Items:CreateNWCommand( ITEM, "Unload",				function( self, ... ) self:Unload( ... ) end,			{ "int" }			);
+IF.Items:CreateNWCommand( ITEM, "PlayerFirePrimary",	nil,													{}					);
+IF.Items:CreateNWCommand( ITEM, "PlayerFireSecondary",	nil,													{}					);
+IF.Items:CreateNWCommand( ITEM, "PlayerReload",			nil,													{}					);
+IF.Items:CreateNWCommand( ITEM, "PlayerLoadAmmo",		nil,													{ "int", "item" }	);
+IF.Items:CreateNWCommand( ITEM, "PlayerUnloadAmmo",		nil,													{ "int" }			);

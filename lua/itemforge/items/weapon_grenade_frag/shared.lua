@@ -4,32 +4,36 @@ SHARED
 
 Explosive fragmentation grenade.
 ]]--
-if SERVER then AddCSLuaFile("shared.lua") end
 
-ITEM.Name = "Frag Grenade";
-ITEM.Description="An explosive fragmentation grenade. Activates when thrown. Can be activated manually.\n WARNING: VOLATILE";
-ITEM.Base="base_thrown";
+if SERVER then AddCSLuaFile( "shared.lua" ) end
 
-ITEM.Weight=454;  --454 grams
-ITEM.MaxHealth=10;
-ITEM.MaxAmount=15;
+ITEM.Name				= "Frag Grenade";
+ITEM.Description		= "This is an M26 fragmentation grenade, a variety of high-explosive hand grenades.\nPull the pin and throw. The pin can be pulled before being thrown.\nBe careful! Highly explosive!";
+ITEM.Base				= "base_thrown";
 
-ITEM.WorldModel="models/weapons/w_eq_fraggrenade.mdl";
-ITEM.ViewModel="models/weapons/v_eq_fraggrenade.mdl";
-ITEM.SWEPViewModelFlip = true;								--CS view models need to be flipped
+ITEM.Weight				= 454;										--454 grams (taken from http://en.wikipedia.org/wiki/M26_grenade )
+ITEM.MaxHealth			= 10;
+ITEM.MaxAmount			= 15;
 
-ITEM.Spawnable=true;
-ITEM.AdminSpawnable=true;
+ITEM.WorldModel			= "models/weapons/w_eq_fraggrenade.mdl";
+ITEM.ViewModel			= "models/weapons/v_eq_fraggrenade.mdl";
+ITEM.SWEPViewModelFlip	= true;										--Some CS view models need to be flipped
 
---Base Thrown Weapon
-ITEM.ThrowSpeedMin=500;
-ITEM.ThrowSpeedMax=1000;
-ITEM.ThrowDelay=0.1;
+ITEM.Spawnable			= true;
+ITEM.AdminSpawnable		= true;
+
+--Overridden base weapon stuff
+ITEM.HasPrimary			= true;
+
+--Overridden base thrown stuff
+ITEM.ThrowSpeedMin		= 500;
+ITEM.ThrowSpeedMax		= 1000;
+ITEM.ThrowDelay			= 0.1;
 
 --Frag Grenade
-ITEM.ExplodeDamage = 110;
-ITEM.ExplodeDelay = 5;
-ITEM.PullPinSound = Sound("weapons/smg1/switch_burst.wav");
+ITEM.ExplodeDamage		= 110;
+ITEM.ExplodeDelay		= 5;
+ITEM.PullPinSound		= Sound( "weapons/smg1/switch_burst.wav" );
 
 --[[
 * SHARED
@@ -38,11 +42,13 @@ ITEM.PullPinSound = Sound("weapons/smg1/switch_burst.wav");
 If you intentionally use the grenade (i.e. you weren't trying to pick it up by pressing [E] on it while it's in the world),
 then the grenade's pin is pulled. Hint - Hide them in containers, then pull the pin!
 ]]--
-function ITEM:OnUse(pl)
-	--Its in the world. We probably want to pick it up, so we can throw it back to the guy who threw it
-	--(or you know, maybe it's just lying around and we want to take it)
+function ITEM:OnUse( pl )
+	--[[
+	Its in the world. We probably want to pick it up, so we can throw it back to the guy who threw it
+	(or you know, maybe it's just lying around and we want to take it)
+	]]--
 	if self:InWorld() then
-		return self:BaseEvent("OnUse",false,pl);
+		return self:BaseEvent( "OnUse", false, pl );
 	end
 	
 	--Definitely not intending to pick it up. Pull the pin and run!
@@ -60,8 +66,8 @@ and then this event runs on the 1 item that was split off - NOT the stack it was
 
 pl should be the player who threw the item.
 ]]--
-function ITEM:OnThrow(pl)
-	self:PullPin(pl);
+function ITEM:OnThrow( pl )
+	self:PullPin( pl );
 end
 
 --[[
@@ -72,17 +78,16 @@ The grenade becomes live, and the explosion timer is activated.
 
 pl should be the player who is credited with pulling the pin.
 ]]--
-function ITEM:PullPin(pl)
-	if self:GetNWBool("Live", true) then return false end
-	self:SetNWBool("Live", true);
+function ITEM:PullPin( pl )
+	if self:GetNWBool( "Live" ) then return false end
+	self:SetNWBool( "Live", true );
 
-	self:EmitSound(self.PullPinSound,true)
+	self:EmitSound( self.PullPinSound, true );
 
 	if SERVER then
-		self:SimpleTimer( self.ExplodeDelay, self.Explode, pl );
+		self:SimpleTimer( self.ExplodeDelay, self.DoExplosion, pl );
 	end
 	
-
 	return true;
 end
 
@@ -92,8 +97,8 @@ end
 
 Active grenades cannot be merged (you can still have a stack of active grenades, though).
 ]]--
-function ITEM:CanMerge(otherItem,bToHere)
-	return !self:GetNWBool("Live");
+function ITEM:CanMerge( otherItem, bToHere )
+	return !self:GetNWBool( "Live" );
 end
 
 --[[
@@ -102,8 +107,8 @@ end
 
 Active grenades cannot be split (you can still have a stack of active grenades, though).
 ]]--
-function ITEM:CanSplit(howMany)
-	return !self:GetNWBool("Live");
+function ITEM:CanSplit( iHowMany )
+	return !self:GetNWBool( "Live" );
 end
 
 if SERVER then
@@ -114,21 +119,12 @@ if SERVER then
 --[[
 * SERVER
 
-Causes the grenade(s) to explode.
-pl is an optional player to credit the kill to.
+Does a standard grenade explosion.
+
+eWhoTriggered is an optional player / entity to credit the kill to.
 ]]--
-function ITEM:Explode(pl)
-
-	local explode = ents.Create( "env_explosion" )
-    explode:SetPos( self:GetPos() );
-	explode:SetOwner( pl );
-	explode:SetKeyValue( "iMagnitude", tostring( self.ExplodeDamage * self:GetAmount() ) );
-	explode:Spawn();
-	
-	self:Remove();
-
-	explode:Fire( "Explode", 0, 0 );
-
+function ITEM:DoExplosion( eWhoTriggered )
+	self:Explode( self.ExplodeDamage * self:GetAmount(), 256, eWhoTriggered );
 end
 
 --[[
@@ -137,8 +133,8 @@ end
 
 If a grenade gets destroyed, it explodes
 ]]--
-function ITEM:OnBreak(howMany,bLastBroke,who)
-	self:Explode(who);
+function ITEM:OnBreak( iHowMany, bLastBroke, eWho )
+	self:DoExplosion( eWho );
 end
 
 --[[
@@ -150,8 +146,8 @@ If a grenade is launched from a Rock-It launcher, it activates.
 iRockitLauncher is the rock-it launcher the grenade was fired from.
 pl is the player who fired it.
 ]]--
-function ITEM:OnRockItLaunch(iRockitLauncher,pl)
-	self:PullPin(pl);
+function ITEM:OnRockItLaunch( iRockitLauncher, pl )
+	self:PullPin( pl );
 end
 
 --[[
@@ -160,8 +156,8 @@ end
 
 This event tells Wiremod that our grenades can have their pins pulled or they can explode
 ]]--
-function ITEM:GetWireInputs(entity)
-	return Wire_CreateInputs(entity,{"Pull Pin","Explode"});
+function ITEM:GetWireInputs( eEntity )
+	return Wire_CreateInputs( eEntity, { "Pull Pin", "Explode" } );
 end
 
 --[[
@@ -170,9 +166,9 @@ end
 
 This event handles Wiremod's requests
 ]]--
-function ITEM:OnWireInput(entity,inputName,value)
-	if		inputName=="Pull Pin" &&	value==1 then		self:PullPin();
-	elseif	inputName=="Explode" &&		value==1 then		self:Explode();
+function ITEM:OnWireInput( eEntity, strInputName, vValue )
+	if		strInputName == "Pull Pin"	&&	vValue != 0 then	self:PullPin();
+	elseif	strInputName == "Explode"	&&	vValue != 0 then	self:DoExplosion();
 	end
 end
 
@@ -190,12 +186,12 @@ else
 
 When grenades are active, the background flashes red
 ]]--
-function ITEM:OnDraw2DBack(width,height)
-	if self:GetNWBool("Live") == true then
-		surface.SetDrawColor(255,0,0, 114.75 + 63.75 * math.sin( CurTime() * 30 ) );
-		surface.DrawRect(0,0,width,height);
+function ITEM:OnDraw2DBack( fWidth, fHeight )
+	if self:GetNWBool( "Live" ) == true then
+		surface.SetDrawColor( 255, 0, 0, 114.75 + 63.75 * math.sin( 30 * RealTime() ) );
+		surface.DrawRect( 0, 0, fWidth, fHeight );
 	end
-	self:BaseEvent("OnDraw2D",nil,width,height);
+	self:BaseEvent( "OnDraw2DBack", nil, fWidth, fHeight );
 end
 
 
@@ -203,4 +199,4 @@ end
 
 end
 
-IF.Items:CreateNWVar(ITEM,"Live","bool",false,false,false);
+IF.Items:CreateNWVar( ITEM, "Live", "bool", false );

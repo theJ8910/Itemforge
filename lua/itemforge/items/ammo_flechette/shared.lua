@@ -5,18 +5,26 @@ SHARED
 This is ammunition for the Flechette Gun.
 ]]--
 
-if SERVER then AddCSLuaFile("shared.lua") end
+if SERVER then AddCSLuaFile( "shared.lua" ) end
 
-ITEM.Name="Flechette";
-ITEM.Description="Explosive, dagger-like hunter flechettes.";
-ITEM.Base="base_ammo";
-ITEM.Weight=20;			--The flechettes are pretty big, eh? Seems appropriate.
-ITEM.Size=11;
-ITEM.StartAmount=30;
+ITEM.Name				= "Flechette";
+ITEM.Description		= "Explosive, dagger-like hunter flechettes.";
+ITEM.Base				= "base_ammo";
+ITEM.Weight				= 20;			--The flechettes are pretty big, eh? Seems appropriate.
+ITEM.Size				= 11;
+ITEM.StartAmount		= 30;
 
-ITEM.WorldModel="models/weapons/hunter_flechette.mdl";
+ITEM.WorldModel			= "models/weapons/hunter_flechette.mdl";
 
-ITEM.HoldType="melee";
+ITEM.SWEPHoldType		= "melee";
+
+if CLIENT then
+
+ITEM.Icon				= Material( "itemforge/items/ammo_flechette" );
+ITEM.WorldModelNudge	= Vector( 3, 0, 7 );
+ITEM.WorldModelRotate	= Angle( 90, 0, 0 );
+
+end
 
 --[[
 * SHARED
@@ -37,20 +45,20 @@ maxspread should be a number indicating the radius of a cone at a distance of 1 
 This returns true if a flechette was created and fired.
 false is returned otherwise.
 ]]--
-function ITEM:ShootFlechette(vPos,ang,speed,maxspread,eKillCredit)
+function ITEM:ShootFlechette( vPos, ang, speed, maxspread, eKillCredit )
 	if CLIENT then return false end
 	
-	local fTheta = math.Rand(0,2*math.pi);
-	local fSpread = math.Rand(0, maxspread);
-	local fwd = ang:Forward() + fSpread*math.cos(fTheta)*ang:Right() + fSpread*math.sin(fTheta)*ang:Up();
+	local fTheta = math.Rand(0, 2 * math.pi);
+	local fSpread = math.Rand(0, maxspread );
+	local fwd = ang:Forward() + fSpread * math.cos( fTheta ) * ang:Right() + fSpread * math.sin( fTheta ) * ang:Up();
 	fwd:Normalize();
 
-	local ent=ents.Create("hunter_flechette");
+	local ent = ents.Create( "hunter_flechette" );
 	if !ent || !ent:IsValid() then return false end
-	ent:SetPos(vPos+fwd*32);
-	ent:SetAngles(ang);
-	ent:SetVelocity(fwd*speed);
-	ent:SetOwner(eKillCredit);
+	ent:SetPos(vPos + 32 * fwd );
+	ent:SetAngles( ang );
+	ent:SetVelocity( speed * fwd );
+	ent:SetOwner( eKillCredit );
 	ent:Spawn();
 	return true;
 end
@@ -72,40 +80,29 @@ the whole stack is fired shotgun style.
 iRockitLauncher is the rock-it launcher the stack of flechettes was fired from.
 pl is the player who fired it.
 ]]--
-function ITEM:OnRockItLaunch(iRockitLauncher,pl)
+function ITEM:OnRockItLaunch( iRockitLauncher, pl )
 	local pos;
 	local ang;
 	local eKillCredit;
 	if iRockitLauncher:IsHeld() then
 		eKillCredit = pl;
-		pos=pl:GetShootPos();
-		ang=pl:EyeAngles();
+		pos = pl:GetShootPos();
+		ang = pl:EyeAngles();
 	elseif iRockitLauncher:InWorld() then
 		eKillCredit  = iRockitLauncher:GetEntity();
 		local posang = iRockitLauncher:GetMuzzle( eKillCredit );
-		pos=posang.Pos;
-		ang=posang.Ang;
+		pos = posang.Pos;
+		ang = posang.Ang;
 	else
 		return;
 	end
 
-	for i=1,self:GetAmount() do
-		self:ShootFlechette(pos, Angle( ang.p+math.Rand(-5,5), ang.y+math.Rand(-5,5), ang.r), 2000, 0.0874886635, eKillCredit);
+	for i = 1, self:GetAmount() do
+		self:ShootFlechette( pos, ang, 2000, 0.0874886635, eKillCredit );
 	end
 
 	self:Remove();
 end
-
-
-
-
-else
-
-
-
-
-	ITEM.WorldModelNudge=Vector(3,0,7);
-	ITEM.WorldModelRotate=Angle(90,0,0);
 
 
 

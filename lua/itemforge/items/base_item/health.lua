@@ -5,41 +5,41 @@ SHARED
 This file contains functions related to the health of items.
 ]]--
 
-ITEM.MaxHealth=100;									--How much health does a single item in the stack have when at full health (by default - this can be changed with SetMaxHealth())?
+ITEM.MaxHealth		= 100;								--How much health does a single item in the stack have when at full health (by default - this can be changed with SetMaxHealth())?
 
 --[[
 * SHARED
 * Protected
 
-Get HP of the top item in stack (the items beneath it are assumed to be at full health)
+Get the health of the top item in stack (the items beneath it are assumed to be at full health)
 ]]--
 function ITEM:GetHealth()
-	return self:GetNWInt("Health");
+	return self:GetNWInt( "Health" );
 end
-IF.Items:ProtectKey("GetHealth");
+IF.Items:ProtectKey( "GetHealth" );
 
 --[[
 * SHARED
 * Protected
 
-Get the max HP of an item in the stack (they all have the same Max HP)
-If the max HP is 0, the item(s) are invincible
+Get the max health of an item in the stack (they all have the same max health)
+If the max health is 0, the item(s) are invincible
 ]]--
 function ITEM:GetMaxHealth()
-	return self:GetNWInt("MaxHealth");
+	return self:GetNWInt( "MaxHealth" );
 end
-IF.Items:ProtectKey("GetMaxHealth");
+IF.Items:ProtectKey( "GetMaxHealth" );
 
 --[[
 * SHARED
 * Protected
 
-Returns whether or not the item is invincible (does not take damage, doesn't use HP).
+Returns whether or not the item is invincible (does not take damage, doesn't use health).
 ]]--
 function ITEM:IsInvincible()
-	return self:GetMaxHealth()==0;
+	return self:GetMaxHealth() == 0;
 end
-IF.Items:ProtectKey("IsInvincible")
+IF.Items:ProtectKey( "IsInvincible" );
 
 --[[
 * SHARED
@@ -47,18 +47,21 @@ IF.Items:ProtectKey("IsInvincible")
 
 Hurt the top item on the stack however many points you want.
 Serverside, this will actually damage the item (reduce it's health), but it can be used clientside for prediction if you want.
-who is an optional entity that will be credited with causing damage to this item.
+
+iPts is the amount of health to subtract from the item.
+eWho is an optional entity that will be credited with causing damage to this item.
 
 ITEM.Damage is the same thing as ITEM.Hurt
 ]]--
-function ITEM:Hurt(pts,who)
-	if !pts then return self:Error("Couldn't hurt/damage item, hitpoints to remove from item not given!\n") end
-	if pts<0 then pts=0 end
-	self:SetHealth(self:GetHealth()-pts,who);
+function ITEM:Hurt( iPts, eWho )
+	if !iPts then return self:Error( "Couldn't hurt/damage item, health to remove from item not given!\n" ) end
+	if iPts < 0 then iPts = 0 end
+
+	self:SetHealth( self:GetHealth() - iPts, eWho );
 end
-IF.Items:ProtectKey("Hurt");
-ITEM.Damage=ITEM.Hurt;
-IF.Items:ProtectKey("Damage");
+IF.Items:ProtectKey( "Hurt" );
+ITEM.Damage = ITEM.Hurt;
+IF.Items:ProtectKey( "Damage" );
 
 --[[
 * SHARED
@@ -66,16 +69,18 @@ IF.Items:ProtectKey("Damage");
 
 Heals the top item on the stack however many points you want.
 Serverside, this will actually heal the item, but clientside it can be used for prediction.
-who is an optional entity that will be credited with healing the item.
+
+iPts is the amount of health to add to the item.
+eWho is an optional entity that will be credited with healing the item.
 ]]--
-function ITEM:Heal(pts,who)
-	if !pts then self:Error("Couldn't heal/repair item, hitpoints to restore item not given!\n") end
-	if pts<0 then pts=0 end
-	self:SetHealth(self:GetHealth()+pts,who);
+function ITEM:Heal( iPts, eWho )
+	if !iPts then self:Error( "Couldn't heal/repair item, health to restore to the item not given!\n" ) end
+	if iPts < 0 then iPts = 0 end
+	self:SetHealth( self:GetHealth() + iPts, eWho );
 end
-IF.Items:ProtectKey("Heal");
-ITEM.Repair=ITEM.Heal;
-IF.Items:ProtectKey("Repair");
+IF.Items:ProtectKey( "Heal" );
+ITEM.Repair = ITEM.Heal;
+IF.Items:ProtectKey( "Repair" );
 
 if SERVER then
 
@@ -83,103 +88,95 @@ if SERVER then
 
 
 --[[
-* SHARED
+* SERVER
 * Protected
 
-Set HP of top item in stack
-hp is the health to set the item to. If this value exceeds the max HP, it is clamped down to the max HP.
-	A value of -maxhp*i will subtract i+1 items, where i is a number from 0 to infinity.
+Sets the health of the top item in the stack.
+
+This function will call the "OnBreak" event if items are subtracted. (The code assumes the item has been destroyed by something if zero or negative health is given).
+
+iHealth is the health to set the item to. If this value exceeds the max health, it is clamped down to the max health.
+	A value of -maxhealth * i will subtract i + 1 items, where i is a number from 0 to infinity.
 	e.g. Lets say the max health of each item in a stack is 100.
 	Setting the health to 0 subtracts 1 item,
 	Setting health to -100 subtracts 2 items,
 	Setting health to -125 subtracts 2 items and subtracts 25 health from the next item in the stack.
 
-who is the player or entity who changed the HP (who damaged or repaired it).
-
-This function will call the "OnBreak" event if items are subtracted (assumed the item is destroyed by something).
+eWho is the player or entity who changed the HP (who damaged or repaired the item).
 
 TODO optimize
 ]]--
-function ITEM:SetHealth(hp,who)
-	local maxhp=self:GetMaxHealth();
-	if hp>maxhp then hp=maxhp end	--HP can't exceed the max health, but it 
+function ITEM:SetHealth( iHealth, eWho )
+	local iMaxHealth = self:GetMaxHealth();
 	
-	local shouldUp=true;
-	
-	if hp<=0 && maxhp!=0 then		--If HP falls at or below 0, subtract from the stack. Unless the item is invincible, of course.
+	if iHealth <= 0 && iMaxHealth != 0 then				--If health falls at or below 0, subtract from the stack. Unless the item is invincible, of course.
+
 		--[[
-		If maxhealth is 100
-		and hp is set to -92
+		To determine how many items will be subtracted, first we divide the new health by the max health of the top item to get an idea
+		how the new health differs from the normal health of a single item. Because we know the new health is negative or zero, we'll get a negative or zero ratio.
+
+		Since a value of 1 indicates the top item is 100% healthy, a value of 0 indicates the top item lost all of it's health.
+		Negative values indicate that not only was the top item blown away but the items beneath it suffered damage as well.
+		For instance, -0.5 indicates the top item lost all it's health, and then the item beneath it lost half of it's health.
+		Or, it could be -1, indicating that the top two items in the stack lost their all of their health.
+
+		We need to come up with some way of turning this ratio into an actual number of items to be removed.
+		Luckily, there is a way.
 		
-		-92/100 = -.92
-		floored to 0
-		1 subtracted
-		-1
-		
-		1 item will be removed
-		
-		(1*100)-92
-		New HP will be 8
-		
-		hp is set to -100?
-		-100/100 = -1
-		floored to -1
-		1 subtracted
-		-2
-		
-		2 items will be removed
-		-(-2*100)-100 = 100
-		
-		New HP will be 100
+		math.ceil returns 0 for the range [0, -1), returns -1 for [-1, -2), and so on.
+		By taking 1, then subtracting the ceil of the ratio we found earlier,
+		we can get the proper number of items that should be subtracted.
+
+		For instance, -1, when math.ceil()ed, produces -1. Taking 1, then subtracting -1, produces 2; the correct # of items to be removed. 
+		Or, -0.5, when math.ceil()ed, produces 0. Taking 1 and subtracting 0 produces 1, again the correct # of items to be removed.
 		]]--
+		local iSubtractHowMany = 1 - math.ceil( iHealth / iMaxHealth );
+		iHealth = iHealth + iSubtractHowMany * iMaxHealth;
 		
-		local SubtractHowMany=math.floor(hp/maxhp)-1;
-		local Remainder=(-(SubtractHowMany*maxhp))+hp;
-		
-		hp=Remainder;
-		
-		local totalLoss=-SubtractHowMany;
-		if totalLoss > self:GetAmount() then
-			totalLoss=self:GetAmount();
+		local iCurrentAmount = self:GetAmount();
+		if iSubtractHowMany > iCurrentAmount then
+			iSubtractHowMany = iCurrentAmount;
 		end
 		
 		--TODO this old code needs to be reworked slightly
-		self:Event("OnBreak",nil,totalLoss,(totalLoss==self:GetAmount()),who);
-		
+		local r, s = self:Event( "OnBreak", nil, iSubtractHowMany, ( iSubtractHowMany == iCurrentAmount ), eWho );
+
 		if !self:IsValid() then return end
 
-		shouldUp=self:SetAmount(math.max(0,self:GetAmount()+SubtractHowMany));
-	elseif hp>self:GetMaxHealth() then
-		hp=self:GetMaxHealth();
+		self:SetAmount( iCurrentAmount - iSubtractHowMany );
+		if !self:IsValid() then return end
+
+	elseif iHealth > iMaxHealth then
+
+		iHealth = iMaxHealth;
+
 	end
 	
-	--Update the client with this item's health - if there are no items left (all destroyed) don't bother.
-	if shouldUp==true then
-		self:SetNWInt("Health",hp);
-	end
+	self:SetNWInt( "Health", iHealth );
 end
-IF.Items:ProtectKey("SetHealth");
+IF.Items:ProtectKey( "SetHealth" );
 
 --[[
-* SHARED
+* SERVER
 * Protected
 
 Set max health of all items in the stack.
 
-maxhp is the amount to set the HP to. If maxhp is 0, the item becomes invincible.
+iMaxHealth is the amount to set the max health to.
+	If this is 0, the item becomes invincible.
 
-If the health of the item is greater than the given max health, it is brought down to the max health.
-Likewise, if the item was formerly invincible, the hp is set to the maxhealth.
+If the new max health is lower than the current health of the item, the item's health is brought down to the max health.
+Likewise, if the item was formerly invincible, the health is set to the max health.
 ]]--
-function ITEM:SetMaxHealth(maxhp)
-	local hp=self:GetHealth();
-	local oldmax=self:GetMaxHealth();
+function ITEM:SetMaxHealth( iMaxHealth )
+	local iHealth = self:GetHealth();
+	local iOldMax = self:GetMaxHealth();
 	
-	self:SetNWInt("MaxHealth",maxhp);
+	self:SetNWInt( "MaxHealth", iMaxHealth );
 	
-	if oldmax==0 || hp > maxhp then self:SetHealth(maxhp) end
+	if iOldMax == 0 || iMaxHealth < iHealth then self:SetHealth( iMaxHealth ) end
 end
-IF.Items:ProtectKey("SetMaxHealth");
+IF.Items:ProtectKey( "SetMaxHealth" );
 
 
 
@@ -190,21 +187,26 @@ else
 
 
 --[[
-* SHARED
+* CLIENT
 * Protected
 
-Set HP of top item in stack
+Sets the health of the top item in the stack.
+Cannot subtract items clientside.
+
+iHealth is the health to set the item to.
+	If this value exceeds the max health, it is clamped down to the max health.
+	Likewise, if it's less than 0, it's set to 0.
 ]]--
-function ITEM:SetHealth(hp)
-	if hp<0 then		--Keep health in range clientside
-		hp=0;
-	elseif hp>self:GetMaxHealth() then
-		hp=self:GetMaxHealth();
+function ITEM:SetHealth( iHealth )
+	local iMaxHealth = self:GetMaxHealth();
+
+	if iHealth < 0 then						iHP = 0;
+	elseif iHealth > iMaxHealth then		iHP = iMaxHealth;
 	end
 	
-	self:SetNWInt("Health",hp);
+	self:SetNWInt( "Health", iHealth );
 end
-IF.Items:ProtectKey("SetHealth");
+IF.Items:ProtectKey( "SetHealth" );
 
 
 

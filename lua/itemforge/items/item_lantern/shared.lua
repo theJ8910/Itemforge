@@ -3,33 +3,56 @@ item_lantern
 SHARED
 
 This item generates dynamic light. It can be turned on or off.
-Set the color of the lantern to set the color of the light ( self:SetColor(Color(r,g,b,a)) )
+Set the color of the lantern to set the color of the light ( self:SetColor( Color( r, g, b, a ) ) )
 ]]--
 
-if SERVER then AddCSLuaFile("shared.lua") end
+if SERVER then AddCSLuaFile( "shared.lua" ) end
 
-ITEM.Name="Lantern";
-ITEM.Description="An electric lantern.";
-ITEM.Weight=7000;
-ITEM.Size=14;
-ITEM.WorldModel="models/props/cs_italy/it_lantern1.mdl";
-ITEM.Sounds={
-	Sound("buttons/button1.wav"),
-	Sound("buttons/button4.wav")
-};
+ITEM.Name					= "Lantern";
+ITEM.Description			= "An electric lantern.";
+ITEM.Weight					= 7000;
+ITEM.Size					= 14;
+ITEM.WorldModel				= "models/props/cs_italy/it_lantern1.mdl";
 
-ITEM.HoldType="normal";
+
+ITEM.SWEPHoldType			= "normal";
 
 if SERVER then
 
-ITEM.GibEffect = "glass";
+
+
+
+ITEM.GibEffect				= "glass";
+
+
+
 
 else
 
-ITEM.WorldModelNudge=Vector(0,0,8);
+
+
+
+ITEM.WorldModelNudge		= Vector( 0, 0, 8 );
+
+
+
 
 end
 
+--Lantern
+ITEM.Sounds			= {
+	Sound( "buttons/button1.wav" ),
+	Sound( "buttons/button4.wav" )
+};
+
+if CLIENT then
+
+ITEM.GlowMat				= Material( "sprites/gmdm_pickups/light" );		--This glow sprite is drawn on the item while the item is on
+ITEM.GlowOffset				= Vector( 0, 0, 3 );							--The glow sprite is offset from the center of the entity by this much.
+ITEM.WorldModelNudgeHip		= Vector( -10, 0, 0 );
+ITEM.WorldModelRotateHip	= Angle( 0, 0, -45 );
+
+end
 
 --Server only
 if SERVER then
@@ -38,65 +61,83 @@ if SERVER then
 
 
 --[[
+* SERVER
+
 Whenever the lantern is used it's turned on or off.
 ]]--
-function ITEM:OnUse(pl)
+function ITEM:OnUse( pl )
 	self:Toggle();
 	return true;
 end
 
 --[[
-Turns the lantern on. Nothing happens if it's already on.
+* SERVER
+
+Turns the lantern on.
+Nothing happens if it's already on.
 ]]--
 function ITEM:TurnOn()
-	if self:GetNWBool("On") then return true end
+	if self:GetNWBool( "On" ) then return end
 	
-	self:SetNWBool("On",true);
-	self:EmitSound(self.Sounds[1]);
-	self:WireOutput("On",1);
-	return true;
+	self:SetNWBool( "On", true );
+	self:EmitSound( self.Sounds[1] );
+	self:WireOutput( "On", 1 );
 end
 
 --[[
-Turns the lantern off. Nothing happens if it's already off.
+* SERVER
+
+Turns the lantern off.
+Nothing happens if it's already off.
 ]]--
 function ITEM:TurnOff()
-	if !self:GetNWBool("On") then return true end
+	if !self:GetNWBool( "On" ) then return end
 	
-	self:SetNWBool("On",false);
-	self:EmitSound(self.Sounds[2]);
-	self:WireOutput("On",0);
-	return true;
+	self:SetNWBool( "On", false );
+	self:EmitSound( self.Sounds[2] );
+	self:WireOutput( "On", 0 );
 end
 
 --[[
+* SERVER
+
 If the lantern is on, turns it off, and vice versa.
 ]]--
 function ITEM:Toggle()
-	if self:GetNWBool("On") then return self:TurnOff();	end
-	return self:TurnOn();
+	if self:GetNWBool( "On" ) then	self:TurnOff();
+	else							self:TurnOn();
+	end
 end
 
 --[[
+* SERVER
+* Event
+
 The lantern can report whether or not it is on to Wiremod
 ]]--
-function ITEM:GetWireOutputs(entity)
-	return Wire_CreateOutputs(entity,{"On"});
+function ITEM:GetWireOutputs( eEntity )
+	return Wire_CreateOutputs( eEntity, { "On" } );
 end
 
 --[[
+* SERVER
+* Event
+
 The lantern can be turned on/off with wiremod
 ]]--
-function ITEM:GetWireInputs(entity)
-	return Wire_CreateInputs(entity,{"On"});
+function ITEM:GetWireInputs( eEntity )
+	return Wire_CreateInputs( eEntity, { "On" } );
 end
 
 --[[
+* SERVER
+* Event
+
 The lantern can be turned on/off with wiremod
 ]]--
-function ITEM:OnWireInput(entity,inputName,value)
-	if inputName=="On" then
-		if value==0 then	self:TurnOff();
+function ITEM:OnWireInput( eEntity, strInputName, vValue )
+	if strInputName == "On" then
+		if vValue == 0 then	self:TurnOff();
 		else				self:TurnOn();
 		end
 	end
@@ -111,10 +152,10 @@ else
 
 
 
-ITEM.GlowMat=Material("sprites/gmdm_pickups/light");	--This glow sprite is drawn on the item while the item is on
-ITEM.GlowOffset=Vector(0,0,3.0);						--The glow sprite is offset from the center of the entity by this much.
-
 --[[
+* CLIENT
+* Event
+
 We think clientside
 ]]--
 function ITEM:OnInit()
@@ -122,110 +163,146 @@ function ITEM:OnInit()
 end
 
 --[[
+* CLIENT
+* Event
+
 For a constant glow, dynamic lights must be created/refreshed every frame.
 The item must be on and in the world/held by a player.
 ]]--
 function ITEM:OnThink()
-	if !self:GetNWBool("On") then return false end
+	if !self:GetNWBool( "On" ) then return false end
 	
-	local ent=self:GetEntity() || self:GetWeapon();
-	if !ent then return false end
+	local eEntity = self:GetEntity() || self:GetWeapon();
+	if !eEntity then return false end
 	
-	local dlight = DynamicLight(ent:EntIndex());
-	if dlight then
-		ent=(self.WMAttach && self.WMAttach.ent) || ent;
-		
-		local t=CurTime()+self:GetRand();
-		local r=256 + math.sin(t*50) * 8;
-		local c=self:GetColor();
-		dlight.Pos = ent:GetPos();
-		dlight.r = c.r;
-		dlight.g = c.g;
-		dlight.b = c.b;
-		dlight.Brightness=5;
-		dlight.Decay=r*2;
-		dlight.Size=r;
-		dlight.DieTime=CurTime()+0.2;
-	end
-end
+	local dlight = DynamicLight( eEntity:EntIndex() );
+	if !dlight then return end
 
---Pose model in item slot. I want it posed a certain way (standing upright)
-function ITEM:OnPose3D(eEntity,PANEL)
-	local r=(RealTime()+self:GetRand())*20;
-	
-	local min,max=eEntity:GetRenderBounds();
-	local center=max-((max-min)*.5);			--Center, used to position 
-	eEntity:SetAngles(Angle(0,r,0));
-	eEntity:SetPos(Vector(0,0,0)-(eEntity:LocalToWorld(center)-eEntity:GetPos()));
+	eEntity = ( self.WMAttach && self.WMAttach.ent ) || eEntity;
+		
+	local t				= CurTime() + self:GetRand();
+	local r				= 256 + 8 * math.sin( 50 * t);
+	local c				= self:GetColor();
+	dlight.Pos			= eEntity:GetPos();
+	dlight.r			= c.r;
+	dlight.g			= c.g;
+	dlight.b			= c.b;
+	dlight.Brightness	= 5;
+	dlight.Decay		= 2 * r;
+	dlight.Size			= r;
+	dlight.DieTime		= CurTime() + 0.2;
 end
 
 --[[
+* CLIENT
+* Event
+
+Pose model in item slot.
+I want it posed a certain way (standing upright)
+]]--
+function ITEM:OnPose3D( eEntity, pnlModelPanel )
+	self:PoseUprightRotate( eEntity );
+end
+
+--[[
+* CLIENT
+* Event
+
 Draws a glow sprite on an entity.
 The entity varies depending on what is drawing.
 ]]--
-function ITEM:DrawGlow(ent)
-	if self:GetNWBool("On") then
-		local x=62 + 2 * math.sin( (CurTime()+self:GetRand()) * 50) ;
-		render.SetMaterial(self.GlowMat);
-		render.DrawSprite(ent:LocalToWorld(self.GlowOffset),x,x,self:GetColor());
-	end
+function ITEM:DrawGlow( eEntity )
+	local x = 62 + 2 * math.sin( 50 * ( CurTime() + self:GetRand() ) ) ;
+	render.SetMaterial( self.GlowMat );
+	render.DrawSprite( eEntity:LocalToWorld( self.GlowOffset ), x, x, self:GetColor() );
 end
 
+--[[
+* CLIENT
+
+Moves the lantern gear to the player's hand
+]]--
 function ITEM:SwapToHand()
-	if self.WMAttach && self.WMAttach:ToAP("anim_attachment_RH") then
+	if self.WMAttach && self.WMAttach:ToAP( "anim_attachment_RH" ) then
 		self.WMAttach:Show();
-		self.WMAttach:SetOffset(self.WorldModelNudge);
-		self.WMAttach:SetOffsetAngles(self.WorldModelRotate);		
+		self.WMAttach:SetOffset( self.WorldModelNudge );
+		self.WMAttach:SetOffsetAngles( self.WorldModelRotate );		
 	end
 end
 
+--[[
+* CLIENT
+
+Moves the lantern gear to the player's hip
+]]--
 function ITEM:SwapToHip()
-	if self.WMAttach && self.WMAttach:ToBone("ValveBiped.Bip01_Pelvis") then
+	if self.WMAttach && self.WMAttach:ToBone( "ValveBiped.Bip01_Pelvis" ) then
 		self.WMAttach:Show();
-		self.WMAttach:SetOffset(Vector(-10,0,0));
-		self.WMAttach:SetOffsetAngles(Angle(0,0,-45));
+		self.WMAttach:SetOffset( self.WorldModelNudgeHip );
+		self.WMAttach:SetOffsetAngles( self.WorldModelRotateHip );
 	end
 end
 
-function ITEM:OnHold(pl,weapon)	
-	self:BaseEvent("OnHold",nil,pl,weapon);
-	--self:InheritedEvent("OnHold","base_item",nil,pl,weapon);
-	--self["base_item"].OnHold(self,pl,weapon);
-	
-	if pl:GetActiveWeapon()==weapon then	self:SwapToHand();
+--[[
+* CLIENT
+
+When the player holds the lantern
+]]--
+function ITEM:OnHold( pl, eWeapon )
+	self:BaseEvent( "OnHold", nil, pl, eWeapon );
+	self:SimpleTimer( 0, self.DelayedHoldAction, pl, eWeapon );
+end
+
+--[[
+* CLIENT
+
+Calls shortly after a hold.
+The world model attachment may not exist when OnHold calls,
+so for the code in this function to work it needs to call a short amount of time after a hold.
+]]--
+function ITEM:DelayedHoldAction( pl, eWeapon )
+	if pl:GetActiveWeapon() == eWeapon then	self:SwapToHand();
 	else									self:SwapToHip();
 	end
 end
 
 --[[
+* CLIENT
+
 Deploying the lantern moves the world model attachment to the player's hand
 ]]--
 function ITEM:OnSWEPDeployIF()
 	self:SwapToHand();
 	
-	if self.ItemSlot then self.ItemSlot:SetVisible(true); end
+	if self.ItemSlot then self.ItemSlot:SetVisible( true ); end
 end
 
 --[[
+* CLIENT
+
 Holstering the lantern moves the world model attachment to the player's hip (Legend of Zelda: Twilight Princess anyone?)
 ]]--
 function ITEM:OnSWEPHolsterIF()
 	self:SwapToHip();
 	
-	if self.ItemSlot then self.ItemSlot:SetVisible(false); end
+	if self.ItemSlot then self.ItemSlot:SetVisible( false ); end
+end
+
+--[[
+* CLIENT
+* Event
+
+Draws a lantern glow
+]]--
+function ITEM:OnDraw3D( eEntity, bTranslucent)
+	self:BaseEvent( "OnDraw3D", nil, eEntity, bTranslucent );
+	if self:GetNWBool( "On" ) then self:DrawGlow( eEntity ) end
 end
 
 
---Called when a model associated with this item needs to be drawn
-function ITEM:OnDraw3D(eEntity,bTranslucent)
-	self:BaseEvent("OnDraw3D",nil,eEntity,bTranslucent);
-	self:DrawGlow(eEntity);
-end
-
-
 
 
 end
 
-IF.Items:CreateNWVar(ITEM,"On","bool",false);
+IF.Items:CreateNWVar( ITEM, "On", "bool", false );
 

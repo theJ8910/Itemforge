@@ -2,76 +2,87 @@
 item_passlock
 SERVER
 
-This item is a password lock. It attaches to doors. This is a new version of an item that was in RPMod v2.
+This item is a password lock. It attaches to doors.
+This is a new version of an item that was in RPMod v2.
 ]]--
 
-AddCSLuaFile("shared.lua");
-AddCSLuaFile("cl_init.lua");
+AddCSLuaFile( "shared.lua" );
+AddCSLuaFile( "cl_init.lua" );
 
-include("shared.lua");
+include( "shared.lua" );
 
-ITEM.Requests=nil;
-ITEM.Password="";
+--Password Lock
+ITEM.Requests = nil;
+ITEM.Password = "";
 
 --[[
+* SERVER
+* Event
+
 Every time we request a password on the server, we store a request
 which contains the player we're asking, the callback function, and a timeout timer
 in the item's Requests table. We create a requests table for every new password lock here:
 ]]--
 function ITEM:OnInit()
-	self.Requests={};
+	self.Requests = {};
 end
 
 --[[
+* SERVER
+* Event
+
 When we use the password lock, something happens depending on the state the password lock is in.
 ]]--
-function ITEM:OnUse(pl)
+function ITEM:OnUse( pl )
 	if self:GetAttachedEnt() || self:GetAttachedItem() then
-		if self.Password=="" then
-			self:SetPassword(pl);
-		elseif self:IsAttachmentLocked() then
-			self:RequestPassword(pl,"Enter password to unlock:",function(self,pl,string) self:Event("UnlockAttachment",false,pl,string) end);
-		else
-			self:RequestPassword(pl,"Enter password to lock:",function(self,pl,string) self:Event("LockAttachment",false,pl,string) end);
+		if		self.Password == "" then		self:SetPassword( pl );
+		elseif	self:IsAttachmentLocked() then	self:RequestPassword( pl, "Enter password to unlock:",	function( self, pl, str ) self:Event( "UnlockAttachment", false, pl, str ) end );
+		else									self:RequestPassword( pl, "Enter password to lock:",	function( self, pl, str ) self:Event( "LockAttachment",   false, pl, str ) end );
 		end
 	elseif self:InWorld() then	self:WorldAttach();
-	else						self:EmitSound(self.DenySound);
+	else						self:EmitSound( self.DenySound );
 	end
 	return true;
 end
 
 --[[
+* SERVER
+
 Password was entered successfully; play sound + temporary skin change
 ]]--
 function ITEM:PasswordSuccess()
-	local ent=self:GetEntity();
-	if ent then
-		ent:Fire("skin","1",0);
-		ent:Fire("skin","0",1);
+	local eEntity = self:GetEntity();
+	if eEntity then
+		eEntity:Fire( "skin", "1", 0 );
+		eEntity:Fire( "skin", "0", 1 );
 	end
-	self:EmitSound(self.AllowSound);
+	self:EmitSound( self.AllowSound );
 end
 
 --[[
+* SERVER
+
 Password was entered incorrectly; play sound + temporary skin change
 ]]--
 function ITEM:PasswordFail()
-	local ent=self:GetEntity();
-	if ent then
-		ent:Fire("skin","2",0);
-		ent:Fire("skin","0",1);
+	local eEntity = self:GetEntity();
+	if eEntity then
+		eEntity:Fire( "skin", "2", 0 );
+		eEntity:Fire( "skin", "0", 1 );
 	end
-	self:EmitSound(self.DenySound);
+	self:EmitSound( self.DenySound );
 end
 
 --[[
+* SERVER
+
 Unlocks the attached entity if the password given matches this password.
 ]]--
-function ITEM:LockAttachment(pl,password)
-	if !pl then return self:BaseEvent("LockAttachment",false); end
+function ITEM:LockAttachment( pl, strPassword )
+	if !pl then return self:BaseEvent( "LockAttachment", false ); end
 	
-	if password==self.Password then
-		self:BaseEvent("LockAttachment");
+	if strPassword == self.Password then
+		self:BaseEvent( "LockAttachment" );
 		self:PasswordSuccess();
 		return true;
 	else
@@ -81,13 +92,15 @@ function ITEM:LockAttachment(pl,password)
 end
 
 --[[
+* SERVER
+
 Unlocks the attached entity if the password given matches this password.
 ]]--
-function ITEM:UnlockAttachment(pl,password)
-	if !pl then return self:BaseEvent("UnlockAttachment",false); end
+function ITEM:UnlockAttachment( pl, strPassword )
+	if !pl then return self:BaseEvent( "UnlockAttachment", false ); end
 	
-	if password==self.Password then
-		self:BaseEvent("UnlockAttachment");
+	if strPassword == self.Password then
+		self:BaseEvent( "UnlockAttachment" );
 		self:PasswordSuccess();
 		return true;
 	else
@@ -97,31 +110,35 @@ function ITEM:UnlockAttachment(pl,password)
 end
 
 --[[
+* SERVER
+
 This function is run in three cases:
 	Whenever the client selects "Set Password" clientside (or uses an attached password lock without a password set).
 	After the client enters the old password correctly.
 	After the client enters the new password.
 ]]--
-function ITEM:SetPassword(pl,to,oldPass)
-	if !to then
-		if self.Password!="" && self.Password!=oldPass then
-			self:RequestPassword(pl,"Enter the old password:",self.CheckOldPassword);
+function ITEM:SetPassword( pl, strTo, strOldPass )
+	if !strTo then
+		if self.Password != "" && self.Password != strOldPass then
+			self:RequestPassword( pl, "Enter the old password:", self.CheckOldPassword );
 		else
-			self:RequestPassword(pl,"Enter a new password:",self.SetPassword);
+			self:RequestPassword( pl, "Enter a new password:", self.SetPassword );
 		end
 	else
-		self:EmitSound(self.SetPassSound);
-		self.Password=to;
+		self:EmitSound( self.SetPassSound );
+		self.Password = strTo;
 	end
 end
 
 --[[
+* SERVER
+
 This function runs whenever the client is changing the password and enters the old password.
 Continues to the next step if it was correct, or fails if it wasn't.
 ]]--
-function ITEM:CheckOldPassword(pl,password)
-	if password==self.Password then
-		self:SetPassword(pl,nil,password);
+function ITEM:CheckOldPassword( pl, strPassword )
+	if strPassword == self.Password then
+		self:SetPassword( pl, nil, strPassword );
 		self:PasswordSuccess();
 	else
 		self:PasswordFail();
@@ -129,44 +146,54 @@ function ITEM:CheckOldPassword(pl,password)
 end
 
 --[[
+* SERVER
+
 Requests a password from a player. 
+
 pl is the player we will ask for a password.
-sQuestion is a string containing a question for the player; this is usually something like "Enter Password:".
-fCallback runs when (or if) the player responds.
+strQuestion is a string containing a question for the player.
+	This is usually something like "Enter Password:".
+fnCallback runs when (or if) the player responds.
 ]]--
-function ITEM:RequestPassword(pl,sQuestion,fCallback)
-	local r={};
-	r.Player=pl;
-	r.Callback=fCallback;
-	local i=table.insert(self.Requests,r);
-	r.Timeout=self:SimpleTimer(60,self.ForgetRequest,i);
+function ITEM:RequestPassword( pl, strQuestion, fnCallback )
+	local r = {};
+	local i = table.insert( self.Requests, r );
+
+	r.Player	= pl;
+	r.Callback	= fnCallback;
+	r.Timeout	= self:SimpleTimer( 60, self.ForgetRequest, i );
 	
-	self:SendNWCommand("AskForPassword",pl,i,sQuestion);
+	self:SendNWCommand( "AskForPassword", pl, i, strQuestion );
 end
 
 --[[
+* SERVER
+
 Cleans up a request that was temporarily stored.
 Runs whenever the request is answered or times out.
 ]]--
-function ITEM:ForgetRequest(reqid)
-	local r=self.Requests[reqid];
-	self:DestroyTimer(r.Timeout);
-	self.Requests[reqid]=nil;
+function ITEM:ForgetRequest( iReqID )
+	local r = self.Requests[iReqID];
+	self:DestroyTimer( r.Timeout );
+	self.Requests[iReqID] = nil;
 end
 
 --[[
+* SERVER
+
 Whenever a password is requested and the player enters it,
 this function runs to double check that the request is still valid,
 that the player who responded was the same one we requested information from,
 and finally to run the callback function and clean up the request.
 ]]--
-function ITEM:ReturnPassword(pl,reqid,string)
-	local request=self.Requests[reqid];
-	if !request || pl!=request.Player then return false end
-	request.Callback(self,pl,string);
-	self:ForgetRequest(reqid);
+function ITEM:ReturnPassword( pl, iReqID, str )
+	local r = self.Requests[iReqID];
+	if !r || pl != r.Player then return false end
+	r.Callback( self, pl, str );
+
+	self:ForgetRequest( iReqID );
 end
 
-IF.Items:CreateNWCommand(ITEM,"AskForPassword",nil,{"short","string"});
-IF.Items:CreateNWCommand(ITEM,"ReturnPassword",function(self,...) self:ReturnPassword(...) end,{"short","string"});
-IF.Items:CreateNWCommand(ITEM,"SetPassword",function(self,...) self:SetPassword(...) end);
+IF.Items:CreateNWCommand( ITEM, "AskForPassword",	nil,													{ "short", "string" } );
+IF.Items:CreateNWCommand( ITEM, "ReturnPassword",	function( self, ... ) self:ReturnPassword( ... ) end,	{ "short", "string" } );
+IF.Items:CreateNWCommand( ITEM, "SetPassword",		function( self, ... ) self:SetPassword( ... )	 end						  );

@@ -10,48 +10,68 @@ I've commented out a few example paths in the code to demonstrate what the path 
 It's confusing for me too. That's why I wrote a module to handle it.
 ]]--
 
-MODULE.Name="Resources";										--Our module will be stored at IF.Resources
-MODULE.Disabled=false;											--Our module will be loaded
-MODULE.LuaFolder="addons/itemforge/lua/"						--Where's our Lua directory serverside?
-MODULE.RelativeToData="../";									--Where is MODULE.ResourceFolder and MODULE.LuaFolder relative to the data folder?
+MODULE.Name				= "Resources";										--Our module will be stored at IF.Resources
+MODULE.Disabled			= false;											--Our module will be loaded
+MODULE.LuaFolder		= "addons/itemforge/lua/"							--Where's our Lua directory serverside?
+MODULE.RelativeToData	= "../";											--Where is MODULE.ResourceFolder and MODULE.LuaFolder relative to the data folder?
 
---Initilize resources module
+--[[
+* SERVER
+* Event
+
+Initilize resources module
+]]--
 function MODULE:Initialize()
 end
 
+--[[
+* SERVER
+* Event
+
+Cleans up the resources module
+]]--
 function MODULE:Cleanup()
 end
 
---Add resources at the given path and all subfolders to the download list for clients
-function MODULE:AddResources(path)
-	local pathRelToData=self.RelativeToData..path;		--"../materials/itemforge/"
-	local files=file.Find(pathRelToData.."*");
-	for k,v in pairs(files) do
-		if v!= ".svn" && v!=".." && v!="." then
-			if file.IsDir(pathRelToData..v) then
-				self:AddResources(path..v.."/");							--"materials/itemforge/inventory/"
-			else
-				resource.AddFile(path..v);									--"materials/itemforge/icon.vtf" or "materials/itemforge/icon.vmt"
+--[[
+* SERVER
+
+Recursively adds resources at the given path and all subfolders to the download list for clients.
+]]--
+function MODULE:AddResources( strPath )
+	local strPathRelToData = self.RelativeToData..strPath;											--"../materials/itemforge/"
+	local tFiles = file.Find( strPathRelToData.."*" );
+	for k, v in ipairs( tFiles ) do
+		if !IF.Util:IsBadFolder( v ) then
+			if file.IsDir( strPathRelToData..v ) then	self:AddResources( strPath..v.."/");		--"materials/itemforge/inventory/"
+			else										resource.AddFile( strPath..v );				--"materials/itemforge/icon.vtf" or "materials/itemforge/icon.vmt"
 			end
 		end
 	end
 end
 
---Adds all of the .lua files in the given path and all subfolders
-function MODULE:AddCSLuaFiles(path)
-	local pathRelToData=self.RelativeToData..self.LuaFolder..path;			--"../addons/itemforge/lua/itemforge/shared/"
-	local files=file.FindInLua(path.."*");
-	for k,v in pairs(files) do
-		if v!=".svn" && v!=".." && v!="." then
-			if file.IsDir(pathRelToData..v) then
-				self:AddCSLuaFiles(path..v.."/");
-			else
-				AddCSLuaFile(path..v);										--"itemforge/shared/item.lua"
+--[[
+* SERVER
+
+Recursively adds all of the .lua files in the given path and all subfolders
+]]--
+function MODULE:AddCSLuaFiles( strPath )
+	local strPathRelToData = self.RelativeToData..self.LuaFolder..strPath;							--"../addons/itemforge/lua/itemforge/shared/"
+	local tFiles = file.FindInLua( strPath.."*" );
+	for k, v in ipairs( tFiles ) do
+		if !IF.Util:IsBadFolder( v ) then
+			if file.IsDir( strPathRelToData..v ) then	self:AddCSLuaFiles( strPath..v.."/" );		--"itemforge/shared/somefolder/"
+			else										AddCSLuaFile( strPath..v );					--"itemforge/shared/item.lua"
 			end
 		end
 	end
 end
 
+--[[
+* SERVER
+
+I forget why this is here.
+]]--
 function MODULE:Reload()
 	
 end

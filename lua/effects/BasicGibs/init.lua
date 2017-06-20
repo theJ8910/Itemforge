@@ -2,7 +2,7 @@
 BasicGibs
 CLIENT
 
-This effect spawns a few metal gibs where it's told to.
+This effect spawns a few metal, wood, or glass gibs where it's told to.
 ]]--
 EFFECT.Models={
 	{

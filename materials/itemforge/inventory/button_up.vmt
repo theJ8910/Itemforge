@@ -1,7 +1,8 @@
 "UnlitGeneric"
 {
-	"$basetexture" "itemforge/inventory/button_up"
-	"$vertexalpha" 1
-	"$vertexcolor" 1
-	"$nolod" 1
+	"$basetexture"		"itemforge/inventory/button_up"
+	"$vertexalpha"		1
+	"$vertexcolor"		1
+	"$nolod"			1
+	"$ignorez"			1
 }

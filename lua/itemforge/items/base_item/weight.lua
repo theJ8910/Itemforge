@@ -5,7 +5,7 @@ SHARED
 This file contains functions related to item weight.
 ]]--
 
-ITEM.Weight=1;										--Default weight of one item in this stack, in grams. By default, I mean that the weight can be changed after the item is created. Note: this doesn't affect the physics weight when the item is on the ground, just the weight of the item in an inventory.
+ITEM.Weight		= 1;										--Default weight of one item in this stack, in grams. By default, I mean that the weight can be changed after the item is created. Note: this doesn't affect the physics weight when the item is on the ground, just the weight of the item in an inventory.
 
 --[[
 * SHARED
@@ -25,11 +25,11 @@ For example:
 TODO Stranded 2 supports negative weights (eg butterflies) so it might not be a bad idea
 	 to add support for that
 ]]--
-function ITEM:SetWeight(iGrams)
-	if iGrams < 0 then return self:Error("Couldn't set weight. Weight cannot be negative value ("..iGrams..")."); end
-	self:SetNWInt("Weight",iGrams);
+function ITEM:SetWeight( iGrams )
+	if iGrams < 0 then return self:Error( "Couldn't set weight. Weight cannot be negative value ("..iGrams..")." ); end
+	self:SetNWInt( "Weight", iGrams );
 end
-IF.Items:ProtectKey("SetWeight");
+IF.Items:ProtectKey( "SetWeight" );
 
 --[[
 * SHARED
@@ -38,9 +38,9 @@ IF.Items:ProtectKey("SetWeight");
 Get the weight of an item in the stack (they all weigh the same).
 ]]--
 function ITEM:GetWeight()
-	return self:GetNWInt("Weight");
+	return self:GetNWInt( "Weight" );
 end
-IF.Items:ProtectKey("GetWeight");
+IF.Items:ProtectKey( "GetWeight" );
 
 --[[
 * SHARED
@@ -49,6 +49,6 @@ IF.Items:ProtectKey("GetWeight");
 Get the weight of all the items in the stack. This is the weight of an individual item times the amount.
 ]]--
 function ITEM:GetStackWeight()
-	return self:GetWeight()*self:GetAmount();
+	return self:GetAmount() * self:GetWeight();
 end
-IF.Items:ProtectKey("GetStackWeight");
+IF.Items:ProtectKey( "GetStackWeight" );

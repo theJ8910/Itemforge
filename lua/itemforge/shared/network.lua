@@ -6,19 +6,19 @@ This module handles the networking of data between client and server.
 It also implements a base networked object.
 ]]--
 
-MODULE.Name="Network";											--Our module will be stored at IF.Network
-MODULE.Disabled=false;											--Our module will be loaded
+MODULE.Name				= "Network";							--Our module will be stored at IF.Network
+MODULE.Disabled			= false;								--Our module will be loaded
 
-local BaseNWClassName="base_nw";								--The name of the Base Networked class
+local BaseNWClassName	= "base_nw";							--The name of the Base Networked class
 
-local IFN_DTYPE_CHAR = 1;
-local IFN_DTYPE_SHORT = 2;
-local IFN_DTYPE_LONG = 3;
+local IFN_DTYPE_CHAR	= 1;
+local IFN_DTYPE_SHORT	= 2;
+local IFN_DTYPE_LONG	= 3;
 
-local _OBJECTS={};												--Networked objects are stored here
-local ChangedNWObjects={};										--When a network object has a networked property changed, the object is added here temporarily
+local _OBJECTS			= {};									--Networked objects are stored here
+local ChangedNWObjects	= {};									--When a network object has a networked property changed, the object is added here temporarily
 
-local _NWBASE={};
+local _NWBASE			= {};
 
 --[[
 What type of datatype do the NWIDs for networked objects use?
@@ -32,7 +32,7 @@ If for some reason, however, you feel the need to change this, NWIDType can be s
 	IFN_DTYPE_SHORT: Up to 65,536 unique networked objects may exist at any time. The short datatype is twice as big as the char datatype in terms of bandwidth used, but the number of networked objects you can have in increased dramatically.
 	IFN_DTYPE_LONG: Up to 4,294,967,296 unique networked objects may exist at any time. The long datatype is four times as big as the char datatype in terms of bandwidth used. This datatype will likely slow things down, especially if you actually manage to surpass 65,536 networked objects. If you have to, absolutely have to, the long datatype is here for you.
 ]]--
-MODULE.NWIDType=IFN_DTYPE_SHORT;
+MODULE.NWIDType = IFN_DTYPE_SHORT;
 
 --[[
 The following commands apply to all networked objects.
@@ -50,22 +50,22 @@ However, I can calculate part of the message's sized based on my knowledge of da
 If something is marked with "?", I am estimating what the size of the datatype is.
 Remember, less is more! Do your part to make Garry's Mod playable for everyone - use small datatpes whenever possible!
 ]]--
-local IFN_MSG_SETNIL		=	-124;	--(Server > Client) [0 bits]				Sync a networked var - changes whatever was there before to nil
-local IFN_MSG_SETBOOL		=	-123;	--(Server > Client) [8 bits]				Sync a networked boolean
-local IFN_MSG_SETCHAR		=	-122;	--(Server > Client) [8 bits]				Sync a networked char (an int from -128 to 127)
-local IFN_MSG_SETUCHAR		=	-121;	--(Server > Client) [8 bits]				Sync a networked unsigned char (an int from 0 to 255)
-local IFN_MSG_SETSHORT		=	-120;	--(Server > Client) [16 bits]				Sync a networked short (an int from -32,768 to 32,767)
-local IFN_MSG_SETUSHORT		=	-119;	--(Server > Client) [16 bits]				Sync a networked unsigned short (an int from 0 to 65,535)
-local IFN_MSG_SETENTITY		=	-118;	--(Server > Client) [16 bits?]				Sync a networked entity
-local IFN_MSG_SETITEM		=	-117;	--(Server > Client) [16 bits]				Sync a networked item
-local IFN_MSG_SETINV		=	-116;	--(Server > Client) [16 bits]				Sync a networked inventory
-local IFN_MSG_SETLONG		=	-115;	--(Server > Client) [32 bits]				Sync a networked long (an int from -2,147,483,648 to 2,147,483,647)
-local IFN_MSG_SETULONG		=	-114;	--(Server > Client) [32 bits]				Sync a networked unsigned long (an int from 0 to 4,294,967,295)
-local IFN_MSG_SETCOLOR		=	-113;	--(Server > Client) [32 bits]				Sync a networked color
-local IFN_MSG_SETFLOAT		=	-112;	--(Server > Client) [32 bits]				Sync a networked float
-local IFN_MSG_SETVECTOR		=	-111;	--(Server > Client) [96 bits?]				Sync a networked vector
-local IFN_MSG_SETANGLE		=	-110;	--(Server > Client) [96 bits?]				Sync a networked angle
-local IFN_MSG_SETSTRING		=	-109;	--(Server > Client) [8*(str_len+1) bits?]	Sync a networked string
+local IFN_MSG_SETNIL		=	-124;	--(Server > Client) [0 bits]						Sync a networked var - changes whatever was there before to nil
+local IFN_MSG_SETBOOL		=	-123;	--(Server > Client) [8 bits]						Sync a networked boolean
+local IFN_MSG_SETCHAR		=	-122;	--(Server > Client) [8 bits]						Sync a networked char (an int from -128 to 127)
+local IFN_MSG_SETUCHAR		=	-121;	--(Server > Client) [8 bits]						Sync a networked unsigned char (an int from 0 to 255)
+local IFN_MSG_SETSHORT		=	-120;	--(Server > Client) [16 bits]					Sync a networked short (an int from -32,768 to 32,767)
+local IFN_MSG_SETUSHORT		=	-119;	--(Server > Client) [16 bits]					Sync a networked unsigned short (an int from 0 to 65,535)
+local IFN_MSG_SETENTITY		=	-118;	--(Server > Client) [16 bits?]					Sync a networked entity
+local IFN_MSG_SETITEM		=	-117;	--(Server > Client) [16 bits]					Sync a networked item
+local IFN_MSG_SETINV		=	-116;	--(Server > Client) [16 bits]					Sync a networked inventory
+local IFN_MSG_SETLONG		=	-115;	--(Server > Client) [32 bits]					Sync a networked long (an int from -2,147,483,648 to 2,147,483,647)
+local IFN_MSG_SETULONG		=	-114;	--(Server > Client) [32 bits]					Sync a networked unsigned long (an int from 0 to 4,294,967,295)
+local IFN_MSG_SETCOLOR		=	-113;	--(Server > Client) [32 bits]					Sync a networked color
+local IFN_MSG_SETFLOAT		=	-112;	--(Server > Client) [32 bits]					Sync a networked float
+local IFN_MSG_SETVECTOR		=	-111;	--(Server > Client) [96 bits?]					Sync a networked vector
+local IFN_MSG_SETANGLE		=	-110;	--(Server > Client) [96 bits?]					Sync a networked angle
+local IFN_MSG_SETSTRING		=	-109;	--(Server > Client) [8 * ( str_len + 1 ) bits?]	Sync a networked string
 
 --Item
 local IFN_MSG_CREATEITEM	=	-108;	--(Server > Client) Sync Create item clientside
@@ -79,27 +79,27 @@ local IFN_MSG_PARTIALMERGE	=	-101;	--(Server > Client) Macro. Merge two items pa
 local IFN_MSG_SPLIT			=	-100;	--(Server > Client) Macro. Split an item (saves bandwidth)
 
 --Inventory
-local IFN_MSG_CREATEINV		=	-99;	--(Server > Client) Sync create inventory clientside
-local IFN_MSG_REMOVEINV		=	-98;	--(Server > Client) Sync remove inventory clientside
-local IFN_MSG_REQUP			=	-97;	--(Client > Server) Client requests an update of an inventory
-local IFN_MSG_REQFULLUP		=	-96;	--(Client > Server) Client requests an update of all inventories (joining player)
-local IFN_MSG_STARTFULLUP	=	-95;	--(Server > Client) This message tells the client that a full update of all inventories is going to being sent and how many to expect.
-local IFN_MSG_ENDFULLUP		=	-94;	--(Server > Client) This message tells the client the full update of all inventories has finished.
-local IFN_MSG_INVUP			=	-93;	--(Server > Client) A full update on an inventory is being sent. This sends basic data about the inventory.
-local IFN_MSG_WEIGHTCAP		=	-92;	--(Server > Client) The weight capacity of the inventory has changed serverside. Sync to client.
-local IFN_MSG_SIZELIMIT		=	-91;	--(Server > Client) The size limit of the inventory has changed serverside. Sync to client.
-local IFN_MSG_MAXSLOTS		=	-90;	--(Server > Client) The max number of slots was changed. Sync to client.
-local IFN_MSG_CONNECTITEM	=	-89;	--(Server > Client) The inventory has connected itself with an item. Have client connect too.
-local IFN_MSG_CONNECTENTITY	=	-88;	--(Server > Client) The inventory has connected itself with an entity. Have client connect too.
-local IFN_MSG_SEVERITEM		=	-87;	--(Server > Client) The inventory is severing itself from an item. Have client sever as well.
-local IFN_MSG_SEVERENTITY	=	-86;	--(Server > Client) The inventory is severing itself from an entity. Have client sever too.
-local IFN_MSG_LOCK			=	-85;	--(Server > Client) The inventory has been locked serverside. Have client lock too.
-local IFN_MSG_UNLOCK		=	-84;	--(Server > Client) The inventory has been unlocked serverside. Have client unlock too.
+local IFN_MSG_CREATEINV		=	-99;		--(Server > Client) Sync create inventory clientside
+local IFN_MSG_REMOVEINV		=	-98;		--(Server > Client) Sync remove inventory clientside
+local IFN_MSG_REQUP			=	-97;		--(Client > Server) Client requests an update of an inventory
+local IFN_MSG_REQFULLUP		=	-96;		--(Client > Server) Client requests an update of all inventories (joining player)
+local IFN_MSG_STARTFULLUP	=	-95;		--(Server > Client) This message tells the client that a full update of all inventories is going to being sent and how many to expect.
+local IFN_MSG_ENDFULLUP		=	-94;		--(Server > Client) This message tells the client the full update of all inventories has finished.
+local IFN_MSG_INVUP			=	-93;		--(Server > Client) A full update on an inventory is being sent. This sends basic data about the inventory.
+local IFN_MSG_WEIGHTCAP		=	-92;		--(Server > Client) The weight capacity of the inventory has changed serverside. Sync to client.
+local IFN_MSG_SIZELIMIT		=	-91;		--(Server > Client) The size limit of the inventory has changed serverside. Sync to client.
+local IFN_MSG_MAXSLOTS		=	-90;		--(Server > Client) The max number of slots was changed. Sync to client.
+local IFN_MSG_CONNECTITEM	=	-89;		--(Server > Client) The inventory has connected itself with an item. Have client connect too.
+local IFN_MSG_CONNECTENTITY	=	-88;		--(Server > Client) The inventory has connected itself with an entity. Have client connect too.
+local IFN_MSG_SEVERITEM		=	-87;		--(Server > Client) The inventory is severing itself from an item. Have client sever as well.
+local IFN_MSG_SEVERENTITY	=	-86;		--(Server > Client) The inventory is severing itself from an entity. Have client sever too.
+local IFN_MSG_LOCK			=	-85;		--(Server > Client) The inventory has been locked serverside. Have client lock too.
+local IFN_MSG_UNLOCK		=	-84;		--(Server > Client) The inventory has been unlocked serverside. Have client unlock too.
 
 --FileSend stuff
-IFN_MSG_FILESENDSTART		=	-83;	--(Server > Client) Indicates a file is about to be sent; gives it's path and size
-IFN_MSG_FILESEND			=	-82;	--(Server > Client) Contains a fragment of the sent file's contents.
-IFN_MSG_FILESENDEND			=	-81;	--(Server > Client) Indicates the file has been sent completely.
+IFN_MSG_FILESENDSTART		=	-83;		--(Server > Client) Indicates a file is about to be sent; gives it's path and size
+IFN_MSG_FILESEND			=	-82;		--(Server > Client) Contains a fragment of the sent file's contents.
+IFN_MSG_FILESENDEND			=	-81;		--(Server > Client) Indicates the file has been sent completely.
 
 --[[
 * SHARED
@@ -107,8 +107,8 @@ IFN_MSG_FILESENDEND			=	-81;	--(Server > Client) Indicates the file has been sen
 Initilize network module
 ]]--
 function MODULE:Initialize()
-	IF.Base:RegisterClass(_NWBASE,BaseNWClassName);
-	self:StartTick()
+	IF.Base:RegisterClass( _NWBASE, BaseNWClassName );
+	self:StartTick();
 end
 
 --[[
@@ -125,7 +125,7 @@ end
 
 Returns the networked object with the given ID.
 ]]--
-function MODULE:Get(id)
+function MODULE:Get( id )
 	return _OBJECTS[id];
 end
 
@@ -135,7 +135,7 @@ end
 Starts the network tick
 ]]--
 function MODULE:StartTick()
-	hook.Add("Tick","itemforge_tick",function(...) self:Tick(...) end);
+	hook.Add( "Tick", "itemforge_tick", function( ... ) self:Tick( ... ) end );
 end
 
 --[[
@@ -144,7 +144,7 @@ end
 Ends the network tick
 ]]--
 function MODULE:StopTick()
-	hook.Remove("Tick","itemforge_tick");
+	hook.Remove( "Tick", "itemforge_tick" );
 end
 
 --[[
@@ -154,63 +154,66 @@ Ticks all network objects clientside and serverside
 ]]--
 function MODULE:Tick()
 	--[[
-	for k,v in pairs(ChangedNWObjects) do
+	for k,v in pairs( ChangedNWObjects ) do
 		v:Tick();
-		ChangedNWObjects[k]=nil;
+		ChangedNWObjects[k] = nil;
 	end
 	]]--
 end
 
 if SERVER then
 
-local ServerOutHandlers={
-	[IFN_MSG_FILESENDSTART]=function(self,pl,strFilepath,iSize)
-		self:IFSendStart(pl,IFN_MSG_FILESENDSTART,0);
-		self:IFSendString(strFilepath);
-		self:IFSendLong(iSize);
+
+
+
+local ServerOutHandlers = {
+	[IFN_MSG_FILESENDSTART] = function( self, pl, strFilepath, iSize )
+		self:IFSendStart( pl, IFN_MSG_FILESENDSTART, 0 );
+		self:IFSendString( strFilepath );
+		self:IFSendLong( iSize );
 		self:IFSendEnd();
 	end,
-	[IFN_MSG_FILESEND]=function(self,pl,strFragment)
-		self:IFSendStart(pl,IFN_MSG_FILESEND,0);
-		self:IFSendString(strFragment);
+	[IFN_MSG_FILESEND] = function( self, pl, strFragment )
+		self:IFSendStart( pl, IFN_MSG_FILESEND, 0 );
+		self:IFSendString( strFragment );
 		self:IFSendEnd();
 	end,
-	[IFN_MSG_FILESENDEND]=function(self,pl)
-		self:IFSendStart(pl,IFN_MSG_FILESENDEND,0);
+	[IFN_MSG_FILESENDEND] = function( self, pl )
+		self:IFSendStart( pl, IFN_MSG_FILESENDEND, 0 );
 		self:IFSendEnd();
 	end,
 };
 
-local ServerInHandlers={
+local ServerInHandlers = {
 };
 
 --Server send functions
 local IFSendStartLookupTable = {
-	[IFN_DTYPE_CHAR]	= function(self,pl,eMsg,id) umsg.Start("if",pl); umsg.Char(eMsg); umsg.Char((id or 0)-128)			end,
-	[IFN_DTYPE_SHORT]	= function(self,pl,eMsg,id) umsg.Start("if",pl); umsg.Char(eMsg); umsg.Short((id or 0)-32768)		end,
-	[IFN_DTYPE_LONG]	= function(self,pl,eMsg,id) umsg.Start("if",pl); umsg.Char(eMsg); umsg.Long((id or 0)-2147483648)	end
+	[IFN_DTYPE_CHAR]	= function( self, pl, eMsg, id ) umsg.Start( "if", pl ); umsg.Char( eMsg ); umsg.Char(	( id or 0 ) - 128 )			end,
+	[IFN_DTYPE_SHORT]	= function( self, pl, eMsg, id ) umsg.Start( "if", pl ); umsg.Char( eMsg ); umsg.Short(	( id or 0 ) - 32768 )		end,
+	[IFN_DTYPE_LONG]	= function( self, pl, eMsg, id ) umsg.Start( "if", pl ); umsg.Char( eMsg ); umsg.Long(	( id or 0 ) - 2147483648 )	end
 };
 
 MODULE.IFSendStart = IFSendStartLookupTable[MODULE.NWIDType];
 
-function MODULE:IFSendAngle(v)			umsg.Angle(v)			end
-function MODULE:IFSendBool(v)			umsg.Bool(v)			end
-function MODULE:IFSendChar(v)			umsg.Char(v)			end
-function MODULE:IFSendEntity(v)			umsg.Entity(v)			end
-function MODULE:IFSendFloat(v)			umsg.Float(v)			end
-function MODULE:IFSendLong(v)			umsg.Long(v)			end
-function MODULE:IFSendShort(v)			umsg.Short(v)			end
-function MODULE:IFSendString(v)			umsg.String(v)			end
-function MODULE:IFSendVector(v)			umsg.Vector(v)			end
-function MODULE:IFSendVectorNormal(v)	umsg.VectorNormal(v)	end
+function MODULE:IFSendAngle( v )		umsg.Angle( v )			end
+function MODULE:IFSendBool( v )			umsg.Bool( v )			end
+function MODULE:IFSendChar( v )			umsg.Char( v )			end
+function MODULE:IFSendEntity( v )		umsg.Entity( v )		end
+function MODULE:IFSendFloat( v )		umsg.Float( v )			end
+function MODULE:IFSendLong( v )			umsg.Long( v )			end
+function MODULE:IFSendShort( v )		umsg.Short( v )			end
+function MODULE:IFSendString( v )		umsg.String( v )		end
+function MODULE:IFSendVector( v )		umsg.Vector( v )		end
+function MODULE:IFSendVectorNormal( v )	umsg.VectorNormal( v )	end
 
 local IFSendNWObjLookupTable = {
-	[IFN_DTYPE_CHAR]	= function(self,v) umsg.Char(v:GetID()-128)					end,
-	[IFN_DTYPE_SHORT]	= function(self,v) umsg.Short(v:GetID()-32768)				end,
-	[IFN_DTYPE_LONG]	= function(self,v) umsg.Long(v:GetID()-2147483648)			end
+	[IFN_DTYPE_CHAR]	= function( self, v ) umsg.Char(	v:GetID() - 128 )				end,
+	[IFN_DTYPE_SHORT]	= function( self, v ) umsg.Short(	v:GetID() - 32768 )				end,
+	[IFN_DTYPE_LONG]	= function( self, v ) umsg.Long(	v:GetID() - 2147483648 )			end
 };
 
-MODULE.IFSendNWObj=IFSendNWObjLookupTable[MODULE.NWIDType];
+MODULE.IFSendNWObj = IFSendNWObjLookupTable[MODULE.NWIDType];
 
 function MODULE:IFSendEnd() umsg.End() end
 
@@ -227,51 +230,51 @@ function MODULE:IFReadVector()			return nil				end
 function MODULE:IFReadVectorNormal()	return nil				end
 
 local IFReadNWIDLookupTable = {
-	[IFN_DTYPE_CHAR]	= function(self,msg)	return 0+128		end,
-	[IFN_DTYPE_SHORT]	= function(self,msg)	return 0+32768		end,
-	[IFN_DTYPE_LONG]	= function(self,msg)	return 0+2147483648	end
+	[IFN_DTYPE_CHAR]	= function( self, msg )	return 0 + 128			end,
+	[IFN_DTYPE_SHORT]	= function( self, msg )	return 0 + 32768		end,
+	[IFN_DTYPE_LONG]	= function( self, msg )	return 0 + 2147483648	end
 };
 
-MODULE.IFReadNWID=IFReadNWIDLookupTable[MODULE.NWIDType];
-function MODULE:IFReadNWObj()			return self:Get(self:IFReadNWID())		end
+MODULE.IFReadNWID = IFReadNWIDLookupTable[MODULE.NWIDType];
+function MODULE:IFReadNWObj()			return self:Get( self:IFReadNWID() )		end
 
 --[[
 * SERVER
 
 Sends a message out with the given args on the given player(s)
 ]]--
-function MODULE:ServerOut(eMsg,pl,...)
-	local f=ServerOutHandlers[eMsg];
-	if pl==nil then
-		for k,v in pairs(player.GetAll()) do
-			f(self,v,...);
+function MODULE:ServerOut( eMsg, pl, ... )
+	local f = ServerOutHandlers[eMsg];
+	if pl == nil then
+		for k, v in pairs( player.GetAll() ) do
+			f( self, v, ... );
 		end
 	else
-		f(self,pl,...);
+		f( self, pl, ... );
 	end
 end
 
 --[[
 * SERVER
 
-Handles incoming "if" (Itemforge) messages from client
+Handles incoming "if" (Itemforge) messages from the client
 ]]--
-function MODULE:ServerIn(pl,command,args)
-	if !pl || !pl:IsValid() || !pl:IsPlayer() then ErrorNoHalt("Itemforge Network: Couldn't handle incoming message from client - Player given doesn't exist or wasn't player!\n"); return false end
-	if !args[1] then ErrorNoHalt("Itemforge Network: Couldn't handle incoming message from client "..tostring(pl).." - message type wasn't received.\n"); return false end
+function MODULE:ServerIn( pl, command, args )
+	if !pl || !pl:IsValid() || !pl:IsPlayer()	then ErrorNoHalt( "Itemforge Network: Couldn't handle incoming message from client - Player given doesn't exist or wasn't player!\n" );		return false end
+	if !args[1]									then ErrorNoHalt( "Itemforge Network: Couldn't handle incoming message from client "..tostring(pl).." - message type wasn't received.\n" ); return false end
 	
-	local eMsg=tonumber(args[1]);
-	local f=ServerInHandlers[eMsg];
+	local eMsg = tonumber( args[1] );
+	local f = ServerInHandlers[eMsg];
 	if f then
-		f(self,pl,args);
+		f( self, pl, args );
 		return true;
 	else
-		ErrorNoHalt("Itemforge Network: Unhandled IF message \""..msgType.."\"\n");
+		ErrorNoHalt( "Itemforge Network: Unhandled IF message \""..msgType.."\"\n" );
 		return false;
 	end
 end
 
-concommand.Add("if",function(pl,command,args) return IF.Items:ServerIn(pl,command,args) end);
+concommand.Add( "if", function( pl, command, args ) return IF.Items:ServerIn( pl, command, args ) end );
 
 
 
@@ -281,103 +284,103 @@ else
 
 
 
-local ClientOutHandlers={
+local ClientOutHandlers = {
 };
 
-local ClientInHandlers={
-	[IFN_MSG_FILESENDSTART]=function(self,msg)
-		self:IFReadNWID(msg);
-		IF.Util:FileSendStart(self:IFReadString(msg),self:IFReadLong(msg));
+local ClientInHandlers = {
+	[IFN_MSG_FILESENDSTART] = function( self, msg )
+		self:IFReadNWID( msg );
+		IF.Util:FileSendStart( self:IFReadString( msg ), self:IFReadLong( msg ) );
 	end,
-	[IFN_MSG_FILESEND]=function(self,msg)
-		self:IFReadNWID(msg);
-		IF.Util:FileSendTick(self:IFReadString(msg));
+	[IFN_MSG_FILESEND] = function( self, msg )
+		self:IFReadNWID( msg );
+		IF.Util:FileSendTick( self:IFReadString( msg ) );
 	end,
-	[IFN_MSG_FILESENDEND]=function(self,msg)
-		self:IFReadNWID(msg);
+	[IFN_MSG_FILESENDEND] = function( self, msg )
+		self:IFReadNWID( msg );
 		IF.Util:FileSendEnd();
 	end,
 };
 
 --Client send functions
 local IFSendStartLookupTable = {
-	[IFN_DTYPE_CHAR]	= function(self,eMsg,id) end,
-	[IFN_DTYPE_SHORT]	= function(self,eMsg,id) end,
-	[IFN_DTYPE_LONG]	= function(self,eMsg,id) end
+	[IFN_DTYPE_CHAR]	= function( self, eMsg, id ) end,
+	[IFN_DTYPE_SHORT]	= function( self, eMsg, id ) end,
+	[IFN_DTYPE_LONG]	= function( self, eMsg, id ) end
 };
 
 MODULE.IFSendStart = IFSendStartLookupTable[MODULE.NWIDType];
 
-function MODULE:IFSendAngle(v) end
-function MODULE:IFSendBool(v) end
-function MODULE:IFSendChar(v) end
-function MODULE:IFSendEntity(v) end
-function MODULE:IFSendFloat(v) end
-function MODULE:IFSendLong(v) end
-function MODULE:IFSendShort(v) end
-function MODULE:IFSendString(v) end
-function MODULE:IFSendVector(v) end
-function MODULE:IFSendVectorNormal(v) end
+function MODULE:IFSendAngle( v )		end
+function MODULE:IFSendBool( v )			end
+function MODULE:IFSendChar( v )			end
+function MODULE:IFSendEntity( v )		end
+function MODULE:IFSendFloat( v )		end
+function MODULE:IFSendLong( v )			end
+function MODULE:IFSendShort( v )		end
+function MODULE:IFSendString( v )		end
+function MODULE:IFSendVector( v )		end
+function MODULE:IFSendVectorNormal( v )	end
 
 local IFSendNWObjLookupTable = {
-	[IFN_DTYPE_CHAR]	= function(self,v) end,
-	[IFN_DTYPE_SHORT]	= function(self,v) end,
-	[IFN_DTYPE_LONG]	= function(self,v) end
+	[IFN_DTYPE_CHAR]	= function( self, v ) end,
+	[IFN_DTYPE_SHORT]	= function( self, v ) end,
+	[IFN_DTYPE_LONG]	= function( self, v ) end
 };
 
-MODULE.IFSendNWObj=IFSendNWObjLookupTable[MODULE.NWIDType];
+MODULE.IFSendNWObj = IFSendNWObjLookupTable[MODULE.NWIDType];
 
 function MODULE:IFSendEnd() end
 
 --Client receive functions
-function MODULE:IFReadAngle(msg)		return msg:ReadAngle()				end
-function MODULE:IFReadBool(msg)			return msg:ReadBool()				end
-function MODULE:IFReadChar(msg)			return msg:ReadChar()				end
-function MODULE:IFReadEntity(msg)		return msg:ReadEntity()				end
-function MODULE:IFReadFloat(msg)		return msg:ReadFloat()				end
-function MODULE:IFReadLong(msg)			return msg:ReadLong()				end
-function MODULE:IFReadShort(msg)		return msg:ReadShort()				end
-function MODULE:IFReadString(msg)		return msg:ReadString()				end
-function MODULE:IFReadVector(msg)		return msg:ReadVector()				end
-function MODULE:IFReadVectorNormal(msg) return msg:ReadVectorNormal()		end
+function MODULE:IFReadAngle( msg )			return msg:ReadAngle()				end
+function MODULE:IFReadBool( msg )			return msg:ReadBool()				end
+function MODULE:IFReadChar( msg )			return msg:ReadChar()				end
+function MODULE:IFReadEntity( msg )			return msg:ReadEntity()				end
+function MODULE:IFReadFloat( msg )			return msg:ReadFloat()				end
+function MODULE:IFReadLong( msg )			return msg:ReadLong()				end
+function MODULE:IFReadShort( msg )			return msg:ReadShort()				end
+function MODULE:IFReadString( msg )			return msg:ReadString()				end
+function MODULE:IFReadVector( msg )			return msg:ReadVector()				end
+function MODULE:IFReadVectorNormal( msg )	return msg:ReadVectorNormal()		end
 
 local IFReadNWIDLookupTable = {
-	[IFN_DTYPE_CHAR]	= function(self,msg)	return msg:ReadChar()+128			end,
-	[IFN_DTYPE_SHORT]	= function(self,msg)	return msg:ReadShort()+32768		end,
-	[IFN_DTYPE_LONG]	= function(self,msg)	return msg:ReadLong()+2147483648	end,
+	[IFN_DTYPE_CHAR]	= function( self, msg )	return msg:ReadChar()  + 128		end,
+	[IFN_DTYPE_SHORT]	= function( self, msg )	return msg:ReadShort() + 32768		end,
+	[IFN_DTYPE_LONG]	= function( self, msg )	return msg:ReadLong()  + 2147483648	end,
 };
 
-MODULE.IFReadNWID=IFReadNWIDLookupTable[MODULE.NWIDType];
-function MODULE:IFReadNWObj(msg)		return self:Get(self:IFReadNWID(msg));		end
+MODULE.IFReadNWID = IFReadNWIDLookupTable[MODULE.NWIDType];
+function MODULE:IFReadNWObj( msg )			return self:Get( self:IFReadNWID( msg ) );		end
 
 --[[
 * CLIENT
 
 Sends a message out with the given args
 ]]--
-function MODULE:ClientOut(eMsg,...)
-	ClientOutHandlers[eMsg](self,...);
+function MODULE:ClientOut( eMsg, ... )
+	ClientOutHandlers[eMsg]( self, ... );
 end
 
 --[[
 * CLIENT
 
-Handles incoming "if" messages from server
+Handles incoming "if" (Itemforge) messages from the server
 ]]--
-function MODULE:ClientIn(msg)
-	local eMsg=self:IFReadChar(msg);
+function MODULE:ClientIn( msg )
+	local eMsg = self:IFReadChar( msg );
 	
-	local f=ClientInHandlers[eMsg];
+	local f = ClientInHandlers[eMsg];
 	if f then
-		f(self,msg);
+		f( self, msg );
 		return true;
 	else
-		ErrorNoHalt("Itemforge Network: Unhandled IF message \""..eMsgType.."\"\n");
+		ErrorNoHalt( "Itemforge Network: Unhandled IF message \""..eMsgType.."\"\n" );
 		return false;
 	end
 end
 
-usermessage.Hook("if",function(msg) return IF.Network:ClientIn(msg) end);
+usermessage.Hook( "if", function( msg ) return IF.Network:ClientIn( msg ) end );
 
 
 
@@ -392,7 +395,7 @@ end
 
 
 
-_NWBASE._ProtectedKeys={};
+_NWBASE._ProtectedKeys		= {};
 
 --[[
 * SHARED
@@ -400,7 +403,7 @@ _NWBASE._ProtectedKeys={};
 
 The Base Networked class is based off of the Base class.
 ]]--
-_NWBASE.Base="base";
+_NWBASE.Base				= "base";
 
 --[[
 * SHARED
@@ -409,7 +412,7 @@ _NWBASE.Base="base";
 This table lists the names of networked vars on _this type of_ networked object.
 This table is sorted by each networked var's ID.
 ]]--
-_NWBASE._NWVars=nil;
+_NWBASE._NWVars				= nil;
 
 --[[
 * SHARED
@@ -419,7 +422,7 @@ _NWBASE._NWVars=nil;
 This is an ID number used to identify what object a network update is intended for.
 ID numbers range from 0 to n. n is the max size of the integer datatype used (see MODULE.NWIDType at top of file)
 ]]--
-_NWBASE._NWID=0;
+_NWBASE._NWID				= 0;
 
 --[[
 * SHARED
@@ -437,7 +440,28 @@ Clientside:
 	we update the networked vars with the values from this table.
 	Following that, this table is cleared.
 ]]--
-_NWBASE._NWVar=nil;
+_NWBASE._NWVar				= nil;
+
+if CLIENT then
+
+
+
+
+--[[
+* CLIENT
+* Different for each object
+
+One or more objects can "observe" a networked object (such as a panel that displays information about this networked object).
+Whenever the networked object updates itself, the observing object's Update() function will be called.
+
+This table keeps track of the objects observing this networked object.
+]]--
+_NWBASE.Observers			= nil;
+
+
+
+
+end
 
 --[[
 * SHARED
@@ -448,7 +472,7 @@ This function returns the Network ID of this object.
 function _NWBASE:GetID()
 	return self._NWID;
 end
---_NWBASE._ProtectedKeys["GetID"]=true;
+--_NWBASE._ProtectedKeys["GetID"] = true;
 
 --[[
 * SHARED
@@ -461,7 +485,7 @@ function _NWBASE:Tick()
 	else
 	end
 end
---_NWBASE._ProtectedKeys["Tick"]=true;
+--_NWBASE._ProtectedKeys["Tick"] = true;
 
 --[[
 * SHARED
@@ -472,6 +496,9 @@ When tostring() is used on this object, this function returns a string describin
 function _NWBASE:ToString()
 	return "Networked Object ["..self.ClassName.."]";
 end
+
+
+
 
 if SERVER then
 
@@ -502,7 +529,7 @@ Any time a player becomes a network client, an update of the object will be sent
 If a player is no longer a network client, updates will stop being sent to him.
 No message to remove the object from that client is sent until the object is removed from the server.
 ]]--
-_NWBASE._NWClient=IF_PVS;
+_NWBASE._NWClient = IF_PVS;
 
 --[[
 SERVER
@@ -511,7 +538,7 @@ Object
 A table of players that saw this object last frame.
 This table is indexed by Player ID.
 ]]--
-_NWBASE._PVS=nil;
+_NWBASE._PVS = nil;
 
 --[[
 * SERVER
@@ -522,10 +549,10 @@ Override this function in classes that inherit from this.
 
 Returns true if the given player can see this object, and false otherwise.
 ]]--
-function _NWBASE:DoesPlayerSee(pl)
+function _NWBASE:DoesPlayerSee( pl )
 	return false;
 end
-_NWBASE._ProtectedKeys["DoesPlayerSee"]=true;
+_NWBASE._ProtectedKeys["DoesPlayerSee"] = true;
 
 --[[
 * SERVER
@@ -538,11 +565,142 @@ But it's main purpose is this:
 If a networked value was set to something different, then the object is marked as "changed",
 and an update will be sent to the approprite clients next tick.
 ]]--
-function _NWBASE:OnNewIndex(k,v)
+function _NWBASE:OnNewIndex( k, v )
 	--TODO detect changed keys
 	return true;
 end
-_NWBASE._ProtectedKeys["OnNewIndex"]=true;
+_NWBASE._ProtectedKeys["OnNewIndex"] = true;
+
+
+
+
+else
+
+
+
+
+--[[
+* CLIENT
+
+If an observer that is observering this object should be updated because of
+a change in this object, call this function.
+
+TODO:
+I could probably improve this by having this function require an indication of what was changed,
+and then only informing observers that care about that kind of change.
+]]--
+function _NWBASE:Update()
+	if self.Observers == nil then return end
+
+	for k, v in pairs( self.Observers ) do
+		if k:IsValid() then
+			local s, r = pcall( k.Update, k, self );
+			if !s then return self:Error( "Updating registered observer "..tostring( k ).." failed: "..r ); end
+		else
+			self.Observers[k] = nil;
+		end
+	end
+end
+
+--[[
+* CLIENT
+
+Registers an observer with this networked object.
+
+Some objects, such as panels that display details about items or inventories, must update themselves whenever the item / inventory they're displaying is updated.
+In other words, these objects must "observe" changes in the item / inventory they're displaying.
+
+The way this is implemented in Itemforge, observer objects register themselves with the networked object they're observing,
+and the networked object sends updates to them (like a mailing list).
+
+This will add the given observer object to this networked object's list of observers.
+Whenever the network object :Update()s itself, the observers will be alerted.
+
+vObserver should be an observer object that wants to observe this inventory.
+	This is usually a panel, but can be any object, so long as it has the appropriate events.
+	Observer objects need the following functions:
+		obj:IsValid()				- Must return true if the object hasn't been deleted
+		obj:OnRegister( nwobj )		- Called when the observer is registered on nwobj. Return true to allow registration, false to stop registration.
+		obj:OnUnregister( nwobj )	- Called when the observer is unregistered from nwobj.
+		obj:Update( nwobj )			- Called when the observer receives an update from nwobj.
+
+true is returned if the observer was connected successfully or was already connected.
+false is returned if the observer was not connected for any reason.
+]]--
+function _NWBASE:RegisterObserver( vObserver )
+	if !IsValid( vObserver )							then return self:Error( "Couldn't register observer. A valid object was not given.\n" ) end
+	local fn = vObserver.OnRegister;
+	if !IF.Util:IsFunction( fn )						then return self:Error( "Couldn't register observer "..tostring( vObserver )..". It does not have an \"OnRegister\" function." ) end
+	if !IF.Util:IsFunction( vObserver.OnUnregister )	then return self:Error( "Couldn't register observer "..tostring( vObserver )..". It does not have an \"OnUnregister\" function." ) end
+	if !IF.Util:IsFunction( vObserver.Update )			then return self:Error( "Couldn't register observer "..tostring( vObserver )..". It does not have an \"Update\" function." ) end
+
+	--Make sure we're not registering an already registered observer.
+	--Otherwise, lets make the observers table if it hasn't been made yet.
+	if self.Observers != nil then	if self.Observers[vObserver] then return true end
+	else							self.Observers = {};
+	end
+	
+	--The network object confirms the registration with the observer here
+	local s, r = pcall( fn, vObserver, self );
+	if		!s		then return self:Error( "Error calling \"OnRegister\" on "..tostring( vObserver )..": "..r );
+	elseif	!r		then return false;
+	end
+	
+	--Insert this observer into our collection of observers
+	self.Observers[vObserver] = true;
+end
+
+--[[
+* CLIENT
+
+Unregisters an observer that is observing this networked object.
+When the network object updates, it won't inform this particular observer of the changes any more.
+
+vObserver should be a (once) registered observer.
+	This function will run the observer's OnUnregister function, passing this networked object.
+
+Returns true if pnlObserver was a registered panel in this inventory, and was successfully unregistered.
+Otherwise, returns false.
+]]--
+function _NWBASE:UnregisterObserver( vObserver )
+	if !IsValid( vObserver ) then return self:Error( "Couldn't unregister observer - a valid observer was not given.\n" ) end
+
+	--Lets make sure this observer is still registered.
+	if !self.Observers || !self.Observers[vObserver] then return false end
+	
+	--Since we found it, we'll remove this observer from our collection
+	self.Observers[vObserver] = nil;
+	
+	--Tell it that the networked object unregistered it
+	local s, r = pcall( vObserver.OnUnregister, vObserver, self );
+	if !s then self:Error( "Error calling \"OnUnregister\" on "..tostring( vObserver )..": "..r ); end
+
+	return true;
+end
+
+--[[
+* CLIENT
+
+Unregisters all observers (most likely the networked object was removed)
+]]--
+function _NWBASE:UnregisterAllObservers()
+	if !self.Observers then return false end
+
+	for k, v in pairs( self.Observers ) do
+
+		--Tell each observer that the network object unregistered it
+		if k:IsValid() then
+			local s, r = pcall( k.OnUnregister, k, self );
+			if !s then self:Error( "Error calling \"OnUnregister\" on "..tostring( k )..": "..r ); end
+		end
+	end
+	
+	--Set to nil to indicate we have no observers
+	self.Observers = nil;
+	
+	return true;
+end
+
 
 
 

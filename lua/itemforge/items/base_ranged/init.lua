@@ -1,6 +1,6 @@
 --[[
 base_ranged
-SHARED
+SERVER
 
 base_ranged is a base. That means that other items borrow code from this so they can be created easier.
 Any item that inherits from this has everything this item has, and can override anything this item has.
@@ -26,127 +26,41 @@ Some features the base_ranged has:
 		Wiremod can fire the gun's primary/secondary attack. It can also reload the gun, if there is ammo nearby.
 		You can set whether or not you want the gun's primary/secondary to work underwater
 ]]--
-AddCSLuaFile("shared.lua");
-AddCSLuaFile("cl_init.lua");
-AddCSLuaFile("findammo.lua");
 
-include("shared.lua");
+AddCSLuaFile( "shared.lua" );
+AddCSLuaFile( "cl_init.lua" );
+AddCSLuaFile( "clips.lua" );
+AddCSLuaFile( "ammo.lua" );
+AddCSLuaFile( "findammo.lua" );
 
-ITEM.PrimaryFiring=false;
-ITEM.SecondaryFiring=false;
+include( "shared.lua" );
+include( "wire.lua" );
 
---Unloads the ammo in the given clip. Sends the ammo to the same location as the weapon.
-function ITEM:Unload(clip)
-	local ammo=self:GetAmmo(clip);
-	if !ammo then return false end
-	
-	if !ammo:ToSameLocationAs(self) || !ammo:IsValid() then return false end
-	
-	ammo:SetMaxAmount(ammo.OldMaxAmount);
-	ammo.OldMaxAmount=nil;
-	
-	self.Clip[clip]=nil;
-	self:UpdateWireAmmoCount();
-	self:SendNWCommand("Unload",nil,clip);
-	
-	return true;
-end
+ITEM.PrimaryFiring		= false;
+ITEM.SecondaryFiring	= false;
+ITEM.WasTryingToReload	= false;
+ITEM.TryingToReload		= false;
+
+
+
 
 --[[
-This function runs serverside after a player chooses "reload" from the menu.
-]]--
-function ITEM:PlayerReload(pl)
-	if !self:Event("CanPlayerInteract",false,pl) then return false end
-	return self:OnSWEPReload();
-end
+* SERVER
+* Event
 
---[[
-This function runs serverside after a player drag-drops some ammo to this gun clientside.
-Returns true if the ammo was loaded somewhere, false otherwise.
+When the gun gets removed, also remove any loaded ammo
 ]]--
-function ITEM:PlayerLoadAmmo(pl,item)
-	if !self:Event("CanPlayerInteract",false,pl) || !item:Event("CanPlayerInteract",false,pl) then return false end
-	return self:Load(item);
-end
-
---[[
-This function runs serverside after a player chooses "Unload" from the item's right click menu clientside.
-Returns true if the ammo was unloaded, false otherwise.
-]]--
-function ITEM:PlayerUnloadAmmo(pl,clip)
-	if !self:Event("CanPlayerInteract",false,pl) then return false end
-	return self:Unload(clip);
-end
-
---When the gun gets removed, also remove any loaded ammo
 function ITEM:OnRemove()
-	for i=1,table.getn(self.Clips) do
-		local ammo=self:GetAmmo(i);
-		if ammo then ammo:Remove(); end
+	for i = 1, #self.Clips do
+		local itemCurAmmo = self:GetAmmoSource( i );
+		if itemCurAmmo then itemCurAmmo:Remove(); end
 	end
 end
 
---Auto-attack if Wiremod has told us to
-function ITEM:OnThink()
-	if self.PrimaryFiring==true			&& self:CanPrimaryAttackAuto()		then
-		self:Event("OnSWEPPrimaryAttack");
-	elseif self.SecondaryFiring==true	&& self:CanSecondaryAttackAuto()	then
-		self:Event("OnSWEPSecondaryAttack");
-	elseif self:GetNWBool("InReload")==true									then
-		self:Event("Reload");
-	end
-end
-
---If the gun was firing on it's own it won't be any more; this only works while the item is in the world
-function ITEM:OnExitWorld(forced)
-	self.PrimaryFiring=false;
-	self.SecondaryFiring=false;
-end
-
---Tells Wiremod that our gun can do these things
-function ITEM:GetWireInputs(entity)
-	return Wire_CreateInputs(entity,{"Fire Primary","Fire Secondary","Reload"});
-end
-
---Tells Wiremod that our gun can report how much ammo is in it's clip(s)
-function ITEM:GetWireOutputs(entity)
-	local t={};
-	for i=1,table.getn(self.Clips) do
-		table.insert(t,"Clip "..i);
-	end
-	return Wire_CreateOutputs(entity,t);
-end
-
---This function handles the wiremod requests to fire/reload the gun
---TODO auto reloading
-function ITEM:OnWireInput(entity,inputName,value)
-	if inputName=="Fire Primary" then
-		if value==0 then	self.PrimaryFiring=false;
-		else				self.PrimaryFiring=true;
-		end
-	elseif inputName=="Fire Secondary" then
-		if value==0 then	self.SecondaryFiring=false;
-		else				self.SecondaryFiring=true;
-		end
-	elseif inputName=="Reload" && value!=0 then
-		self:OnSWEPReload();
-	end
-end
-
---Triggers the ammo-in-clip wire outputs; updates them with the correct ammo counts
-function ITEM:UpdateWireAmmoCount()
-	for i=1,table.getn(self.Clips) do
-		local ammo=self:GetAmmo(i);
-		if ammo then	self:WireOutput("Clip "..i,ammo:GetAmount());
-		else			self:WireOutput("Clip "..i,0);
-		end
-	end
-end
-
-IF.Items:CreateNWCommand(ITEM,"SetClip",nil,{"item","int"});
-IF.Items:CreateNWCommand(ITEM,"Unload",nil,{"int"});
-IF.Items:CreateNWCommand(ITEM,"PlayerFirePrimary",	function(self,...) self:Event("OnSWEPPrimaryAttack")	end,{});
-IF.Items:CreateNWCommand(ITEM,"PlayerFireSecondary",function(self,...) self:Event("OnSWEPSecondaryAttack")	end,{});
-IF.Items:CreateNWCommand(ITEM,"PlayerReload",		function(self,...) self:PlayerReload(...)				end,{});
-IF.Items:CreateNWCommand(ITEM,"PlayerLoadAmmo",		function(self,...) self:PlayerLoadAmmo(...)				end,{"item"});
-IF.Items:CreateNWCommand(ITEM,"PlayerUnloadAmmo",	function(self,...) self:PlayerUnloadAmmo(...)			end,{"int"});
+IF.Items:CreateNWCommand( ITEM, "SetAmmoSource",		nil,															 { "int", "item" }	);
+IF.Items:CreateNWCommand( ITEM, "Unload",				nil,															 { "int" }			);
+IF.Items:CreateNWCommand( ITEM, "PlayerFirePrimary",	function( self, ... ) self:Event( "OnSWEPPrimaryAttack" )	end, {}					);
+IF.Items:CreateNWCommand( ITEM, "PlayerFireSecondary",	function( self, ... ) self:Event( "OnSWEPSecondaryAttack" )	end, {}					);
+IF.Items:CreateNWCommand( ITEM, "PlayerReload",			function( self, ... ) self:PlayerReload( ... )				end, {}					);
+IF.Items:CreateNWCommand( ITEM, "PlayerLoadAmmo",		function( self, ... ) self:PlayerLoadAmmo( ... )			end, { "int", "item" }	);
+IF.Items:CreateNWCommand( ITEM, "PlayerUnloadAmmo",		function( self, ... ) self:PlayerUnloadAmmo( ... )			end, { "int" }			);

@@ -7,27 +7,35 @@ They're invisible weights the ropes are attached to that allow the rope ends to 
 
 Using a rope end lets you pick up the rope.
 ]]--
-ENT.Type 			= "anim";
-ENT.Base 			= "base_anim";
 
-ENT.PrintName		= "Loose Rope";
-ENT.Author			= "theJ89";
-ENT.Contact			= "theJ89@charter.net";
-ENT.Purpose			= "This entity allows rope ends to dangle loosely after they have been cut.";
-ENT.Instructions	= "These will be spawned by the game automatically after a rope is cut.";
+if CLIENT then language.Add( "rope_end", "Loose Rope" ) end
+
+ENT.Type 				= "anim";
+ENT.Base 				= "base_anim";
+
+ENT.PrintName			= "Loose Rope";
+ENT.Author				= "theJ89";
+ENT.Contact				= "theJ89@charter.net";
+ENT.Purpose				= "This entity allows rope ends to dangle loosely after they have been cut.";
+ENT.Instructions		= "These will be spawned by the game automatically after a rope is cut.";
 
 ENT.Spawnable			= false;
 ENT.AdminSpawnable		= false;
 
 if SERVER then
 
-ENT.AssociatedRope	= nil;
 
-else
 
-language.Add("rope_end","Loose Rope");
+
+ENT.AssociatedRope		= nil;
+ENT.ItemtypeToGive		= "item_rope";
+
+
+
 
 end
+local vBoxMins = Vector( -2, -2, -2 );
+local vBoxMaxs = Vector(  2,  2,  2 );
 
 if SERVER then
 
@@ -38,16 +46,16 @@ if SERVER then
 Initializes the rope-end as a basic 4x4x4 cube
 ]]--
 function ENT:Initialize()
-	self.Entity:SetModel("models/props_junk/cardboard_box004a.mdl");
-	self.Entity:PhysicsInitBox(Vector(-2,-2,-2),Vector(2,2,2));
-	self.Entity:SetCollisionGroup(COLLISION_GROUP_WEAPON);
-	self.Entity:DrawShadow(false);
+	self.Entity:SetModel( "models/props_junk/cardboard_box004a.mdl" );
+	self.Entity:PhysicsInitBox( vBoxMins, vBoxMaxs );
+	self.Entity:SetCollisionGroup( COLLISION_GROUP_WEAPON );
+	self.Entity:DrawShadow( false );
 	
-	if SERVER then self.Entity:SetUseType(SIMPLE_USE); end
+	if SERVER then self.Entity:SetUseType( SIMPLE_USE ) end
 	
 	local phys = self.Entity:GetPhysicsObject();
-	if (phys:IsValid()) then
-		phys:SetMass(3);
+	if ( phys:IsValid() ) then
+		phys:SetMass( 3 );
 		phys:Wake();
 	end
 end
@@ -59,12 +67,12 @@ end
 Sets the rope (phys_lengthconstraint) that the rope-end is attached to.
 If that phys_lengthconstraint gets removed then the rope end gets removed too.
 ]]--
-function ENT:SetAssociatedRope(r)
+function ENT:SetAssociatedRope( eLCRope )
 	--If we're swapping to a different rope then we no longer want to be deleted automatically by the old rope
-	if IsValid(self.AssociatedRope) then self.AssociatedRope:DontDeleteOnRemove(self.Entity) end
+	if IsValid( self.AssociatedRope ) then self.AssociatedRope:DontDeleteOnRemove( self ) end
 	
-	self.AssociatedRope = r;
-	r:DeleteOnRemove(self.Entity);
+	self.AssociatedRope = eLCRope;
+	eLCRope:DeleteOnRemove( self );
 end
 
 --[[
@@ -75,8 +83,7 @@ Returns the rope end's associated rope or clears it if it's no longer valid
 ]]--
 function ENT:GetAssociatedRope()
 	if self.AssociatedRope && !self.AssociatedRope:IsValid() then
-		self.AssociatedRope=nil;
-		return nil;
+		self.AssociatedRope = nil;
 	end
 	return self.AssociatedRope;
 end
@@ -87,8 +94,8 @@ end
 
 When this takes damage it gets knocked around like a normal physical object
 ]]--
-function ENT:OnTakeDamage(dmg)
-	self.Entity:TakePhysicsDamage(dmg);
+function ENT:OnTakeDamage( dmg )
+	self:TakePhysicsDamage( dmg );
 end
 
 --[[
@@ -97,28 +104,32 @@ end
 
 When the rope ends are used, we try to pick up the rope as an item
 ]]--
-function ENT:Use(activator,caller)
+function ENT:Use( eActivator, eCaller )
 	--Have to be used by a player
-	if !activator:IsPlayer() then return false end
+	if !eActivator:IsPlayer() then return false end
 
 	--Have to have a rope
-	local rope=self:GetAssociatedRope();
-	if !rope then return false end
+	local eRope = self:GetAssociatedRope();
+	if !eRope then return false end
 	
 	--Has to be a loose rope
-	if !IsValid(rope.Ent1) || !IsValid(rope.Ent2) || rope.Ent1:GetClass() != "rope_end" || rope.Ent2:GetClass() != "rope_end" then return false end	
+	if !IsValid( eRope.Ent1 ) || !IsValid( eRope.Ent2 ) || eRope.Ent1:GetClass() != "rope_end" || eRope.Ent2:GetClass() != "rope_end" then return false end	
 	
 	--Create and initialize a rope item
-	local item = IF.Items:CreateHeld("item_rope",activator);
+	local item = IF.Items:CreateHeld( self.ItemtypeToGive, eActivator );
 	if !item then return false end
-	item:SetRopeProperties(rope.length, rope.width, rope.material, rope.forcelimit, rope.rigid);
+	item:SetRopeProperties( eRope.length, eRope.width, eRope.material, eRope.forcelimit, eRope.rigid );
 	
 	--Remove the rope (which removes the rope ends as well)
-	rope:Remove();
+	eRope:Remove();
 end
 
 
+
+
 else
+
+
 
 
 --[[
@@ -128,8 +139,9 @@ else
 Don't draw anything
 ]]--
 function ENT:Draw()
-	return true;
 end
+
+
 
 
 end
